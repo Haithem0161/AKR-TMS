@@ -1,0 +1,18 @@
+Screen: "Network view", a graph of accounts linked to an investigation. Active rail row: Cases.
+
+TOP BAR: title "Network view"; context line "Cluster K-0193 · linked by transfers, shared phone numbers, addresses and family records"; avatar initials "ZK", role label "Analyst".
+
+TWO COLUMNS.
+
+LEFT, about 70 percent width: one large white card containing a node-and-link graph on a very faint dotted grid.
+- In the centre, nine customer-account nodes arranged in a loose ring: white circles with a 2 px #B3261E outline and a small person icon, labelled "Acct 1" to "Acct 9". The ring sits inside a rounded highlight area tinted very light red (#B3261E at 6 percent) with the label "Possible mule ring" at its top in #B3261E.
+- On the left side, about twenty small grey #5B6474 dots grouped loosely, labelled "Senders (214)", with thin grey lines running from them into the ring accounts.
+- On the right side, two larger rounded-square nodes filled #0F2147 with white text "Exchange company A" and "Exchange company B"; thick #1E4FA0 lines with arrowheads run from the ring accounts into these two nodes.
+- Inside the ring, a few dashed #1F8A8A lines join pairs of accounts, with tiny labels on the lines: "same phone", "same address", "same family record".
+- A legend at the bottom left of the card: solid line "Transfer", dashed teal line "Shared phone, address or family record", circle "Customer account", square "Money transfer company".
+- Zoom controls "+", "-" and "Fit" at the top right of the card.
+
+RIGHT, about 30 percent width, three cards stacked:
+1. Card "Cluster summary", label and value rows: "Accounts: 9", "Customers: 6", "Senders: 214", "Money in, 60 days: IQD 1.84 billion", "Sent on to exchange companies: 96%", "Opened in the last 3 months: 7 of 9".
+2. Card "Links found": three rows with small teal link icons: "4 accounts share one mobile number", "3 customers share an address in Hay Al-Jihad, Baghdad", "2 customers are on the same family record".
+3. Card "Next steps": a solid #1E4FA0 full-width button "Open one case for the cluster", an outline full-width button "Add graph to evidence", and a small #5B6474 line "A snapshot of the graph is kept with the case".

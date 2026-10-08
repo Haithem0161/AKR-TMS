@@ -1,0 +1,32 @@
+Screen-accurate interface design of a desktop web application. NOT a poster, NOT a photograph, NOT a device mockup, NOT a browser window. A flat, straight-on UI screenshot filling the whole canvas. Light theme. English text, left-to-right. It must look like the same product as the attached reference screenshot (the AKR-TMS command centre): same navigation rail, top bar, colours, card style and typography.
+
+Product: AKR-TMS, an anti-money-laundering and KYC monitoring system for Iraqi banks. All names and figures are fictional demo data.
+
+NAVIGATION RAIL (identical to the reference): a left rail about 125 px wide, solid #0F2147, full height. At the very top, a 52 px rounded square in a slightly lighter navy #1A2E5C, left completely EMPTY (the logo is added later: draw nothing inside it). Below it, nine rows, each a thin pale grey-blue line icon with its label to the right in 12 px: Command centre, Alerts, Cases, Customers, Screening, Scenarios, Reports, Data, Governance. The active row has a slightly lighter background and a 3 px gold #C8A24B bar on its left edge.
+
+TOP BAR, about 64 px tall, on the clay background: the page title on the left in 26 px bold #18202F, a muted context line beside it in 15 px #5B6474; on the right a search field with placeholder "Search customers, accounts, cases", a bell icon, and a circular #1E4FA0 avatar with white initials and a role label beside it.
+
+MAIN AREA background #F5F0E6 (warm clay off-white). Cards: white #FFFFFF, 1 px border #DDD6C9, 8 px corner radius, no shadow, 16-20 px padding, about 16 px gaps between cards.
+Screen: "Regulatory reporting", a suspicious transaction report (STR) being prepared for the Iraqi financial intelligence unit's goAML system. Active rail row: Reports.
+
+TOP BAR: title "STR R-2026-0331"; context line "Case C-2026-04817 · Demo Mobile Trading Co. · to AML/CFT Office via goAML"; avatar initials "MA", role label "MLRO".
+
+CARD 1, full width: a horizontal stepper with six numbered steps joined by a thin line: "Reporting entity", "Subjects", "Transactions" (these three done: green #2F7D4F circles with white ticks), "Reason and narrative" (current: filled #1E4FA0 circle, bold label), "Validation", "MLRO sign-off" (both upcoming: grey outline circles).
+
+TWO COLUMNS BELOW.
+
+LEFT, about 62 percent width: card "Reason and narrative".
+- A dropdown field labelled "Reason for suspicion" showing "Unlicensed money transfer activity (hawala)".
+- A field labelled "Indicators" holding three removable chips: "CBI 2.2", "CBI 1.4", "CBI 1.7".
+- A small amber outline label "DRAFT BY ASSISTANT · EDITED BY ANALYST" above a large text editor with a minimal toolbar (bold, italic, list). The editor contains this narrative in 13 px: "Between 6 September and 5 October 2026 the account of Demo Mobile Trading Co. received IQD 402.6 million in 213 transfers from 47 individuals and IQD 209.8 million in cash at six branches. Within 24 hours, 92% of the money was transferred to four exchange companies. The declared monthly turnover is IQD 40 million. The customer said the money was payment for phones but provided no invoices."
+- Under the editor, small #5B6474 text: "Subjects: 3 · Transactions linked: 14 · Attachments: 3".
+
+RIGHT, about 38 percent width, two cards and buttons:
+1. Card "Validation": five rows with icons: green tick "goAML schema check passed"; green tick "Mandatory fields complete: 46 of 46"; green tick "Transactions match core banking"; amber warning triangle "1 subject missing national ID number" followed by a small #1E4FA0 link "Fix"; green tick "Narrative within length limit".
+2. Card "Timeline": three rows on a thin vertical line: "05 Oct 2026 · Case escalated to MLRO", "06 Oct 2026 · STR drafted", and in red #B3261E "File without delay after MLRO sign-off".
+3. Under the cards: a full-width solid #1E4FA0 button "Send to MLRO for sign-off" and below it a full-width outline button "Download goAML XML".
+TYPOGRAPHY: a clean humanist sans-serif like IBM Plex Sans throughout; tabular figures for numbers; identifiers such as case numbers in a monospace face; card titles 16 px semibold #18202F; small labels 11-12 px uppercase with slight letter spacing in #5B6474; body text 13-14 px #18202F. All text crisp, legible and correctly spelled English, exactly as written in this description. Do not add any extra text that is not in this description.
+
+COLOURS: use only #0F2147, #1A2E5C, #1E4FA0, #1F8A8A, #C8A24B (active rail marker only), #F5F0E6, #FFFFFF, #18202F, #5B6474, #DDD6C9, #B3261E, #B26A00, #F2A33A, #2F7D4F, plus very light tints of these for chips and pills.
+
+MUST NOT APPEAR: Arabic letters or any non-Latin script, gradients, glows, drop shadows, glassmorphism, 3D effects, perspective tilt, photos, people, emojis, decorative illustrations, lorem ipsum, browser chrome, laptop or monitor frames, watermarks.

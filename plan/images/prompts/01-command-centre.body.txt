@@ -1,0 +1,30 @@
+Screen: "Command centre", the dashboard of the bank's money laundering reporting officer (MLRO). Active rail row: Command centre.
+
+TOP BAR: title "Command centre"; context line "Demo Bank · data as of 06 Oct 2026, 14:32"; avatar initials "MA", role label "MLRO".
+
+ROW 1: five equal KPI cards. Each card: a small uppercase label in #5B6474, a large value (40 px bold #18202F), and a one-line caption:
+- DATA COVERAGE: "100%"; caption "All 14 CBS tables reconciled today" with a small green #2F7D4F check icon.
+- LIST FRESHNESS: "38 min"; caption "UN · Iraq national list · OFAC · EU · UK".
+- OPEN ALERTS: "1,284"; caption "212 older than 30 days" with a small amber #B26A00 warning icon.
+- STRS FILED, 30 DAYS: "27"; caption "goAML · 2 awaiting MLRO sign-off".
+- OVERDUE KYC REVIEWS: "96"; caption "High risk: 11" in red #B3261E with a small red icon.
+
+ROW 2: two cards.
+- Left card, about 62 percent width, titled "Alert backlog by age": a horizontal stacked bar chart with exactly five bars. Each bar has four segments with the count printed inside each segment and the bar total printed just right of the bar. Segment colours: "0-7 days" #1E4FA0, "8-30 days" #1F8A8A, "31-60 days" #F2A33A, "60+ days" #B3261E. Bar lengths must be proportional to the totals. Use EXACTLY these numbers:
+  Cash: 160, 150, 40, 12, total 362
+  Transfers: 140, 170, 45, 20, total 375
+  Trade finance: 40, 50, 18, 9, total 117
+  Screening: 150, 120, 22, 8, total 300
+  Staff accounts: 50, 42, 30, 8, total 130
+  A small legend with the four age buckets under the chart.
+- Right card, about 38 percent width, titled "Regulatory deadlines": five rows, each a label on the left and a rounded date chip on the right:
+  "CTR batch to AML/CFT Office" with red chip "Today 23:59"
+  "Correspondent RFI (USD clearing)" with amber chip "2 days"
+  "CBI monthly branch report" with blue chip "10 Oct"
+  "Periodic review: 11 high-risk customers" with red chip "Overdue"
+  "Annual screening system test" with grey chip "18 days"
+
+ROW 3: three cards.
+- "Customer risk distribution": a donut chart with three segments, High 6% in #B3261E, Medium 21% in #F2A33A, Low 73% in #2F7D4F; in the donut centre "486,200" with "customers" under it; beside the donut a legend table with exactly these rows: "High | 6% | 29,172", "Medium | 21% | 102,102", "Low | 73% | 354,926".
+- "Top scenarios this month": a compact table with columns SCENARIO, ALERTS, PRODUCTIVE. Rows exactly: "Transfers from unrelated parties | 214 | 11%", "Structuring below threshold | 166 | 14%", "Dormant account reactivated | 88 | 9%", "Cash at several branches | 69 | 8%".
+- "Correspondent evidence pack": the line "Last generated: 01 Oct 2026", then four checklist rows each with a green #2F7D4F tick: "Screening test results", "Scenario coverage matrix", "Tuning log approved", "Backlog and timeliness"; at the bottom a full-width solid #1E4FA0 button with white text "Generate pack".

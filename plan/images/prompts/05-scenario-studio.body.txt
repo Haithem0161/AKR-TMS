@@ -1,0 +1,25 @@
+Screen: "Scenario studio", where the compliance team tunes a monitoring scenario, tests it on past data and sends the change for approval. Active rail row: Scenarios (spelled exactly "Scenarios").
+
+TOP BAR: title "Scenario studio"; context line "CBI 1.4 · Cash deposits at several branches · version 4 (proposed)"; avatar initials "MA", role label "MLRO".
+
+THREE COLUMNS.
+
+LEFT COLUMN, about 30 percent width: card "Parameters". At the top three segment tabs: "Individuals" (selected, #1E4FA0 underline), "Small businesses", "Companies". Then form rows, each a label above a value field. Where a value changes, the old value is shown in grey with a strikethrough followed by an arrow and the new value in bold:
+   "Look-back period" : "7 days"
+   "Branches used, at least" : old "3" new "4"
+   "Total cash deposited, at least" : old "IQD 25,000,000" new "IQD 30,000,000"
+   "Each deposit below" : "IQD 13,000,000 (cash reporting threshold)"
+   "Exclude" : "Licensed cash-in-transit companies"
+   At the bottom a small grey box: "Data used: cash deposits, branch, customer segment. Source: core banking (read-only)."
+
+CENTRE COLUMN, about 40 percent width, two cards:
+1. Card "What this scenario does", with a small #5B6474 label "Written automatically from the parameters". Body in 15 px: "Raises an alert when an individual deposits cash at four or more branches within 7 days, each deposit below the IQD 13 million reporting threshold, and the total reaches IQD 30 million or more."
+2. Card "Test on the last 6 months": a grouped bar chart of alerts per month from Apr to Sep, version 3 bars in #5B6474 and version 4 bars in #1E4FA0, with the value printed above each bar and a y-axis from 0 to 100. Use EXACTLY these values: Apr 62 and 45, May 75 and 54, Jun 81 and 59, Jul 70 and 51, Aug 66 and 47, Sep 58 and 42 (version 3 first, version 4 second). Under the chart a comparison table with columns blank, "VERSION 3 (LIVE)", "VERSION 4 (PROPOSED)". Rows exactly:
+   "Alerts | 412 | 298"
+   "Led to STR or EDD | 31 | 30"
+   "Productive rate | 7.5% | 10.1%"
+   "Below-the-line sample | n/a | 1 missed of 200 reviewed"
+
+RIGHT COLUMN, about 30 percent width, two cards:
+1. Card "Change request CR-2026-118" with an amber pill "Awaiting approval" at its top right. Label and value rows: "Proposed by: Tuning team, 01 Oct 2026", "Reason: Too many alerts on normal multi-branch use", "Second-line review: Passed, 03 Oct 2026", "Approver: MLRO". Three buttons stacked full width: solid #1E4FA0 "Approve", outline "Request changes", outline with red #B3261E text "Reject".
+2. Card "Version history": four rows with small dots on a vertical line: "v4 · proposed · 01 Oct 2026", "v3 · live since 15 Mar 2026 · approved by MLRO", "v2 · 10 Jan 2026", "v1 · CBI default · 08 Jan 2025".

@@ -1,0 +1,19 @@
+Screen: "Screening review", where an analyst decides whether a customer is the same person as an entry on a sanctions list. Active rail row: Screening.
+
+TOP BAR: title "Screening alert S-2026-11902"; context line "Raised by list update · Iraq national list · 06 Oct 2026, 08:00"; avatar initials "ZK", role label "Analyst".
+
+CARD 1, full width, the comparison header. It is split into two equal halves by a thin vertical divider; centred on the divider sits a circular badge with an amber #B26A00 ring showing the number "91" in large bold text and the small label "match score" under it.
+- Left half, small uppercase title "CUSTOMER · FROM CORE BANKING". Under the title, a white input-like box 60 px tall and the full width of the half, with a thin #DDD6C9 border and the tiny label "Name in Arabic script" above it. The box is EMPTY (text is added later). Under the box, the name "Mustafa Hassan Kadhim Al-Tamimi" in 20 px semibold. Then a two-column grid of label and value pairs in 13 px (labels #5B6474): "Customer ID: 100482231", "Date of birth: 14 Mar 1981", "Nationality: Iraq", "National ID: •••• 4417", "Branch: Basra, Al-Ashar", "Customer since: 2016".
+- Right half, small uppercase title "LIST ENTRY · IRAQ NATIONAL LIST". The same EMPTY box with the tiny label "Name in Arabic script". Under it, the name "Mustapha Hasan Kadhum Al-Timimi" in 20 px semibold. Then pairs: "Reference: IQ-DEMO-0042", "Date of birth: 1979", "Nationality: Iraq", "Listed: 12 Aug 2026", "Basis: Terrorist financing", "List version: 06 Oct 2026, 08:00".
+
+CARD 2, full width, titled "How the names compare": a table with columns NAME PART, CUSTOMER, LIST ENTRY, RESULT, WEIGHT. Rows exactly:
+   "Given name | Mustafa | Mustapha | Same name, spelling variant | High"
+   "Father's name | Hassan | Hasan | Same name, spelling variant | High"
+   "Grandfather's name | Kadhim | Kadhum | Same name, spelling variant | High"
+   "Tribe or family name | Al-Tamimi | Al-Timimi | Same name, very common | Low"
+   "Date of birth | 14 Mar 1981 | 1979 | Differs by 2 years | Medium"
+   In the RESULT column a small coloured dot before the text: green #2F7D4F for the first three rows, amber #F2A33A for the last two. Under the table one line in #5B6474: "Compared in the original Arabic and in transliteration. Very common tribal names count for less."
+
+BOTTOM ROW, two cards:
+- Left card, about 64 percent width, "Decision": three option tiles side by side: "Possible match: escalate" (selected: light amber fill, #B26A00 border), "True match: freeze and report" (white, #B3261E border), "Not the same person" (white, #2F7D4F border). A text area labelled "Reason (required)" containing the typed text "All four name parts match; birth year differs. Escalating to MLRO for a national ID check." A ticked checkbox: "Remember this decision for this pair; re-check if either record changes". A small #5B6474 note: "A true match creates a freeze task for operations, then checks the core banking data to confirm it."
+- Right card, about 36 percent width, "Screening history": three rows: "06 Oct 08:41 · Alert raised by list update", "06 Oct 08:00 · Iraq national list updated, 3 new entries", "02 Sep 2026 · Cleared against all lists".

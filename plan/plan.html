@@ -1,0 +1,1264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AKR-TMS: a plan for Iraqi banks</title>
+<link rel="stylesheet" href="assets/plan.css">
+</head>
+<body>
+<!-- AKR-TMS plan: source text for the PDF. Converted with python-markdown (tables, attr_list, md_in_html) and printed
+     with Chromium. Sections marked TODO are written after the remaining research lands. -->
+
+<section class="cover">
+<div class="bricks"></div>
+<div class="inner">
+<div class="lockup"><img src="assets/logo-symbol.svg" alt=""><div><div class="word"><b>AKR</b><span>-TMS</span></div><div class="ar">نظام مراقبة المعاملات ومخاطر العملاء</div></div></div>
+<div class="rule"></div>
+<h1>An AML and KYC system <em>designed for Iraqi banks</em></h1>
+<div class="sub">A plan for transaction monitoring, sanctions screening and customer risk that meets the Central Bank of Iraq's rules, gives foreign correspondents the evidence they ask for, and never touches the core banking system.</div>
+<div class="hero"><img src="images/final/01-command-centre.png" alt="AKR-TMS command centre"></div>
+<div class="meta"><span>For bank leadership and compliance heads</span><span>October 2026</span></div>
+</div>
+</section>
+
+<h2 id="summary">1. Summary</h2>
+<div class="stats4">
+<div class="stat"><div class="n">19 June 2026</div><div class="l">Iraq returns to the FATF grey list, with an eight-point action plan</div></div>
+<div class="stat"><div class="n">32 banks</div><div class="l">on the CBI's February 2026 lists: 28 barred from dollar dealings, 4 blacklisted</div></div>
+<div class="stat"><div class="n">About 6</div><div class="l">suspicious transaction reports per bank per year (2024)</div></div>
+<div class="stat"><div class="n">86+</div><div class="l">CBI scenarios every bank must run as a minimum (2025 controls)</div></div>
+</div>
+
+<p class="lead">Iraqi banks must now prove their anti-money laundering controls to people outside the bank: the Central
+Bank of Iraq, the FATF's reviewers and, above all, the foreign correspondent banks that decide whether an Iraqi bank
+can move dollars at all. Having a monitoring system is no longer enough. The system has to find what matters in Iraqi
+data, and show that it did.</p>
+
+<p><span class="nw">AKR-TMS</span> is an anti-money laundering (AML) and know-your-customer (KYC) system designed for Iraqi banks. It monitors
+transactions, screens customers and payments against sanctions lists, rates customer risk and runs KYC reviews,
+supports investigations, prepares reports for the AML/CFT Office&rsquo;s goAML system, and keeps the evidence of every step. It
+reads the bank&rsquo;s core banking database through a read-only connection and never changes it.</p>
+<p>What makes it different:</p>
+<ul>
+<li><strong>Made for Iraq.</strong> The CBI&rsquo;s full scenario catalogue, Iraq&rsquo;s national list and Arabic name matching come built in,
+  not as add-ons to a Western product.</li>
+<li><strong>Read-only, and complete.</strong> No writes to the core banking system, and a daily reconciliation that proves every
+  record was seen.</li>
+<li><strong>Evidence by default.</strong> Packs for the CBI, correspondents, validators and the board come from live data in
+  minutes.</li>
+<li><strong>Explainable, with people in charge.</strong> Rules, models and the AI assistant each have their own controls; a named
+  person makes every decision.</li>
+<li><strong>One product for every Iraqi bank.</strong> Conventional and Islamic, private and state-owned, with regime packs for the
+  foreign rules each bank&rsquo;s correspondents apply.</li>
+</ul>
+<p>The plan runs in phases: six to eight weeks of discovery and data mapping, a core system live at the first bank in
+about nine months after a parallel run beside its current system, then checks on payments before release and
+validated machine-learning models over the following six months. Further banks follow in three to five months each.</p>
+<h2 id="why-now">2. Why now: the position Iraqi banks are in</h2>
+<h3>Back on the grey list</h3>
+<p>On 19 June 2026 the Financial Action Task Force (FATF) put Iraq back on its list of jurisdictions under increased
+monitoring, the &ldquo;grey list&rdquo; that Iraq left in 2018. Iraq&rsquo;s action plan has eight items. Four of them land directly on
+the monitoring systems of Iraqi banks:</p>
+<ul>
+<li>more suspicious transaction reports, and better ones;</li>
+<li>detecting informal money transfer (hawala) activity that runs through bank accounts;</li>
+<li>stronger oversight of who really owns and controls companies;</li>
+<li>stopping the evasion of sanctions on weapons proliferation.</li>
+</ul>
+<h3>Dollar access now depends on each bank&rsquo;s own controls</h3>
+<p>Iraq&rsquo;s oil revenue is held at the Federal Reserve Bank of New York, so the United States decides whether Iraqi banks
+can obtain and move dollars. Since 2023 Iraqi banks have been cut off from dollar transactions in waves: 14 banks in
+July 2023, 8 in January 2024 and 5 more reported in February 2025. In 2024 the US Treasury went further and designated
+one Iraqi bank a &ldquo;primary money laundering concern&rdquo;, which closes the US financial system to it entirely. The CBI&rsquo;s
+own lists of February 2026 name 28 banks that may not deal in dollars, directly or indirectly, and 4 that are
+blacklisted.</p>
+<p>The way back now runs through compliance. In July 2026 the CBI announced an understanding with the US Treasury: banks
+that meet its compliance and governance standards and complete the first phase of its reform and re-licensing
+programme return first to correspondent banking in other currencies, and later regain dollar dealings. Seven banks
+qualified for the first step. A bank that wants to be on that path has to show its controls work.</p>
+<p>At the end of 2024 the Central Bank of Iraq (CBI) closed the electronic platform through which it had vetted dollar
+transfers. Since then each bank deals directly with its own foreign correspondent banks, in Jordan, the UAE, Kuwait,
+Europe and the United States. Each correspondent applies its own country&rsquo;s rules to its Iraqi customers, and each can
+end the relationship.</p>
+<div class="timeline">
+<table>
+<thead>
+<tr>
+<th>When</th>
+<th>What happened</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>July 2023</td>
+<td>US bars 14 Iraqi banks from dollar transactions</td>
+</tr>
+<tr>
+<td>January 2024</td>
+<td>8 more banks barred after Iran sanctions concerns</td>
+</tr>
+<tr>
+<td>July 2024</td>
+<td>US Treasury final rule against an Iraqi bank as a &ldquo;primary money laundering concern&rdquo;</td>
+</tr>
+<tr>
+<td>End of 2024</td>
+<td>CBI dollar platform closes; banks must deal with correspondents directly</td>
+</tr>
+<tr>
+<td>January 2025</td>
+<td>CBI issues detailed AML supervisory controls with explicit system requirements</td>
+</tr>
+<tr>
+<td>February 2025</td>
+<td>5 more banks barred, most of them Islamic banks</td>
+</tr>
+<tr>
+<td>September 2025</td>
+<td>UN sanctions on Iran restored; US designates four more Iraqi armed groups as terrorist organisations</td>
+</tr>
+<tr>
+<td>February 2026</td>
+<td>CBI lists 28 banks barred from dollar dealings and 4 blacklisted</td>
+</tr>
+<tr>
+<td>June 2026</td>
+<td>FATF grey-lists Iraq</td>
+</tr>
+<tr>
+<td>July 2026</td>
+<td>CBI and US Treasury agree a way back for banks that pass the CBI&rsquo;s reform programme</td>
+</tr>
+<tr>
+<td>August 2026</td>
+<td>CBI circulars on behavioural indicators and politically exposed persons</td>
+</tr>
+<tr>
+<td>September 2026</td>
+<td>Deadline for each private bank&rsquo;s external AML assessment under the CBI&rsquo;s reform</td>
+</tr>
+<tr>
+<td>July 2027</td>
+<td>New EU anti-money laundering regulation applies to every EU correspondent</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>The bar has been raised at home</h3>
+<p>The CBI&rsquo;s supervisory controls of January 2025 are unusually specific about what an AML system must do. They require
+real-time monitoring of account activity against what the customer declared; the CBI&rsquo;s own catalogue of more than 86
+scenarios as a minimum; artificial intelligence and machine learning to find suspicious activity; holding a transaction
+that matches a scenario until the money laundering reporting officer (MLRO) clears it; screening against the UN,
+Iraqi, US, EU and UK lists, refreshed at least every 12 hours, with search in Arabic and English; a liaison officer in
+every branch with a window into the system; and AML tools verified by a CBI-approved firm. The August 2026 circulars
+added daily news screening of politically exposed persons and their relatives to the second degree.</p>
+<p>The CBI&rsquo;s banking reform, in force since September 2025, makes that verification a test of survival. Every private bank
+that chose to continue had to submit, by 30 September 2026, an assessment of its anti-money laundering controls by an
+independent external auditor approved by the CBI. Gaps must be fixed and the file resubmitted within six months; a bank
+that cannot fix them may be moved to the merger or liquidation path. The auditor tests the system itself: its rule
+logic and alert thresholds, user permissions, the integrity of its audit trail, its links between customer checks,
+monitoring and screening, and whether the data behind each report can be traced.</p>
+<h3>Execution is the gap</h3>
+<p>The 2024 mutual evaluation of Iraq found that most of the rules are in place but that they do not yet work well enough:
+it rated the effectiveness of banks&rsquo; preventive measures &ldquo;moderate&rdquo; and of proliferation sanctions &ldquo;low&rdquo;. Every Iraqi
+bank already runs an automated monitoring system with the CBI&rsquo;s standard scenarios, yet none of the banks interviewed
+had written a single scenario of its own, and large numbers of alerts were archived every day against very few
+reports. Bank reports to the AML/CFT Office rose from 82 in 2022 to 672 in 2023 and 451 in 2024; that is still about
+six reports per bank per year. The quality is there (the Office graded 90 percent of bank reports &ldquo;good&rdquo; in 2022). The
+volume, the coverage and the evidence are not.</p>
+<h3>Correspondents have become a second supervisor</h3>
+<p>Every foreign regime reaches an Iraqi bank through its correspondents:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>What it means for an Iraqi bank</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>United States</strong></td>
+<td>Dollar clearing depends on screening against US sanctions lists, including companies owned 50 percent or more by listed persons, and on coverage of Iran-related and armed-group typologies. Sanctions records must be kept for 10 years</td>
+</tr>
+<tr>
+<td><strong>European Union</strong></td>
+<td>From July 2027 every EU bank applies one regulation that requires a record of every assessment, human involvement in automated decisions, and answers to authorities within days. A new EU authority can single out an individual non-EU bank whose controls fall short; EU banks must then stop new business with it and end existing relationships unless they can show the risk is covered</td>
+</tr>
+<tr>
+<td><strong>United Kingdom</strong></td>
+<td>Iraq counts as a high-risk country. UK banks no longer have to apply enhanced checks to every Iraqi relationship automatically, so the quality of the Iraqi bank&rsquo;s own controls decides how it is treated</td>
+</tr>
+<tr>
+<td><strong>UAE and the Gulf</strong></td>
+<td>UAE banks follow detailed guidance on monitoring and screening (daily re-screening, data testing, documented tuning) and expect the same from their partners. Kuwait and Lebanon are grey-listed too, so their banks pass the pressure on</td>
+</tr>
+</tbody>
+</table>
+<p>The common thread is evidence. A correspondent cannot visit the bank, does not read Arabic, and will not take the bank&rsquo;s
+word for it. It wants to see which lists are screened and how fast they are updated, which scenarios run and how they
+were tested, how many alerts are waiting and for how long, and who approved each change.</p>
+<div class="callout">
+<p><strong>What this means.</strong> An Iraqi bank&rsquo;s AML system is no longer a back-office tool. It decides whether the bank can do
+business in dollars. It has to do three things at once: meet the CBI&rsquo;s explicit requirements; find what matters in
+Iraqi data, which is largely in Arabic; and prove all of it to people outside the bank.</p>
+</div>
+<h2 class="nobreak" id="rules">3. What the rules require, and how they converge</h2>
+<h3>Iraq first</h3>
+<p>Iraqi law and the CBI&rsquo;s instructions always come first. The research behind this plan read the AML/CFT Law No. 39 of
+2015, the CDD instructions of 2023, the CBI supervisory controls of 2025 and the CBI circulars of August 2026 in full.
+Their requirements for an AML system, condensed:</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>What the CBI requires</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Monitoring</td>
+<td>Real-time monitoring of all account activity against declared activity; the full CBI scenario catalogue as a minimum, plus the bank&rsquo;s own scenarios; AI and machine-learning analytics</td>
+</tr>
+<tr>
+<td>Holding transactions</td>
+<td>A transaction matching a scenario is held until the MLRO clears it</td>
+</tr>
+<tr>
+<td>Customer risk</td>
+<td>High, medium and low ratings (up to five levels) on customer, product, channel and geography; re-rating on events; review at least every two years; KYC refresh at least yearly</td>
+</tr>
+<tr>
+<td>Screening</td>
+<td>UN, Iraqi national list, US, EU and UK lists, with <span class="nw">World-Check</span> named as the data source; all parties including beneficial owners; refresh at least every 12 hours; Arabic and English search</td>
+</tr>
+<tr>
+<td>PEPs</td>
+<td>Relatives to the second degree and close associates; daily local and regional news screening; status kept after leaving office</td>
+</tr>
+<tr>
+<td>Wire transfers</td>
+<td>Complete originator and beneficiary data including purpose; incomplete incoming transfers detected and rejected if not fixed</td>
+</tr>
+<tr>
+<td>Branches</td>
+<td>A liaison officer in every branch with a branch window in the AML system; monthly report by the 10th</td>
+</tr>
+<tr>
+<td>Reporting</td>
+<td>STRs through goAML, including attempted transactions and any amount, with reasons; written decisions, also when the MLRO decides not to report</td>
+</tr>
+<tr>
+<td>Records</td>
+<td>At least five years after the relationship ends, and seven years of AML data for the reform&rsquo;s external assessment; transactions can be reconstructed; off-site backup</td>
+</tr>
+<tr>
+<td>Assurance</td>
+<td>AML tooling verified by a CBI-approved firm; three lines of defence; reports to the board and audit committee</td>
+</tr>
+</tbody>
+</table>
+<h3>International standards</h3>
+<p>The FATF&rsquo;s 40 Recommendations (revised to October 2025) set the global baseline: customer due diligence, beneficial
+ownership, politically exposed persons, payment transparency, suspicious transaction reporting and the freezing of
+terrorist and proliferation funds &ldquo;without delay&rdquo;, which the FATF defines as within hours. The UN Security Council&rsquo;s
+consolidated list, including the Iran sanctions restored in September 2025, applies to every Iraqi bank. The Basel
+Committee, the Wolfsberg Group of global banks and the Egmont Group of financial intelligence units add detailed
+guidance on monitoring, screening and reporting that correspondents use as their checklist.</p>
+<h3>Foreign rules converge on one specification</h3>
+<p>US, EU, UK and UAE rules were written separately and years apart, yet they now describe almost the same screening and
+monitoring system: complete and current lists checked against the official source; every party and identifier
+screened, in the original script and in transliteration; ownership and control taken into account; matching tested
+before and after every change; re-screening on every list change; backlogs under control; and every decision recorded
+and explainable. <span class="nw">AKR-TMS</span> is built to the union of these rules, so that one system satisfies the CBI and every
+correspondent at once, and each bank switches on the foreign &ldquo;regime packs&rdquo; that apply to it.</p>
+<div class="callout">
+<p><strong>The research behind this plan</strong> reviewed Iraqi law and CBI instructions, the FATF standards, UN sanctions, the
+Basel, Wolfsberg and Egmont guidance, US, EU, UK and Gulf regimes, more than 50 AML and KYC suppliers, and about 40
+enforcement cases. It produced more than 1,200 specific product requirements, each traced to its source.</p>
+</div>
+<h2 class="nobreak" id="market">4. What the market offers, and where it falls short</h2>
+<p class="lead">More than 50 AML and KYC suppliers were reviewed, from the global suites and the core banking vendors
+to this year's AI start-ups and the regional suppliers already working in Iraq. The best of them do many things well,
+and <span class="nw">AKR-TMS</span> adopts those as its minimum. None documents the whole of what an Iraqi bank needs.</p>
+
+<div class="market">
+<table>
+<thead>
+<tr>
+<th>Kind of supplier</th>
+<th>Examples</th>
+<th>Strong at</th>
+<th>Weak for an Iraqi bank</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Global AML suites</td>
+<td>Oracle, SAS, NICE Actimize, SymphonyAI</td>
+<td>Breadth, rule libraries, case management</td>
+<td>Cost, heavy data loading, gaps in Arabic and goAML</td>
+</tr>
+<tr>
+<td>AI detection specialists</td>
+<td>Quantexa, Hawk, Feedzai, Tookitaki</td>
+<td>Network analysis; models that rank alerts</td>
+<td>Mostly foreign cloud or big-data stacks; no Arabic</td>
+</tr>
+<tr>
+<td>Investigation automation</td>
+<td>Silent Eight, Napier, Lucinity, Unit21, Flagright</td>
+<td>Faster alert review; modern case tools</td>
+<td>Mostly cloud; more autonomy than Iraqi rules allow</td>
+</tr>
+<tr>
+<td>Screening engines and list data</td>
+<td>LexisNexis, Eastnets, FinScan, Swift, LSEG <span class="nw">World-Check</span>, Dow Jones</td>
+<td>Sanctions and PEP lists; payment screening</td>
+<td>Arabic and Iraqi names handled poorly; no data supplier publishes its Iraqi coverage</td>
+</tr>
+<tr>
+<td>KYC and onboarding platforms</td>
+<td>Fenergo, Pega, Moody&rsquo;s, Encompass, Uqudo</td>
+<td>Client lifecycle workflows; identity checks</td>
+<td>Cloud-only, and built to own the customer record with write access; only one documents the Iraqi national card</td>
+</tr>
+<tr>
+<td>AML modules of core banking vendors</td>
+<td>Temenos, Azentio (iMAL), Capital Banking Solutions, Oracle (FLEXCUBE)</td>
+<td>A ready link to their own core system; one contract</td>
+<td>End-of-day feeds; no published Arabic matching or full CBI pack. The core system most Iraqi banks run has no AML module</td>
+</tr>
+<tr>
+<td>Regional suppliers</td>
+<td><span class="nw">Pio-Tech</span> (Jordan), Eastnets (UAE)</td>
+<td>Iraqi or regional customers; goAML and customer-risk modules; Arabic-speaking teams</td>
+<td>No published accuracy or prices; detection depth unclear</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>What Iraqi banks run today.</strong> Every Iraqi bank already runs a monitoring system (section 2), so <span class="nw">AKR-TMS</span> replaces
+or sits beside an existing tool rather than filling a gap. Banks&rsquo; annual reports name their tools, often several per
+bank: FICO Siron for monitoring at two of the largest private banks, Firco for payment screening at two banks, core
+banking vendors&rsquo; AML modules at four banks, and goAML, customer-risk and scenario modules from <span class="nw">Pio-Tech</span>, a Jordanian
+supplier that lists 29 banks in Iraq among its references. None of the largest global suites has an Iraqi customer.
+Auditors at two banks still describe the CBI&rsquo;s minimum as 25 scenarios; the 2025 catalogue numbers 86.</p>
+<h3>What the best systems get right</h3>
+<ul>
+<li><strong>Rules and models together.</strong> Rules cover known patterns and legal duties, models rank the alerts and spot unusual
+  behaviour, and every alert shows its reasons.</li>
+<li><strong>Peer groups and tested thresholds.</strong> Customers are compared with similar customers, thresholds are set per group,
+  and a sample of what falls just below a threshold is reviewed.</li>
+<li><strong>The customer, not the transaction.</strong> Alerts are gathered per customer and per network, so an analyst investigates
+  a person or a group, not a list of payments.</li>
+<li><strong>Changes tested before they go live.</strong> The best products replay every rule change on past data and show the
+  difference before anyone approves it.</li>
+<li><strong>Screening that explains itself.</strong> Scores are broken down field by field, and a decision on a false match is
+  remembered so that nobody reviews the same pair twice.</li>
+<li><strong>Reporting as a workflow.</strong> Draft, approve, file, acknowledge and archive, with validation before submission.</li>
+<li><strong>One product, many banks.</strong> SAS serves 120 Nordic banks through a shared service: one standard product, with a
+  separate layer for each bank&rsquo;s settings.</li>
+</ul>
+<h3>Where they fall short for an Iraqi bank</h3>
+<table>
+<thead>
+<tr>
+<th>What an Iraqi bank needs</th>
+<th>What the market offers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A system in the bank&rsquo;s own data centre</td>
+<td>Most new products, and the newest AI features of the large suites, run only in foreign clouds</td>
+</tr>
+<tr>
+<td>Arabic names matched properly, Iraqi naming included</td>
+<td>Arabic treated as an edge case. Oracle&rsquo;s on-premises name matcher states that Arabic characters &ldquo;will not match&rdquo;; no vendor documents handling of the mother&rsquo;s name, tribe or Kurdish spellings</td>
+</tr>
+<tr>
+<td>The CBI&rsquo;s scenario catalogue</td>
+<td>Global vendors ship their own libraries; the systems in Iraq that carry CBI scenarios do not show which ones, or whether the set is current</td>
+</tr>
+<tr>
+<td>Reports to the AML/CFT Office through goAML</td>
+<td>One global suite documents a goAML module, but not for Iraq; a regional module runs at two Iraqi banks, with no published test results</td>
+</tr>
+<tr>
+<td>Islamic contracts monitored as contracts</td>
+<td>No vendor documents murabaha, ijara, musharaka or mudaraba</td>
+</tr>
+<tr>
+<td>A read-only link with proof of completeness</td>
+<td>Heavy data loading through several staging databases; completeness rarely measured</td>
+</tr>
+<tr>
+<td>Rules that can change quickly</td>
+<td>TD Bank added no new scenario between 2014 and 2022</td>
+</tr>
+<tr>
+<td>A price an Iraqi bank can pay, and local support</td>
+<td>No published prices; global suites meter licences by volume and have no office in Iraq</td>
+</tr>
+<tr>
+<td>Continuity</td>
+<td>NICE Actimize is being sold; FICO and BAE sold their AML products; start-ups are being bought</td>
+</tr>
+</tbody>
+</table>
+<div class="callout">
+<p><strong>Claims and evidence.</strong> Vendors advertise that AI clears 75 to 98 percent of alerts automatically and removes 30 to 99
+percent of false positives. The only figure compiled by a regulator from a bank in production is 7 percent of alerts
+closed automatically, with sampling and the option to reopen (Hong Kong Monetary Authority, 2023). <span class="nw">AKR-TMS</span> promises only
+what it can show on the bank&rsquo;s own data before a contract is signed: a replay of twelve months of the bank&rsquo;s history,
+compared alert by alert with the system the bank already runs.</p>
+</div>
+<h3>A legal check comes first</h3>
+<p>Iraq&rsquo;s 2022 law against normalisation with Israel bans economic dealings with Israeli companies, with severe penalties.
+NICE Actimize, one of the largest AML vendors, and ThetaRay, an AI detection vendor, are headquartered in Israel. Banks
+should take legal advice before considering either. US vendors carry a different risk: their own sanctions policies can
+end licences and support for a bank that becomes subject to US measures. <span class="nw">AKR-TMS</span> applies the same legal check to every
+component and data feed it uses.</p>
+<h3>Where <span class="nw">AKR-TMS</span> fits</h3>
+<p><span class="nw">AKR-TMS</span> is built for the gap: in the bank&rsquo;s own data centre, read-only, Arabic first, with the CBI catalogue, goAML
+reporting and Islamic contracts built in, a published price, and continuity guaranteed by source-code escrow and open
+export of all data. Where a bank already runs a screening engine it trusts, <span class="nw">AKR-TMS</span> imports that engine&rsquo;s alerts and
+adds what is missing, rather than demanding a replacement.</p>
+<h2 class="nobreak" id="lessons">5. Lessons from enforcement</h2>
+<p class="lead">About 40 enforcement actions against banks and payment firms were studied, most of them from the
+regulators' own notices. The cause was seldom a weak algorithm. Banks were fined because the system was not given all
+the data, because alerts were limited to fit the staff, because nobody tested whether it worked, and because the
+records could not be trusted.</p>
+
+<div class="lessons">
+<table>
+<thead>
+<tr>
+<th>What went wrong</th>
+<th>Where it happened</th>
+<th>What <span class="nw">AKR-TMS</span> does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The system did not see all the data</td>
+<td>TD Bank left 92 percent of its transaction volume, over USD 18 trillion, unmonitored (US, 2024). Metro Bank&rsquo;s monitoring, fed from a copy of its core banking data, missed 60 million transactions worth GBP 51 billion (UK, 2024)</td>
+<td>Reconciles what it received against the core banking database every day, table by table, and shows coverage on the front page</td>
+</tr>
+<tr>
+<td>Alerts were limited to fit the staff</td>
+<td>US Bancorp capped alerts to match its staffing; ING&rsquo;s system stopped monitoring some categories after three alerts a day; by 2015 HSBC UK&rsquo;s rules suppressed two-thirds of its alerts</td>
+<td>No caps and no hidden filters. Workload is managed in the queue; a threshold changes only with tested evidence and approval from outside operations</td>
+</tr>
+<tr>
+<td>Nobody tested whether it worked</td>
+<td>Starling screened customers against 39 of 3,088 listed names for six years (UK, 2024)</td>
+<td>Daily tests with known answers on every list and scenario; a scenario that goes silent raises an alarm</td>
+</tr>
+<tr>
+<td>Data the bank held was never used</td>
+<td>Standard Chartered held fax numbers and IP addresses pointing to Iran; Swedbank Latvia saw IP addresses in Crimea</td>
+<td>Addresses, phone prefixes and login locations feed screening and customer risk</td>
+</tr>
+<tr>
+<td>Exemption lists switched controls off</td>
+<td>Habib Bank&rsquo;s &ldquo;good guy&rdquo; list let at least USD 250 million through unscreened; Rabobank&rsquo;s &ldquo;verified&rdquo; customers, exempt from review, grew from fewer than 10 in 2009 to over 1,000 by 2012</td>
+<td>Exemptions are approved by two people, expire, and are re-tested whenever a list changes</td>
+</tr>
+<tr>
+<td>Declared activity was never checked</td>
+<td>NatWest onboarded a jewellery business expected to handle no cash and never compared that with the cash it deposited</td>
+<td>Expected activity from KYC is compared with actual activity in every customer review and scenario</td>
+</tr>
+<tr>
+<td>Records were edited or withheld</td>
+<td>Metro Bank (edited minutes), US Bancorp (altered presentations), Swedbank (narrowed answers to its New York regulator; USD 50 million, July 2026)</td>
+<td>Logs, parameter changes and board packs are generated by the system with full history, and cannot be altered</td>
+</tr>
+<tr>
+<td>Backlogs grew with the business</td>
+<td>Coinbase&rsquo;s unreviewed alerts passed 100,000 by the end of 2021 after rapid growth</td>
+<td>Queue clocks, ageing alarms and volume forecasts on the command centre</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="callout">
+<p><strong>Closest to home.</strong> On 1 September 2026 the US Treasury proposed cutting the UAE branches of Egypt&rsquo;s state-owned
+Banque Misr off from US correspondent banking. Its case rests on flows alone: 103 potential Iranian front companies that
+moved about USD 1.8 billion through the branches, set against their size. A bank can compute the same ratios from its
+own data. <span class="nw">AKR-TMS</span> gives each bank this view of itself before its correspondents compute it.</p>
+</div>
+<h2 class="nobreak" id="principles">6. Design principles</h2>
+<p class="lead">Ten principles follow from the rules, from what existing systems do well and badly, and from the cases in
+which banks were fined. Each one shapes something a user can see in the product.</p>
+
+<div class="principles">
+<ol>
+<li><strong>Iraq first.</strong> Built around Iraqi law, the CBI&rsquo;s scenario catalogue, Iraqi lists, Arabic names and dinar amounts.
+   Foreign rules are added on top as regime packs, never the other way round.</li>
+<li><strong>Read-only, and provably so.</strong> <span class="nw">AKR-TMS</span> never writes to the core banking system and never calls its application.
+   The bank&rsquo;s own database permissions guarantee it; the bank&rsquo;s own audit log proves it.</li>
+<li><strong>Complete, and able to show it.</strong> Every day <span class="nw">AKR-TMS</span> reconciles what it received against the core banking system,
+   table by table, counts and totals. A scenario that cannot run because data are missing is reported, never skipped
+   in silence.</li>
+<li><strong>Arabic is the original.</strong> Names are matched in Arabic script and in every common transliteration. The interface
+   is designed right to left first, with Hijri and Gregorian dates and both styles of digits.</li>
+<li><strong>No black boxes.</strong> Every alert shows its reasons, every risk score its factors, every rule a plain-language
+   description generated from its settings.</li>
+<li><strong>People decide.</strong> The system finds, ranks, links and drafts. A named person decides, and a second person confirms
+   the decisions that matter.</li>
+<li><strong>Every decision is recorded,</strong> including the decision not to report, with its reasons. Records are kept as long
+   as the strictest applicable rule requires, and cannot be altered.</li>
+<li><strong>Evidence is a product.</strong> The packs that the CBI, correspondents, validators and the board ask for come from live
+   data in minutes, not from weeks of manual assembly.</li>
+<li><strong>Change is governed.</strong> Rules and models change only through testing, approval and versioning, and every change
+   can be rolled back.</li>
+<li><strong>Proportionate.</strong> Effort follows risk. Low-risk customers are not buried in checks, and the system does not
+    demand what no rule requires.</li>
+</ol>
+</div>
+<h2 id="modules">7. The system, module by module</h2>
+<p class="lead"><span class="nw">AKR-TMS</span> has six working modules on a shared foundation of governance, evidence and audit. All of them
+work from one picture of each customer, built from the core banking data, so an analyst never has to reconcile what
+the screening system, the monitoring system and the KYC file each say about the same person.</p>
+
+<div class="sysmap">
+<div class="col">
+<div class="h">Data in, read-only</div>
+<div class="box">Core banking database<span>customers, accounts, transactions</span></div>
+<div class="box">Payment records<span>SWIFT, RTGS, ACH, cards</span></div>
+<div class="box">Sanctions and PEP lists<span>UN, Iraq, OFAC, EU, UK</span></div>
+<div class="box">News and adverse media<span>local and regional sources</span></div>
+</div>
+<div class="arrow"></div>
+<div class="col core">
+<div class="h"><span class="nw">AKR-TMS</span></div>
+<div class="box m">Command centre</div>
+<div class="box m">Customer risk and KYC</div>
+<div class="box m">Screening</div>
+<div class="box m">Transaction monitoring</div>
+<div class="box m">Investigation and cases</div>
+<div class="box m">Reporting through goAML</div>
+<div class="box base">Governance, evidence vault and audit trail</div>
+</div>
+<div class="arrow"></div>
+<div class="col">
+<div class="h">People and outputs</div>
+<div class="box">MLRO, analysts and branch liaison officers<span>one queue, one case per customer</span></div>
+<div class="box">Operations team<span>freeze, hold and KYC tasks</span></div>
+<div class="box">AML/CFT Office<span>STRs and CTRs through goAML</span></div>
+<div class="box">CBI, correspondents, auditors, board<span>evidence packs from live data</span></div>
+</div>
+</div>
+
+<h3>Command centre</h3>
+<p>The command centre is the MLRO&rsquo;s daily view, and the first screen a supervisor or a correspondent is shown. It answers
+five questions at a glance: is the data complete, are the lists current, how large and how old is the backlog, what is
+due to whom, and how is customer risk spread across the bank.</p>
+<ul>
+<li>Data coverage and list freshness sit at the top, because every other number depends on them.</li>
+<li>The backlog is shown by queue and by age, with service levels per alert type and a surge mode for the day a large
+  list update lands.</li>
+<li>Every deadline is in one place: CTR batches, the branch liaison officers&rsquo; monthly reports, correspondent requests,
+  periodic reviews and annual tests.</li>
+<li>Each branch liaison officer gets a branch window, as the CBI requires, limited to that branch&rsquo;s customers and tasks.</li>
+</ul>
+<figure>
+<img src="images/final/01-command-centre.png" alt="AKR-TMS command centre">
+<figcaption><b>Figure 1. Command centre.</b> Coverage, list freshness, backlog age, deadlines and risk distribution on
+one screen; the correspondent evidence pack is generated from the same live data. All names and figures in the
+mockups are fictional.</figcaption>
+</figure>
+
+<h3>Customer risk and KYC</h3>
+<p>Customer risk is calculated, not typed in. <span class="nw">AKR-TMS</span> rates every customer on the four risk elements the CBI prescribes
+(customer, product and service, delivery channel, geography) on up to five levels, and re-rates on events instead of
+waiting for the next review: a list match, a sharp change in activity, an adverse news item, a new owner.</p>
+<ul>
+<li>Each score shows the factors behind it, so the rating can be explained to an auditor, a correspondent or the
+  customer&rsquo;s relationship manager.</li>
+<li>Reviews are scheduled by risk and by the CBI&rsquo;s minimum intervals; overdue reviews escalate automatically.</li>
+<li>Enhanced due diligence is a checklist with the evidence attached: source of funds, beneficial owners, senior
+  management approval, site visit.</li>
+<li>Ownership is drawn as a tree, with owners at 20 percent or more (the Iraqi threshold) highlighted.</li>
+<li>Documents go into an evidence vault that locks them for the retention period.</li>
+<li>Onboarding stays in the core banking system. <span class="nw">AKR-TMS</span> reads what was captured there and flags what is missing, such
+  as an occupation, the purpose of an account or a company&rsquo;s owners.</li>
+</ul>
+<figure>
+<img src="images/final/04-customer-risk.png" alt="Customer risk profile">
+<figcaption><b>Figure 2. Customer risk profile.</b> A score of 72 broken down into its factors, with the enhanced due
+diligence checklist, the ownership tree and the locked evidence beside it.</figcaption>
+</figure>
+
+<h3>Screening</h3>
+<p>Screening is where Iraqi banks are most exposed, and where imported systems are weakest. Most names on an Iraqi bank&rsquo;s
+books are Arabic, and so are many names on the lists that matter most to it. The same name can be written in Latin
+letters a dozen ways (Mustafa, Moustafa, Mustapha), and a full Iraqi name chains a person&rsquo;s own name with the
+father&rsquo;s, the grandfather&rsquo;s and often a family or tribal name.</p>
+<ul>
+<li>Names are compared in Arabic script and in transliteration, name part by name part. Very common tribal names and
+  titles such as Sayyid, Sheikh and Hajji count for less. Kurdish names are covered too. The mother&rsquo;s name, which
+  Iraq&rsquo;s national list records for almost every entry, helps confirm or rule out a match; no engine on the market
+  documents using it.</li>
+<li>The lists are the UN, Iraq&rsquo;s national list, OFAC (including companies owned 50 percent or more by listed persons),
+  the EU and the UK. Each is checked against the official source on every load and refreshed well inside the CBI&rsquo;s
+  12-hour limit. Commercial data, including <span class="nw">World-Check</span>, which the CBI&rsquo;s controls name, connects through the bank&rsquo;s
+  own licence.</li>
+<li>Every customer, beneficial owner, counterparty and payment party is re-screened whenever a list changes, not only
+  at onboarding.</li>
+<li>When an analyst clears a match as the wrong person, the decision is remembered for that pair of records and
+  reopened automatically if either record changes.</li>
+<li>A true match creates freeze and report tasks with their legal deadlines, such as the first report to Iraq&rsquo;s
+  freezing committee within 48 hours. <span class="nw">AKR-TMS</span> then confirms from the core banking data that the freeze is in place,
+  and flags any money that leaves a frozen account afterwards, fees included. In September 2026 the UK sanctions
+  authority fined a global bank&rsquo;s London branch partly for fees taken from frozen accounts.</li>
+<li>A built-in test harness measures matching quality before and after every change, as US, EU, UK and UAE rules now
+  expect.</li>
+</ul>
+<figure>
+<img src="images/final/03-screening.png" alt="Screening match review">
+<figcaption><b>Figure 3. Screening review.</b> The customer and the list entry are compared in Arabic script and in
+transliteration, name part by name part. The analyst escalates this potential match with a recorded reason; a pair is
+remembered only when it is cleared as the wrong person.</figcaption>
+</figure>
+
+<h3>Transaction monitoring and the scenario studio</h3>
+<p><span class="nw">AKR-TMS</span> ships with the CBI&rsquo;s full scenario catalogue: 86 numbered scenarios plus the product indicators, each mapped
+to the data it needs and to the CBI article it implements. Its library holds 161 scenarios in 18 families. Beyond
+the catalogue they cover the risks named in Iraq&rsquo;s action plan and by foreign authorities (hawala through bank
+accounts, sanctions evasion, front companies, trade-based laundering, misuse of dollar access), Islamic products, and
+public funds and payroll: corruption is the threat Iraq&rsquo;s national risk assessment ranks first, yet the CBI catalogue
+has no scenario for it. As the CBI&rsquo;s controls require, a bank adds such scenarios in coordination with the AML/CFT
+Office.</p>
+<ul>
+<li>Each scenario shows whether the bank&rsquo;s data can support it. Only about a quarter of the CBI&rsquo;s 173 scenarios and
+  indicators can run on the core system&rsquo;s account, transaction and customer data alone; the rest need other modules
+  such as cards or trade finance, payment messages, outside sources, or what branch staff observe at the counter,
+  recorded through the branch window in <span class="nw">AKR-TMS</span>.</li>
+<li>Scenarios run per customer segment with their own thresholds, so a supermarket chain is not judged like a student.</li>
+<li>In the scenario studio the compliance team changes a threshold, reads a plain-language description of what the
+  scenario will now do, and tests the change on months of past data before anyone approves it. The test includes a
+  review of a sample of cases that would no longer alert.</li>
+<li>Every change goes through a change request with a second-line review and the MLRO&rsquo;s approval, and every version is
+  kept.</li>
+<li>Alerts about the same customer are grouped into one case, so analysts investigate customers, not alerts.</li>
+<li>Monitoring runs continuously on data that are minutes old. Holding a payment before it leaves needs the optional
+  phase-2 connection described in section 8.</li>
+</ul>
+<figure>
+<img src="images/final/05-scenario-studio.png" alt="Scenario studio">
+<figcaption><b>Figure 4. Scenario studio.</b> A proposed change to CBI scenario 1.4 tested on six months of data:
+alerts fall from 412 to 298, and those that led to a report or enhanced due diligence from 31 to 30. The reason is
+recorded as risk-based, not workload, and the change now waits for the MLRO's approval.</figcaption>
+</figure>
+
+<h3>Investigation and network analysis</h3>
+<p>An analyst opens a case, not a pile of alerts. The case shows why it was raised, how money moved in and out against
+what the customer declared, who the counterparties are, and what earlier alerts and reviews found.</p>
+<ul>
+<li>An AI assistant drafts a summary from the case data, labelled as a draft and linked to the transactions it relies
+  on. The analyst edits it and decides.</li>
+<li>The network view links accounts through transfers, shared phone numbers, shared addresses and family records. That
+  is how mule rings and hawala networks give themselves away.</li>
+<li>Closures and escalations follow a four-eyes rule, and every action is time-stamped in the case log.</li>
+<li>Requests for information to branches are tracked against deadlines, without alerting the customer.</li>
+</ul>
+<figure>
+<img src="images/final/02-investigation.png" alt="Case workspace">
+<figcaption><b>Figure 5. Case workspace.</b> Three alerts on one customer grouped into one case: reasons, money in and
+out against declared turnover, counterparties, a draft summary awaiting review, and the four-eyes decision.</figcaption>
+</figure>
+
+<figure>
+<img src="images/final/06-network.png" alt="Network view">
+<figcaption><b>Figure 6. Network view.</b> Nine accounts linked by transfers, a shared phone number, a shared address
+and a family record, all forwarding money to two exchange companies: one case for the whole cluster.</figcaption>
+</figure>
+
+<h3>Reporting to the AML/CFT Office</h3>
+<p>Reports go to the AML/CFT Office through goAML, the reporting system the Iraqi financial intelligence unit uses.
+<span class="nw">AKR-TMS</span> builds each report from its case: subjects, accounts and transactions are filled from the core banking data,
+the narrative is drafted for the analyst to edit, and the report is checked against the goAML schema the Office
+publishes, including Iraqi rules such as the mother&rsquo;s name of each person reported, before the MLRO signs it. A named
+officer uploads the approved file and <span class="nw">AKR-TMS</span> records the Office&rsquo;s reference; it never holds a goAML password.</p>
+<ul>
+<li>STRs cover attempted as well as completed transactions, with indicators linked to the CBI scenarios.</li>
+<li>Unusual transaction reports, which the Office introduced in 2026 for activity that is unusual but not yet
+  suspicious, are a third outcome besides an STR and no report. The customer is then watched more closely, and the
+  case can still become an STR.</li>
+<li>Each draft is checked against the criteria the Office uses to grade every report it receives; it returns poor
+  reports to the bank.</li>
+<li>CTRs and the other periodic reports are produced on schedule.</li>
+<li>The MLRO&rsquo;s written decision is recorded either way, including a decision not to report.</li>
+<li>Follow-up requests from the AML/CFT Office are tracked against the original report.</li>
+</ul>
+<figure>
+<img src="images/final/07-goaml-report.png" alt="goAML report builder">
+<figcaption><b>Figure 7. Report builder.</b> An STR assembled from the case, validated against goAML's rules and
+waiting for the MLRO's sign-off. The narrative was drafted by the assistant and edited by the analyst.</figcaption>
+</figure>
+
+<h3>Governance and evidence packs</h3>
+<p>Everything that changes how <span class="nw">AKR-TMS</span> decides (a threshold, a scenario, a list source, a model) has an owner, a
+version, test results and an approval. The same records feed four evidence packs, one per audience:</p>
+<table>
+<thead>
+<tr>
+<th>Audience</th>
+<th>What its pack shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CBI and AML/CFT Office</td>
+<td>Coverage of the CBI catalogue, list freshness, backlog and timeliness, reports filed, branch liaison reports</td>
+</tr>
+<tr>
+<td>Correspondent banks</td>
+<td>Lists screened and update times, screening test results, scenario coverage, tuning log, backlog age, answers to their due diligence questionnaires</td>
+</tr>
+<tr>
+<td>Independent validator, CBI-approved firm</td>
+<td>Inventory of rules and models, test results, change history, data reconciliation, model documentation</td>
+</tr>
+<tr>
+<td>Board and audit committee</td>
+<td>Risk distribution and trends, overdue items, key changes and approvals, the annual certification</td>
+</tr>
+</tbody>
+</table>
+<h2 id="connection">8. How it connects to the bank</h2>
+<p class="lead"><span class="nw">AKR-TMS</span> reads the core banking database and nothing else. It never writes to it and never calls the
+core banking application or its interfaces. That one rule makes <span class="nw">AKR-TMS</span> easy for a bank's IT and security teams to
+approve, and independent of which core banking system the bank runs.</p>
+
+<div class="conn">
+<svg viewBox="0 0 760 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="How AKR-TMS connects to the bank">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F2147"/></marker>
+<marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1E4FA0"/></marker>
+</defs>
+<text x="295" y="22" text-anchor="middle" class="lbl">Data flows one way: read-only</text>
+<rect x="10" y="40" width="160" height="70" rx="8" class="bx"/>
+<text x="90" y="70" text-anchor="middle" class="t">Core banking system</text>
+<text x="90" y="90" text-anchor="middle" class="s">the bank's database</text>
+<rect x="215" y="40" width="160" height="70" rx="8" class="bx clay"/>
+<text x="295" y="70" text-anchor="middle" class="t">Read-only replica</text>
+<text x="295" y="90" text-anchor="middle" class="s">or bank-owned views</text>
+<rect x="420" y="30" width="170" height="90" rx="10" class="dark"/>
+<text x="505" y="64" text-anchor="middle" class="tw">AKR-TMS</text>
+<text x="505" y="84" text-anchor="middle" class="sw">monitors, screens, rates</text>
+<text x="505" y="101" text-anchor="middle" class="sw">on the bank's premises</text>
+<rect x="630" y="40" width="122" height="70" rx="8" class="bx dash"/>
+<text x="691" y="66" text-anchor="middle" class="t">Payment gateway</text>
+<text x="691" y="84" text-anchor="middle" class="s">SWIFT, RTGS, ACH</text>
+<text x="691" y="100" text-anchor="middle" class="p2">Phase 2</text>
+<rect x="215" y="190" width="160" height="70" rx="8" class="bx"/>
+<text x="295" y="220" text-anchor="middle" class="t">Operations team</text>
+<text x="295" y="240" text-anchor="middle" class="s">acts in core banking</text>
+<line x1="170" y1="75" x2="213" y2="75" class="ln" marker-end="url(#ah)"/>
+<line x1="375" y1="75" x2="418" y2="75" class="ln" marker-end="url(#ah)"/>
+<line x1="592" y1="75" x2="628" y2="75" class="ln blue" marker-start="url(#ahb)" marker-end="url(#ahb)"/>
+<path d="M505,120 V225 H377" class="ln" fill="none" marker-end="url(#ah)"/>
+<text x="441" y="245" text-anchor="middle" class="s">freeze, hold and</text>
+<text x="441" y="259" text-anchor="middle" class="s">KYC tasks</text>
+<path d="M215,225 H90 V112" class="ln" fill="none" marker-end="url(#ah)"/>
+<text x="152" y="245" text-anchor="middle" class="s">staff take</text>
+<text x="152" y="259" text-anchor="middle" class="s">the action</text>
+<text x="610" y="150" text-anchor="middle" class="s">checks each payment</text>
+<text x="610" y="164" text-anchor="middle" class="s">before release</text>
+</svg>
+<div class="cap"><b>How <span class="nw">AKR-TMS</span> connects.</b> Data flows one way, from the core banking database to <span class="nw">AKR-TMS</span>. Actions
+such as freezes go to the bank's operations team as tasks; <span class="nw">AKR-TMS</span> then confirms from the replica that they were
+carried out. In phase 2 the payment gateway can ask <span class="nw">AKR-TMS</span> about each payment before releasing it.</div>
+</div>
+
+<h3>What &ldquo;read-only&rdquo; means</h3>
+<ul>
+<li><strong>It never changes data.</strong> The database account <span class="nw">AKR-TMS</span> uses can only read. The bank&rsquo;s own database enforces this,
+  and the bank&rsquo;s own audit log records every query.</li>
+<li><strong>It adds no load where it matters.</strong> <span class="nw">AKR-TMS</span> reads from a replica, or from views the bank controls. Where no
+  replica exists, it works within a load budget the bank signs off, and the bank can switch the connection off at any
+  moment.</li>
+<li><strong>It sees everything.</strong> Every day <span class="nw">AKR-TMS</span> reconciles what it received against the core banking system: record
+  counts and totals per table, tied back to the general ledger. Any gap raises an alert, and each day&rsquo;s result is
+  signed and kept as a coverage certificate.</li>
+</ul>
+<h3>One product, any core banking system</h3>
+<p>Iraqi banks run several core banking systems: international products, regional ones and systems built in house. Some
+older systems cannot be read through a database connection at all. <span class="nw">AKR-TMS</span> translates each bank&rsquo;s tables into one
+standard model of customers, accounts and transactions through a mapping layer. The mapping is configuration, owned by
+the bank and versioned like any other change, so connecting a new bank takes weeks of mapping rather than months of
+custom development. Where a database connection is impossible, the bank delivers files to an agreed landing area
+instead, with counts and checksums that still prove completeness. Payment messages are read from the payment systems&rsquo;
+own records, because a core banking system often holds only a summary of them.</p>
+<figure>
+<img src="images/final/08-data-connection.png" alt="Data connection health">
+<figcaption><b>Figure 8. Data connection.</b> The read-only status, replica delay, daily reconciliation of every table
+against the core banking system, and the data-quality issues that affect monitoring.</figcaption>
+</figure>
+
+<h3>Acting without writing</h3>
+<p>When a customer must be frozen or a payment held, <span class="nw">AKR-TMS</span> does not do it itself. It creates a task for the bank&rsquo;s
+operations team, who act in the core banking system as they do today. <span class="nw">AKR-TMS</span> then checks the core banking data to
+confirm the action was taken, and keeps watching: any debit from a frozen account after the freeze, including bank
+fees, is flagged at once.</p>
+<h3>Phase 2: checking payments before they leave</h3>
+<p>The CBI requires a transaction that matches a scenario to be held until the MLRO clears it. For payments, that can
+only happen before release, inside the payment flow. <span class="nw">AKR-TMS</span> will offer an optional connection that the bank&rsquo;s
+payment gateway calls before it releases a SWIFT, RTGS or ACH payment. <span class="nw">AKR-TMS</span> screens and scores the payment and
+answers release, hold or reject within the time the payment system allows; the gateway then acts on the answer. The
+bank decides, rail by rail, what happens if no answer comes in time. The connection starts in shadow mode, then
+advises, and only then enforces. Until it is in place, <span class="nw">AKR-TMS</span> monitors minutes after the event, and records that
+real-time holds depend on the bank&rsquo;s existing payment filter.</p>
+<h3>Security</h3>
+<ul>
+<li>Installed in the bank&rsquo;s own data centre; customer data never leave the bank.</li>
+<li>Encrypted connections, secrets kept in a vault, accounts with the least privilege they need, a separate network
+  zone and no outbound internet access by default; list updates arrive through a controlled channel.</li>
+<li>No on-demand look-ups of individual customers in the core banking database, so its logs cannot reveal who is under
+  investigation.</li>
+<li>Evidence kept in write-once storage; every user action logged.</li>
+<li>Access by role: branch staff see the reasons for an alert, not the thresholds that produced it.</li>
+</ul>
+<div class="dark-box">
+<p><strong>Under the hood.</strong> <span class="nw">AKR-TMS</span> uses a modern open-source stack: services written in Rust, PostgreSQL databases,
+write-once document storage, a secrets vault, single sign-on and a web interface built in React, running on a small
+Kubernetes cluster with full monitoring and logging. No part of it needs a foreign vendor&rsquo;s licence, and it runs
+without internet access.</p>
+</div>
+<h2 class="nobreak" id="ai">9. AI, used responsibly</h2>
+<p class="lead">The CBI requires AML systems to use artificial intelligence and machine learning. Correspondents and the
+new EU rules require that people, not machines, make the decisions, and that every automated step can be explained.
+<span class="nw">AKR-TMS</span> meets both by putting each technique on one of three tracks, each with its own controls.</p>
+
+<table>
+<thead>
+<tr>
+<th>Track</th>
+<th>What it covers</th>
+<th>How it is controlled</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Rules</strong></td>
+<td>CBI scenarios, the bank&rsquo;s own scenarios, screening settings</td>
+<td>Readable in plain language; tested on past data before approval; versioned and reversible. Rules are configuration, not models</td>
+</tr>
+<tr>
+<td><strong>Models</strong></td>
+<td>Anomaly detection, alert prioritisation, network risk, calibration of risk scores</td>
+<td>Documented; validated before use by someone independent of the builders; monitored monthly for drift; explained alert by alert; can be suspended at once, with automatic fallback to rules</td>
+</tr>
+<tr>
+<td><strong>AI assistant</strong></td>
+<td>Case summaries, report narrative drafts, Arabic-English translation, search across case documents</td>
+<td>Drafts only, always labelled; every statement linked to its source; a named person edits and decides; runs inside the bank; never decides an alert or a report</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Starter models, then the bank&rsquo;s own.</strong> A new bank has few confirmed cases to learn from. <span class="nw">AKR-TMS</span> starts with
+  models calibrated elsewhere, labelled as temporary, and builds the bank&rsquo;s own models from its decisions from the
+  first day, under a recalibration plan with a target date.</li>
+<li><strong>Fair by design.</strong> Iraqi names can reveal tribe, sect and ethnicity; these never enter a model. Nationality and
+  geography are used only as documented risk factors that never trigger action on their own, and outcomes are
+  compared across groups every month.</li>
+<li><strong>Built against automation bias.</strong> The interface shows reasons before scores, requires a written rationale, and
+  tracks how often analysts override the system. An unusual override rate triggers a review of the model.</li>
+<li><strong>Built to the strictest standard in the region.</strong> The CBI has not yet issued rules on AI or model risk. <span class="nw">AKR-TMS</span>
+  follows the UAE Central Bank&rsquo;s Model Management Standards, which cover AML models explicitly, together with UK,
+  Singapore and US guidance, so it is ready for whatever the CBI-approved assessors and the correspondents test.</li>
+</ul>
+<h2 class="nobreak" id="banks">10. One product for many Iraqi banks</h2>
+<p class="lead">Iraqi banks differ widely: state banks with millions of customers and large branch networks, private
+banks of every size, Islamic banks and Islamic windows, banks headquartered in the Kurdistan Region, and branches of
+foreign banks. <span class="nw">AKR-TMS</span> is one product, configured for each bank and never customised.</p>
+
+<div class="grid-2">
+<div class="card">
+<h4>Islamic banks</h4>
+<p>Murabaha, ijara, musharaka, mudaraba, salam, istisna&rsquo;a and qard hasan each carry their own laundering risks: commodity
+trades that never take place, sale-and-buyback structures, investment accounts used to place cash, charity and zakat
+funds diverted to terrorism. <span class="nw">AKR-TMS</span> reads Islamic contracts as contracts, not as loans, and adds a scenario pack for
+them. Of the 28 banks on the CBI&rsquo;s February 2026 list of banks barred from dollar dealings, 17 are Islamic banks.</p>
+</div>
+<div class="card">
+<h4>State banks</h4>
+<p>Large customer bases, wide branch networks and older systems. The file landing route connects systems that cannot be
+read through a database, and the branch window supports a liaison officer in every branch.</p>
+</div>
+<div class="card">
+<h4>Kurdistan Region</h4>
+<p>Kurdish names are matched alongside Arabic ones. A Kurdish (Sorani) interface is planned next to Arabic and English.</p>
+</div>
+<div class="card">
+<h4>Regime packs</h4>
+<p>Iraq is always on. Packs for the US, the EU, the UK, the UAE, Saudi Arabia and Jordan add each regime&rsquo;s lists, rules,
+retention periods and evidence formats. A bank switches on the packs its correspondents and owners require. Where two
+rules differ, the stricter one applies unless the bank&rsquo;s policy records a reason otherwise.</p>
+</div>
+</div>
+<p>Each bank gets its own installation in its own data centre, and no data are shared between banks. Product updates,
+list feeds and new scenarios arrive as signed packages, which the bank tests and approves before use.</p>
+<h2 id="roadmap">11. Roadmap</h2>
+<p class="lead"><span class="nw">AKR-TMS</span> is delivered in phases, and each phase leaves the bank better off on its own. Durations are
+indicative for the first bank; they depend most on how fast database access is approved.</p>
+
+<div class="gantt">
+<div class="g-head"><span style="left:0%">Month 0</span><span style="left:16.67%">3</span><span style="left:33.33%">6</span><span style="left:50%">9</span><span style="left:66.67%">12</span><span style="left:83.33%">15</span><span style="left:100%">18</span></div>
+<div class="g-row"><div class="g-label">Phase 0</div><div class="g-track"><div class="g-bar p0" style="left:0%;width:11.1%">Discovery</div></div></div>
+<div class="g-row"><div class="g-label">Phase 1</div><div class="g-track"><div class="g-bar p1" style="left:11.1%;width:27.8%">Build and configure</div><div class="g-bar p1r" style="left:38.9%;width:11.1%">Parallel run</div></div></div>
+<div class="g-row"><div class="g-label">Phase 2</div><div class="g-track"><div class="g-bar p2" style="left:50%;width:33.3%">Pre-release checks, models, assistant</div></div></div>
+<div class="g-row"><div class="g-label">Phase 3</div><div class="g-track"><div class="g-bar p3" style="left:83.3%;width:16.7%">More banks</div></div></div>
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>What it delivers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>0. Discovery</strong> (6 to 8 weeks)</td>
+<td>Inventory of the core banking and payment systems; read-only access approved; data mapped; data-quality baseline; alignment with the bank&rsquo;s own risk assessment</td>
+</tr>
+<tr>
+<td><strong>1. Core system</strong> (first bank live in about 9 months)</td>
+<td>Screening with Arabic matching; the CBI scenario catalogue and the Iraq risk pack; customer risk rating and KYC reviews; cases, investigation and network view; goAML reporting; command centre, branch window and evidence vault; daily reconciliation. Ends with two to three months of running beside the bank&rsquo;s current system, comparing every alert</td>
+</tr>
+<tr>
+<td><strong>2. Before release, and smarter</strong> (about 6 months more)</td>
+<td>Pre-release checks for payments; models in shadow mode, then live after validation; the AI assistant for summaries and narratives; correspondent and validator packs</td>
+</tr>
+<tr>
+<td><strong>3. Scale</strong> (ongoing)</td>
+<td>Further banks in three to five months each; more regime packs; Islamic pack updates; Kurdish interface</td>
+</tr>
+</tbody>
+</table>
+<h2 class="nobreak" id="success">12. What success looks like</h2>
+<div class="kpis">
+<div class="stat"><div class="n">100%</div><div class="l">of core banking tables reconciled every day, and every gap explained</div></div>
+<div class="stat"><div class="n">1 hour</div><div class="l">at most from a list update to a full re-screen, against the CBI's 12-hour limit</div></div>
+<div class="stat"><div class="n">0</div><div class="l">high-risk customer reviews overdue</div></div>
+<div class="stat"><div class="n">0</div><div class="l">alerts older than 30 days without a recorded reason</div></div>
+<div class="stat"><div class="n">Rising</div><div class="l">share of alerts that lead to a report or enhanced due diligence</div></div>
+<div class="stat"><div class="n">Minutes</div><div class="l">to produce an evidence pack for the CBI or a correspondent</div></div>
+<div class="stat"><div class="n">First time</div><div class="l">pass of the CBI-approved firm's verification of the AML system</div></div>
+<div class="stat"><div class="n">Weeks</div><div class="l">of mapping, not months of development, to connect a new bank</div></div>
+</div>
+
+<p><span class="nw">AKR-TMS</span> sets no target for the number of reports. Better detection will produce more reports, and Iraq&rsquo;s action plan
+asks for them, but a report filed to meet a quota is only noise for the AML/CFT Office.</p>
+<h2 id="glossary">Appendix A. Glossary</h2>
+<div class="glossary">
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+<th>Arabic</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AML/CFT</td>
+<td>Anti-money laundering and countering the financing of terrorism</td>
+<td><span class="ar">مكافحة غسل الأموال وتمويل الإرهاب</span></td>
+</tr>
+<tr>
+<td>KYC, CDD</td>
+<td>Know your customer; customer due diligence: identifying customers and understanding their activity</td>
+<td><span class="ar">اعرف عميلك، العناية الواجبة تجاه العملاء</span></td>
+</tr>
+<tr>
+<td>EDD</td>
+<td>Enhanced due diligence: extra checks for higher-risk customers</td>
+<td><span class="ar">العناية الواجبة المعززة</span></td>
+</tr>
+<tr>
+<td>Beneficial owner</td>
+<td>The person who ultimately owns or controls a customer</td>
+<td><span class="ar">المستفيد الحقيقي</span></td>
+</tr>
+<tr>
+<td>PEP</td>
+<td>Politically exposed person: someone with a prominent public function, and their family and close associates</td>
+<td><span class="ar">الشخص المعرض سياسياً</span></td>
+</tr>
+<tr>
+<td>Risk-based approach</td>
+<td>More effort where the risk is higher, less where it is lower</td>
+<td><span class="ar">النهج القائم على المخاطر</span></td>
+</tr>
+<tr>
+<td>Transaction monitoring</td>
+<td>Checking account activity for signs of laundering or terrorist financing</td>
+<td><span class="ar">مراقبة العمليات</span></td>
+</tr>
+<tr>
+<td>Scenario</td>
+<td>A rule that describes a suspicious pattern and raises an alert when it occurs</td>
+<td><span class="ar">سيناريو</span></td>
+</tr>
+<tr>
+<td>Alert, case</td>
+<td>An alert is one signal; a case groups the alerts about one customer for investigation</td>
+<td><span class="ar">تنبيه، حالة</span></td>
+</tr>
+<tr>
+<td>False positive</td>
+<td>An alert or list match that turns out not to be suspicious</td>
+<td><span class="ar">إنذار كاذب</span></td>
+</tr>
+<tr>
+<td>Screening</td>
+<td>Comparing customers and payments against sanctions and PEP lists</td>
+<td><span class="ar">الفحص على القوائم</span></td>
+</tr>
+<tr>
+<td>Asset freeze</td>
+<td>Blocking the funds of a listed person without delay</td>
+<td><span class="ar">تجميد الأموال</span></td>
+</tr>
+<tr>
+<td>STR</td>
+<td>Suspicious transaction report to the financial intelligence unit</td>
+<td><span class="ar">تقرير عن معاملة مشبوهة</span></td>
+</tr>
+<tr>
+<td>CTR</td>
+<td>Report of cash transactions above a threshold (USD 10,000 or its equivalent in Iraq)</td>
+<td><span class="ar">تقرير المعاملات النقدية</span></td>
+</tr>
+<tr>
+<td>goAML</td>
+<td>Reporting software from the UN Office on Drugs and Crime, used by the Iraqi financial intelligence unit</td>
+<td>goAML</td>
+</tr>
+<tr>
+<td>AML/CFT Office</td>
+<td>Iraq&rsquo;s financial intelligence unit, which receives STRs and CTRs</td>
+<td><span class="ar">مكتب مكافحة غسل الأموال وتمويل الإرهاب</span></td>
+</tr>
+<tr>
+<td>MLRO</td>
+<td>Money laundering reporting officer: the bank officer who decides what is reported</td>
+<td><span class="ar">مسؤول الإبلاغ عن غسل الأموال</span></td>
+</tr>
+<tr>
+<td>Tipping off</td>
+<td>Telling a customer that they are suspected or reported; prohibited</td>
+<td><span class="ar">تنبيه العميل</span></td>
+</tr>
+<tr>
+<td>Hawala</td>
+<td>Informal money transfer outside the licensed system</td>
+<td><span class="ar">الحوالة غير الرسمية</span></td>
+</tr>
+<tr>
+<td>Structuring</td>
+<td>Splitting transactions to stay below reporting thresholds</td>
+<td><span class="ar">تجزئة المعاملات</span></td>
+</tr>
+<tr>
+<td>Money mule</td>
+<td>A person whose account moves other people&rsquo;s illicit money</td>
+<td><span class="ar">وسيط نقل الأموال</span></td>
+</tr>
+<tr>
+<td>Correspondent bank</td>
+<td>A foreign bank that holds accounts for an Iraqi bank and makes payments on its behalf</td>
+<td><span class="ar">المصرف المراسل</span></td>
+</tr>
+<tr>
+<td>Grey list</td>
+<td>The FATF&rsquo;s list of jurisdictions under increased monitoring</td>
+<td><span class="ar">القائمة الرمادية</span></td>
+</tr>
+<tr>
+<td>Mutual evaluation</td>
+<td>The peer review of a country&rsquo;s AML/CFT system by the FATF or a regional body</td>
+<td><span class="ar">التقييم المتبادل</span></td>
+</tr>
+<tr>
+<td>Core banking system</td>
+<td>The bank&rsquo;s main system of record for customers, accounts and transactions</td>
+<td><span class="ar">النظام المصرفي الشامل</span></td>
+</tr>
+<tr>
+<td>Three lines of defence</td>
+<td>Business units, compliance and risk, and internal audit, each with its own control role</td>
+<td><span class="ar">خطوط الدفاع الثلاثة</span></td>
+</tr>
+<tr>
+<td>Regime pack</td>
+<td>An <span class="nw">AKR-TMS</span> component that adds one foreign regime&rsquo;s lists, rules and record-keeping</td>
+<td><span class="ar">حزمة الأنظمة الأجنبية</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 class="nobreak" id="research">Appendix B. The research behind this plan</h2>
+<!-- Counts refreshed from research/ by script on 2026-10-07 (unique ^| PREFIX-NN rows across all files, excluding FM, FL, TR, G and IR, which are failure modes, rating floors, triggers, stack gaps and interface rules); all wave-1 and wave-2 files final. -->
+
+<p class="lead">The plan rests on the research files listed below, written in October 2026 and delivered with it. Each
+file records its sources and ends with requirements for <span class="nw">AKR-TMS</span>, each traced to a law, a standard, a regulator's finding
+or a market fact.</p>
+
+<div class="rindex">
+<div class="rcol">
+<h4>Rules and standards</h4>
+<ul>
+<li><strong>01</strong> Iraq: AML/CFT law and CBI rules</li>
+<li><strong>02</strong> Iraq: money laundering and terrorist financing risks</li>
+<li><strong>03</strong> FATF standards</li>
+<li><strong>04</strong> Basel, Wolfsberg, Egmont and UN sanctions</li>
+<li><strong>05</strong> US, EU, UK and Gulf regimes</li>
+<li><strong>06</strong> AML and KYC fundamentals, with an English-Arabic glossary</li>
+</ul>
+</div>
+<div class="rcol">
+<h4>The market</h4>
+<ul>
+<li><strong>07</strong> Vendor landscape overview</li>
+<li><strong>08</strong> NICE Actimize</li>
+<li><strong>09</strong> Oracle FCCM</li>
+<li><strong>10</strong> SAS</li>
+<li><strong>11</strong> SymphonyAI, FICO Siron, Nasdaq Verafin, Fiserv</li>
+<li><strong>12</strong> AI detection specialists</li>
+<li><strong>13</strong> Investigation automation and challengers</li>
+<li><strong>14</strong> Screening engines</li>
+<li><strong>15</strong> Risk data providers</li>
+<li><strong>16</strong> KYC and client lifecycle platforms</li>
+<li><strong>17</strong> AML modules of core banking systems</li>
+<li><strong>18</strong> The Iraqi and regional market</li>
+</ul>
+</div>
+<div class="rcol">
+<h4>Lessons and design</h4>
+<ul>
+<li><strong>20</strong> Enforcement failures</li>
+<li><strong>21</strong> Detection technology</li>
+<li><strong>22</strong> Arabic, Kurdish and Iraqi name matching</li>
+<li><strong>23</strong> Regulatory reporting and goAML</li>
+<li><strong>24</strong> Islamic banking</li>
+<li><strong>25</strong> Core banking integration</li>
+<li><strong>26</strong> Customer risk rating and due diligence</li>
+<li><strong>27</strong> Monitoring scenarios</li>
+<li><strong>28</strong> Case management and workflow</li>
+<li><strong>29</strong> Governance and model risk</li>
+<li><strong>30</strong> Security and privacy</li>
+<li><strong>31</strong> Analyst experience</li>
+<li><strong>32</strong> Technology stack</li>
+</ul>
+</div>
+</div>
+<div class="reqcount">
+<table>
+<thead>
+<tr>
+<th>Research area</th>
+<th>Files</th>
+<th>Requirements</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>International standards: FATF, Basel, Wolfsberg, Egmont, UN sanctions</td>
+<td>03, 04</td>
+<td>78</td>
+</tr>
+<tr>
+<td>Foreign regimes: US, EU, UK, Gulf</td>
+<td>05</td>
+<td>61</td>
+</tr>
+<tr>
+<td>The market</td>
+<td>07-18</td>
+<td>249</td>
+</tr>
+<tr>
+<td>Enforcement</td>
+<td>20</td>
+<td>68</td>
+</tr>
+<tr>
+<td>Detection technology</td>
+<td>21</td>
+<td>66</td>
+</tr>
+<tr>
+<td>Arabic, Kurdish and Iraqi name matching</td>
+<td>22</td>
+<td>59</td>
+</tr>
+<tr>
+<td>Regulatory reporting and goAML</td>
+<td>23</td>
+<td>84</td>
+</tr>
+<tr>
+<td>Islamic banking</td>
+<td>24</td>
+<td>30</td>
+</tr>
+<tr>
+<td>Core banking integration</td>
+<td>25</td>
+<td>65</td>
+</tr>
+<tr>
+<td>Customer risk rating and due diligence</td>
+<td>26</td>
+<td>42</td>
+</tr>
+<tr>
+<td>Monitoring scenarios</td>
+<td>27</td>
+<td>60</td>
+</tr>
+<tr>
+<td>Case management and workflow</td>
+<td>28</td>
+<td>76</td>
+</tr>
+<tr>
+<td>Governance and model risk</td>
+<td>29</td>
+<td>54</td>
+</tr>
+<tr>
+<td>Security and privacy</td>
+<td>30</td>
+<td>102</td>
+</tr>
+<tr>
+<td>Analyst experience</td>
+<td>31</td>
+<td>71</td>
+</tr>
+<tr>
+<td>Technology stack</td>
+<td>32</td>
+<td>43</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>1,208</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Iraqi law and the CBI&rsquo;s instructions (file 01) are the baseline for all of them; their requirements are summarised in
+section 3.</p>
+</body>
+</html>

@@ -1,0 +1,269 @@
+/* AKR-TMS plan PDF: print stylesheet (A4). Identity tokens from plan/identity.md. */
+
+@font-face { font-family: "Plex Sans"; src: url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "Plex Sans"; src: url(fonts/ibm-plex-sans-latin-400-italic.woff2) format("woff2"); font-weight: 400; font-style: italic; }
+@font-face { font-family: "Plex Sans"; src: url(fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2"); font-weight: 500; font-style: normal; }
+@font-face { font-family: "Plex Sans"; src: url(fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2"); font-weight: 600; font-style: normal; }
+@font-face { font-family: "Plex Sans"; src: url(fonts/ibm-plex-sans-latin-700-normal.woff2) format("woff2"); font-weight: 700; font-style: normal; }
+@font-face { font-family: "Plex Serif"; src: url(fonts/ibm-plex-serif-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "Plex Serif"; src: url(fonts/ibm-plex-serif-latin-400-italic.woff2) format("woff2"); font-weight: 400; font-style: italic; }
+@font-face { font-family: "Plex Serif"; src: url(fonts/ibm-plex-serif-latin-600-normal.woff2) format("woff2"); font-weight: 600; font-style: normal; }
+@font-face { font-family: "Plex Serif"; src: url(fonts/ibm-plex-serif-latin-600-italic.woff2) format("woff2"); font-weight: 600; font-style: italic; }
+@font-face { font-family: "Plex Mono"; src: url(fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); font-weight: 400; }
+@font-face { font-family: "Plex Mono"; src: url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2"); font-weight: 500; }
+@font-face { font-family: "Plex Arabic"; src: url(fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2) format("woff2"); font-weight: 400; }
+@font-face { font-family: "Plex Arabic"; src: url(fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2) format("woff2"); font-weight: 600; }
+
+:root {
+  --lapis-night: #0F2147;
+  --ishtar: #1E4FA0;
+  --teal: #1F8A8A;
+  --teal-text: #177272;
+  --gold: #C8A24B;
+  --clay: #F5F0E6;
+  --clay-deep: #EDE6D8;
+  --paper: #FFFFFF;
+  --ink: #18202F;
+  --stone: #5B6474;
+  --sand: #DDD6C9;
+  --risk-high: #B3261E;
+  --risk-med: #B26A00;
+  --risk-low: #2F7D4F;
+}
+
+@page {
+  size: A4;
+  margin: 20mm 19mm 22mm 19mm;
+  @bottom-left { content: "AKR-TMS  \00B7  A plan for Iraqi banks"; font-family: "Plex Sans"; font-size: 7.5pt; color: #5B6474; }
+  @bottom-right { content: counter(page); font-family: "Plex Sans"; font-size: 7.5pt; color: #5B6474; }
+}
+@page cover { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
+@page full { margin: 14mm 14mm 18mm 14mm; }
+
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body {
+  margin: 0;
+  font-family: "Plex Serif", Georgia, serif;
+  font-size: 10.2pt;
+  line-height: 1.52;
+  color: var(--ink);
+  background: var(--paper);
+  hyphens: manual;
+  font-variant-numeric: lining-nums;
+}
+
+/* ---------- Cover ---------- */
+.cover {
+  page: cover;
+  break-after: page;
+  width: 210mm;
+  height: 297mm;
+  background: var(--lapis-night);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  font-family: "Plex Sans", sans-serif;
+}
+.cover .bricks {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 14mm 7mm, 28mm 14mm;
+}
+.cover .inner { position: absolute; left: 20mm; right: 20mm; top: 22mm; bottom: 20mm; display: flex; flex-direction: column; }
+.cover .lockup { display: flex; align-items: center; gap: 5mm; }
+.cover .lockup img { width: 17mm; height: 17mm; }
+.cover .lockup .word { font-size: 25pt; letter-spacing: -0.3pt; line-height: 1; }
+.cover .lockup .word b { font-weight: 600; }
+.cover .lockup .word span { font-weight: 400; }
+.cover .lockup .ar { font-family: "Plex Arabic"; font-size: 10.5pt; color: #C8D2E6; direction: rtl; text-align: left; margin-top: 1.5mm; }
+.cover h1 {
+  font-family: "Plex Sans"; font-weight: 600; font-size: 33pt; line-height: 1.12; letter-spacing: -0.6pt;
+  margin: 26mm 0 0 0; max-width: 150mm; color: #fff;
+}
+.cover h1 em { font-style: normal; color: var(--gold); }
+.cover .sub { font-size: 12.5pt; line-height: 1.5; color: #C8D2E6; max-width: 140mm; margin-top: 7mm; }
+.cover .hero { margin-top: auto; }
+.cover .hero img { width: 100%; border-radius: 2.5mm; display: block; border: 1px solid rgba(255,255,255,0.18); }
+.cover .meta { display: flex; justify-content: space-between; margin-top: 6mm; font-size: 8.5pt; color: #9FB0CF; }
+.cover .rule { width: 18mm; height: 1.2mm; background: var(--gold); margin-top: 9mm; }
+
+/* ---------- Headings ---------- */
+h2 {
+  break-before: page;
+  font-family: "Plex Sans", sans-serif; font-weight: 600; font-size: 21pt; line-height: 1.15; letter-spacing: -0.3pt;
+  color: var(--lapis-night); margin: 0 0 6mm 0; padding-top: 7mm; position: relative;
+}
+h2::before { content: ""; position: absolute; top: 0; left: 0; width: 14mm; height: 1.1mm; background: var(--gold); }
+h2.nobreak { break-before: auto; margin-top: 11mm; }
+h2 { break-after: avoid; }
+h3 {
+  font-family: "Plex Sans", sans-serif; font-weight: 600; font-size: 12.2pt; line-height: 1.3;
+  color: var(--lapis-night); margin: 6.5mm 0 2mm 0; break-after: avoid;
+}
+h4 { font-family: "Plex Sans", sans-serif; font-weight: 600; font-size: 10.2pt; color: var(--ishtar); margin: 4mm 0 1mm 0; break-after: avoid; }
+p { margin: 0 0 2.6mm 0; orphans: 3; widows: 3; }
+ul, ol { margin: 0 0 3mm 0; padding-left: 5.5mm; }
+li { margin: 0 0 1.2mm 0; }
+li::marker { color: var(--ishtar); }
+strong { font-weight: 600; color: var(--lapis-night); }
+a { color: var(--ishtar); text-decoration: none; }
+code, .mono { font-family: "Plex Mono", monospace; font-size: 0.9em; }
+.lead { font-size: 11.6pt; line-height: 1.5; color: var(--lapis-night); }
+.kicker { font-family: "Plex Sans"; font-size: 8pt; font-weight: 600; letter-spacing: 1.2pt; text-transform: uppercase; color: var(--teal-text); margin-bottom: 1mm; }
+
+/* ---------- Tables ---------- */
+table {
+  width: 100%; border-collapse: collapse; margin: 2mm 0 4.5mm 0;
+  font-family: "Plex Sans", sans-serif; font-size: 8.4pt; line-height: 1.38; break-inside: auto;
+}
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th {
+  text-align: left; font-weight: 600; color: var(--lapis-night); font-size: 7.8pt; letter-spacing: 0.3pt; text-transform: uppercase;
+  border-bottom: 1.6px solid var(--lapis-night); padding: 1.6mm 2mm 1.4mm 0;
+}
+td { vertical-align: top; border-bottom: 0.6px solid var(--sand); padding: 1.6mm 2.5mm 1.6mm 0; }
+td:first-child { font-weight: 600; color: var(--lapis-night); }
+th:empty { border-bottom: 1.6px solid var(--lapis-night); }
+table.plain td:first-child { font-weight: 400; color: var(--ink); }
+
+/* Timeline */
+.timeline table { font-size: 8.6pt; margin: 3mm 0 5mm 0; }
+.timeline thead { display: none; }
+.timeline td { border-bottom: none; padding: 1.3mm 3mm 1.3mm 0; }
+.timeline td:first-child { width: 31mm; color: var(--ishtar); white-space: nowrap; position: relative; padding-left: 5mm; }
+.timeline td:first-child::before { content: ""; position: absolute; left: 0; top: 2.6mm; width: 2mm; height: 2mm; border-radius: 50%; background: var(--gold); }
+.timeline tr:not(:last-child) td:first-child::after { content: ""; position: absolute; left: 0.9mm; top: 4.8mm; bottom: -2.2mm; width: 0.25mm; background: var(--sand); }
+
+/* ---------- Callouts and boxes ---------- */
+.callout {
+  background: var(--clay); border-left: 1.4mm solid var(--gold); padding: 3.6mm 5mm 1.4mm 5mm; margin: 4mm 0 5mm 0;
+  break-inside: avoid; font-family: "Plex Sans", sans-serif; font-size: 9.6pt; line-height: 1.5;
+}
+.callout p { margin-bottom: 2.2mm; }
+.dark-box {
+  background: var(--lapis-night); color: #E8ECF5; padding: 5mm 6mm 2.5mm 6mm; border-radius: 1.5mm; margin: 4mm 0 5mm 0;
+  break-inside: avoid; font-family: "Plex Sans", sans-serif; font-size: 9.6pt;
+}
+.dark-box strong { color: var(--gold); }
+.dark-box h3, .dark-box h4 { color: #fff; margin-top: 0; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5mm; }
+.card { border: 0.7px solid var(--sand); border-radius: 1.5mm; padding: 3.5mm 4mm 1.5mm 4mm; break-inside: avoid; font-family: "Plex Sans"; font-size: 8.9pt; line-height: 1.45; }
+.card h4 { margin-top: 0; }
+
+.stat { font-family: "Plex Sans"; }
+.stat .n { font-size: 24pt; font-weight: 600; color: var(--lapis-night); line-height: 1.05; letter-spacing: -0.4pt; }
+.stat .l { font-size: 8.4pt; color: var(--stone); line-height: 1.35; margin-top: 1mm; }
+
+/* ---------- Figures ---------- */
+figure { margin: 4mm 0 5mm 0; break-inside: avoid; }
+figure img { width: 100%; display: block; border: 0.7px solid var(--sand); border-radius: 1.2mm; }
+figcaption { font-family: "Plex Sans"; font-size: 8.2pt; color: var(--stone); margin-top: 2mm; line-height: 1.4; }
+figcaption b { color: var(--lapis-night); font-weight: 600; }
+figure.full { page: full; }
+
+.ar { font-family: "Plex Arabic", sans-serif; direction: rtl; unicode-bidi: isolate; }
+.pagebreak { break-after: page; }
+.small { font-size: 8.4pt; color: var(--stone); font-family: "Plex Sans"; }
+.todo { background: #FFF3CD; color: #7A5A00; padding: 1mm 2mm; font-family: "Plex Sans"; font-size: 8pt; }
+
+/* ---------- Principles (two columns) ---------- */
+.principles ol { columns: 2; column-gap: 9mm; padding-left: 6mm; margin-top: 2mm; }
+.principles li { break-inside: avoid; margin-bottom: 2.6mm; font-size: 9.8pt; line-height: 1.45; }
+.principles li::marker { font-family: "Plex Sans"; font-weight: 600; color: var(--gold); }
+
+/* ---------- System map (section 7) ---------- */
+.sysmap {
+  display: grid; grid-template-columns: 1fr 8mm 1.05fr 8mm 1fr; margin: 5mm 0 6mm 0;
+  font-family: "Plex Sans", sans-serif; font-size: 8.3pt; line-height: 1.3; break-inside: avoid;
+}
+.sysmap .col { display: flex; flex-direction: column; gap: 2mm; }
+.sysmap .h { font-size: 7.4pt; font-weight: 600; letter-spacing: 1pt; text-transform: uppercase; color: var(--teal-text); margin-bottom: 0.5mm; }
+.sysmap .box { border: 0.7px solid var(--sand); background: var(--paper); border-radius: 1.4mm; padding: 2.2mm 3mm; color: var(--ink); font-weight: 600; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.sysmap .box span { display: block; font-weight: 400; color: var(--stone); font-size: 7.6pt; margin-top: 0.4mm; }
+.sysmap .core { background: var(--lapis-night); border-radius: 2mm; padding: 3mm; }
+.sysmap .core .h { color: var(--gold); }
+.sysmap .core .box.m { background: #1A2E5C; border-color: #2A4170; color: #fff; padding: 1.8mm 3mm; }
+.sysmap .core .box.base { background: transparent; border: 0.8px dashed #6F84B0; color: #C8D2E6; font-weight: 500; font-size: 7.8pt; text-align: center; }
+.sysmap .arrow { position: relative; }
+.sysmap .arrow::before { content: ""; position: absolute; top: 50%; left: 1.2mm; right: 2.2mm; height: 0.5mm; background: var(--gold); }
+.sysmap .arrow::after { content: ""; position: absolute; top: calc(50% - 1.35mm); right: 0.6mm; border-left: 2.2mm solid var(--gold); border-top: 1.6mm solid transparent; border-bottom: 1.6mm solid transparent; }
+
+/* ---------- Connection diagram (section 8) ---------- */
+.conn { margin: 3mm 0 5mm 0; break-inside: avoid; }
+.conn svg { width: 100%; height: auto; display: block; font-family: "Plex Sans", sans-serif; }
+.conn .bx { fill: #fff; stroke: var(--lapis-night); stroke-width: 1.3; }
+.conn .bx.clay { fill: var(--clay); }
+.conn .bx.dash { stroke: var(--ishtar); stroke-dasharray: 5 4; }
+.conn .dark { fill: var(--lapis-night); }
+.conn .t { font-size: 13px; font-weight: 600; fill: var(--lapis-night); }
+.conn .s { font-size: 11px; fill: var(--stone); }
+.conn .tw { font-size: 17px; font-weight: 600; fill: #fff; }
+.conn .sw { font-size: 11px; fill: #C8D2E6; }
+.conn .p2 { font-size: 10.5px; font-weight: 600; fill: var(--ishtar); letter-spacing: 0.6px; }
+.conn .lbl { font-size: 11px; font-weight: 600; fill: var(--teal-text); letter-spacing: 0.4px; }
+.conn .ln { stroke: var(--lapis-night); stroke-width: 1.5; }
+.conn .ln.blue { stroke: var(--ishtar); stroke-dasharray: 5 4; }
+.conn .cap { font-family: "Plex Sans"; font-size: 8.2pt; color: var(--stone); margin-top: 1mm; line-height: 1.4; }
+.conn .cap b { color: var(--lapis-night); font-weight: 600; }
+
+/* ---------- Roadmap bars (section 11) ---------- */
+.gantt { font-family: "Plex Sans", sans-serif; font-size: 8pt; margin: 4mm 0 5mm 0; break-inside: avoid; }
+.gantt .g-head { position: relative; height: 5mm; margin-left: 20mm; border-bottom: 0.6px solid var(--sand); }
+.gantt .g-head span { position: absolute; transform: translateX(-50%); color: var(--stone); font-size: 7.4pt; }
+.gantt .g-head span:first-child { transform: none; }
+.gantt .g-head span:last-child { transform: translateX(-100%); }
+.gantt .g-row { display: flex; align-items: center; height: 8.5mm; border-bottom: 0.5px dashed var(--sand); }
+.gantt .g-label { width: 20mm; font-weight: 600; color: var(--lapis-night); }
+.gantt .g-track { position: relative; flex: 1; height: 100%; }
+.gantt .g-bar { position: absolute; top: 1.6mm; height: 5.2mm; border-radius: 1mm; color: #fff; font-weight: 500; font-size: 7.6pt; line-height: 5.2mm; padding: 0 2mm; white-space: nowrap; overflow: hidden; }
+.gantt .p0 { background: var(--teal); }
+.gantt .p1 { background: var(--lapis-night); }
+.gantt .p1r { background: var(--ishtar); }
+.gantt .p2 { background: var(--ishtar); }
+.gantt .p3 { background: var(--clay-deep); color: var(--lapis-night); border: 0.6px dashed var(--stone); }
+
+/* ---------- KPI grid (section 12) ---------- */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5mm 6mm; margin: 4mm 0 6mm 0; break-inside: avoid; }
+.kpis .stat { border-top: 1mm solid var(--gold); padding-top: 2.5mm; }
+.kpis .stat .n { font-size: 19pt; }
+
+/* ---------- Summary stat strip (section 1) ---------- */
+.stats4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5mm; margin: 1mm 0 6mm 0; padding: 4mm 0; border-top: 0.7px solid var(--sand); border-bottom: 0.7px solid var(--sand); }
+.stats4 .stat .n { font-size: 17pt; color: var(--lapis-night); }
+.stats4 .stat .l { font-size: 8pt; }
+
+/* ---------- Glossary ---------- */
+.glossary table { font-size: 8.2pt; }
+.glossary td:first-child { width: 31mm; }
+.glossary td:last-child, .glossary th:last-child { text-align: right; width: 52mm; padding-right: 0; }
+.glossary td .ar { font-size: 9.2pt; color: var(--lapis-night); }
+.glossary td, .glossary th { padding-top: 0.85mm; padding-bottom: 0.85mm; line-height: 1.25; }
+
+/* Section 4 market table and section 5 lessons table */
+.market table { font-size: 8.4pt; }
+.market td:first-child { font-weight: 600; width: 33mm; }
+.lessons table { font-size: 8.2pt; line-height: 1.38; }
+.lessons td { vertical-align: top; }
+.lessons td:first-child { font-weight: 600; width: 32mm; color: var(--lapis-night); }
+.lessons td:last-child { width: 58mm; }
+
+/* Appendix B research index */
+.rindex { display: grid; grid-template-columns: 1fr 1.15fr 1.1fr; gap: 6mm; margin: 2mm 0 5mm 0; font-family: "Plex Sans"; font-size: 8.3pt; line-height: 1.4; }
+.rindex h4 { margin: 0 0 1.5mm 0; font-size: 8.4pt; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ishtar); }
+.rindex ul { list-style: none; margin: 0; padding: 0; }
+.rindex li { margin: 0 0 0.8mm 0; padding: 0; }
+.rindex li strong { color: var(--gold); font-weight: 600; margin-right: 1.2mm; }
+.reqcount table { font-size: 8.4pt; }
+.reqcount td:nth-child(2), .reqcount th:nth-child(2) { width: 20mm; }
+.reqcount td:last-child, .reqcount th:last-child { text-align: right; width: 26mm; padding-right: 0; }
+/* 16 research areas since wave 2: tighter rows keep Appendix B on one page. */
+.reqcount td, .reqcount th { padding-top: 0.9mm; padding-bottom: 0.9mm; line-height: 1.3; }
+
+/* Hyphenated names (AKR-TMS, World-Check, Pio-Tech) never break at the hyphen; build.py adds the spans. */
+.nw { white-space: nowrap; }

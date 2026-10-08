@@ -1,0 +1,25 @@
+Screen: "Customer risk profile" for one company customer. Active rail row: Customers.
+
+TOP BAR: title "Demo Foodstuffs Co."; context line "Customer 200917455 · Company · Baghdad, Al-Mansour branch · since 2014"; avatar initials "MA", role label "MLRO".
+
+ROW 1, three cards:
+- Card "Risk rating", about 28 percent width: a semicircular gauge from 0 to 100 whose arc has three segments, green #2F7D4F (0-39), amber #F2A33A (40-64) and red #B3261E (65-100), with a needle pointing at 72 and the number "72" large under the arc. Under it a red pill "HIGH" and the text "Since 14 Sep 2026 · was Medium". Then a small sparkline labelled "12 months" rising from 41 to 58 to 72, and the line "Next review due 14 Sep 2027".
+- Card "What drives the score", about 42 percent width: six rows, each a label, a short reason in #5B6474, and a horizontal #1E4FA0 bar whose length is proportional to its points, with the points at the right:
+   "Ownership and structure · three layers of ownership · +18"
+   "Geography · suppliers in two high-risk countries · +16"
+   "Products and channels · letters of credit, high cash use · +14"
+   "Activity against profile · turnover 2.4x declared · +12"
+   "Adverse media · one article under review · +8"
+   "Other factors · +4"
+   A thin line and "Total 72" at the bottom right.
+- Card "Enhanced due diligence", about 30 percent width: a progress bar "4 of 6 complete" in #2F7D4F, then a checklist: four rows with green ticks: "Source of funds evidence", "Beneficial owners verified", "Senior management approval", "Branch site visit report"; two rows with amber clock icons: "Trade documents, top 5 suppliers", "Adverse media assessment". Footer: "Due 30 Oct 2026".
+
+ROW 2, two cards:
+- Card "Ownership and control", about 55 percent width: a clean tree diagram with rounded rectangles and thin connector lines. Top box: "Demo Foodstuffs Co. · Iraq". Second level, two boxes: "Person A · 60%" and "Demo Holding Ltd · Jordan · 40%". Third level, under the holding company only: "Person B · 100%". The boxes "Person A" and "Person B" have a #1F8A8A outline and a small teal tag "Beneficial owner". Under the diagram a #5B6474 note: "Beneficial owners: 20% or more, or control by other means. Verified 02 Sep 2026."
+- Card "Evidence vault", about 45 percent width: a table with columns DOCUMENT, DATE, STATUS. Rows exactly:
+   "Commercial registration certificate | 02 Sep 2026 | Locked"
+   "Shareholder register | 02 Sep 2026 | Locked"
+   "Source of funds letter | 18 Sep 2026 | Locked"
+   "Site visit report | 25 Sep 2026 | Locked"
+   "Supplier contracts (5) | Requested 26 Sep | Pending"
+   Each "Locked" status shows a small padlock icon in #2F7D4F; "Pending" is amber #B26A00. Under the table a #5B6474 note: "Documents cannot be edited or deleted during the retention period."

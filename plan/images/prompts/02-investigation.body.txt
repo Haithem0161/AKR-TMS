@@ -1,0 +1,25 @@
+Screen: "Case workspace", where an analyst investigates one case that groups several alerts about one customer. Active rail row: Cases. The navigation rail is flat solid #0F2147 from top to bottom and perfectly sharp, exactly like the reference.
+
+TOP BAR: title "Case C-2026-04817"; context line "Demo Mobile Trading Co. · opened 03 Oct 2026"; avatar initials "ZK", role label "Analyst".
+
+SUMMARY STRIP: a full-width white card, one line high, with left to right: a red #B3261E pill "High risk"; the text "Customer since 2019 · Small business · Baghdad, Karrada branch"; a divider; "3 alerts in this case"; a divider; "Declared turnover IQD 40 million / month"; and on the far right an amber pill "Due in 4 days".
+
+BELOW, TWO COLUMNS.
+
+LEFT COLUMN, about 63 percent width, three cards stacked:
+1. Card "Why this case was raised": a row of four reason chips (light tinted background, dark text): "Turnover 15x declared", "47 unrelated senders in 30 days", "92% moved out within 24 h", "Outflows to 4 exchange companies". Under the chips, three compact alert rows, each with a code in a small grey monospace chip, a description and a date:
+   "CBI 2.2 | Repeated transfers from unrelated parties | 28 Sep"
+   "CBI 1.4 | Cash deposits at several branches | 30 Sep"
+   "CBI 1.7 | Withdrawal shortly after deposit | 02 Oct"
+2. Card "Money in and out, last 30 days": above the chart three figures side by side: "In: IQD 612.4 million", "Out: IQD 598.1 million", "Balance today: IQD 3.2 million". Below them a daily bar chart from 06 Sep to 05 Oct with paired thin bars per day, incoming in #1E4FA0 and outgoing in #1F8A8A, and one dashed horizontal grey line labelled "Declared turnover, daily average". Most bars rise far above the dashed line.
+3. Card "Counterparties": a compact table with columns COUNTERPARTY, TYPE, COUNT, AMOUNT (IQD). Rows exactly:
+   "47 individual senders | Incoming transfers | 213 | 402,600,000"
+   "Cash at 6 branches | Cash deposits | 38 | 209,800,000"
+   "Exchange company A | Outgoing transfers | 22 | 311,500,000"
+   "Exchange company B | Outgoing transfers | 17 | 204,900,000"
+   "Exchange companies C and D | Outgoing transfers | 9 | 81,700,000"
+
+RIGHT COLUMN, about 37 percent width, three cards stacked:
+1. Card "Case summary", with a small amber outline label at its top right: "DRAFT · REQUIRES REVIEW". Body text, four short sentences: "The account receives many small transfers from 47 individuals with no visible link to a phone business. 92% of the money leaves within 24 hours to four exchange companies. Activity is 15 times the declared turnover. The pattern matches an unlicensed money transfer (hawala) business using the account." Under it a small #1E4FA0 link line: "Based on 14 transactions and 3 alerts · view sources".
+2. Card "Decision": three stacked radio options: "Recommend STR to MLRO" (selected, filled #1E4FA0 dot), "Request information from branch", "Close: no suspicion". A text area labelled "Analyst rationale (required)" containing the typed text "Matches hawala indicators; customer explanation does not fit the KYC profile." A small #5B6474 note: "A second reviewer must approve any closure (four-eyes)." Two buttons side by side: solid #1E4FA0 "Submit decision" and outline "Save draft".
+3. Card "Activity": three timestamped lines in 12 px #5B6474: "05 Oct 10:42 · Branch call note added", "04 Oct 16:05 · Alerts merged into case", "03 Oct 09:12 · Case created from 3 alerts".

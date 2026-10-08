@@ -1,0 +1,79 @@
+/* AKR-TMS plan PDF, Arabic edition: right-to-left overrides, loaded after plan.css by "build.py ar".
+   Arabic text uses IBM Plex Sans Arabic ("Plex Arabic", declared in plan.css); its Arabic-only subset has no Latin
+   glyphs, so Latin names, Western digits and punctuation fall back to Plex Sans. Every physical left/right rule in
+   plan.css is mirrored here. */
+
+:root { --ar-stack: "Plex Arabic", "Plex Sans", "Noto Naskh Arabic", sans-serif; }
+
+/* One type family for the whole document; letter-spacing breaks the joins between Arabic letters. */
+:is(body, body *):not(code, .mono) { font-family: var(--ar-stack) !important; }
+:is(body, body *) { letter-spacing: 0 !important; }
+em, i { font-style: normal; }
+
+@page {
+  @bottom-left { content: counter(page); font-family: "Plex Sans"; font-size: 7.5pt; color: #5B6474; }
+  @bottom-right { content: "AKR-TMS  \00B7  خطة للمصارف العراقية"; font-family: "Plex Arabic", "Plex Sans"; font-size: 7.5pt; color: #5B6474; direction: rtl; }
+}
+
+body { font-size: 10.3pt; line-height: 1.62; }
+p { margin-bottom: 2.4mm; }
+.lead { font-size: 11pt; line-height: 1.6; }
+
+/* ---------- Cover ---------- */
+.cover .lockup .word { direction: ltr; text-align: right; }
+.cover .lockup .ar { text-align: right; font-size: 11pt; }
+.cover h1 { font-size: 31pt; line-height: 1.38; max-width: 160mm; }
+.cover .sub { font-size: 12.5pt; line-height: 1.7; }
+
+/* ---------- Headings and lists ---------- */
+h2 { font-size: 20pt; line-height: 1.32; }
+h2::before { left: auto; right: 0; }
+/* Part of the h3 top margin moves into padding: a margin is dropped at a page break, and the marks above Arabic
+   letters would then print at the foot of the previous page. */
+h3 { font-size: 12.4pt; line-height: 1.45; margin-top: 5.3mm; padding-top: 1.2mm; }
+h4 { font-size: 10.4pt; }
+ul, ol { padding-left: 0; padding-right: 5.5mm; }
+.principles ol { padding-left: 0; padding-right: 6mm; }
+.principles li { line-height: 1.58; }
+
+/* ---------- Tables ---------- */
+table { line-height: 1.5; }
+th { text-align: right; font-size: 8.2pt; padding: 1.6mm 0 1.4mm 2mm; }
+td { padding: 1.5mm 0 1.5mm 2.5mm; }
+
+.timeline table { line-height: 1.35; }
+.timeline td { padding: 0.8mm 0 0.8mm 3mm; }
+.timeline td:first-child::before { top: 2mm; }
+.timeline tr:not(:last-child) td:first-child::after { top: 4.2mm; bottom: -1.6mm; }
+.timeline td:first-child { padding-left: 3mm; padding-right: 5mm; }
+.timeline td:first-child::before { left: auto; right: 0; }
+.timeline tr:not(:last-child) td:first-child::after { left: auto; right: 0.9mm; }
+
+/* ---------- Callouts, figures, cards ---------- */
+.callout { border-left: none; border-right: 1.4mm solid var(--gold); line-height: 1.6; }
+.dark-box { line-height: 1.6; }
+.card { line-height: 1.55; }
+figcaption, .conn .cap { line-height: 1.5; }
+.stat .l { line-height: 1.45; }
+.stats4 .stat .n { font-size: 15pt; }
+
+/* ---------- System map (section 7): arrows point right to left ---------- */
+.sysmap { line-height: 1.4; }
+.sysmap .arrow::before { left: 2.2mm; right: 1.2mm; }
+.sysmap .arrow::after { right: auto; left: 0.6mm; border-left: none; border-right: 2.2mm solid var(--gold); }
+
+/* ---------- Roadmap bars (section 11): month 0 on the right; bars use inline right: offsets ---------- */
+.gantt .g-head { margin-left: 0; margin-right: 20mm; }
+.gantt .g-head span { transform: translateX(50%); }
+.gantt .g-head span:first-child { transform: none; }
+.gantt .g-head span:last-child { transform: translateX(100%); }
+
+/* ---------- Glossary: Arabic term, meaning, English term (left-aligned, left to right) ---------- */
+.glossary td:first-child { width: 42mm; }
+.glossary td:last-child, .glossary th:last-child { text-align: left; width: 36mm; padding-left: 0; padding-right: 2mm; direction: ltr; }
+
+/* ---------- Appendix B ---------- */
+.rindex li strong { margin-right: 0; margin-left: 1.2mm; }
+.reqcount td:last-child, .reqcount th:last-child { text-align: left; padding-left: 0; padding-right: 2mm; }
+/* Appendix B starts on its own page so its heading stays with the index (the Arabic glossary fills page 23). */
+h2#research { break-before: page; margin-top: 0; }

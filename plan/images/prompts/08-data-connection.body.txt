@@ -1,0 +1,29 @@
+Screen: "Data connection", the health of AKR-TMS's read-only link to the bank's core banking database. Active rail row: Data.
+
+TOP BAR: title "Data connection"; context line "Core banking replica · read-only · data as of 06 Oct 2026, 14:32"; avatar initials "SR", role label "Data steward".
+
+ROW 1: four equal KPI cards, each with a small uppercase label, a large value (40 px bold) and a caption:
+- CONNECTION: "Read-only"; caption "Read permission only · checked 14:00" with a green #2F7D4F check icon.
+- REPLICA DELAY: "42 s"; caption "Target: under 5 minutes".
+- RECONCILIATION: "14 / 14"; caption "Tables match on counts and totals · 03:00 today".
+- DATA QUALITY ISSUES: "23"; caption "4 affect monitoring" in amber #B26A00.
+
+ROW 2, two cards:
+- Left card, about 60 percent width, "Daily reconciliation · core banking vs AKR-TMS": a table with columns TABLE, CORE BANKING, AKR-TMS, CHECK, STATUS. Rows exactly:
+   "Customers | 486,200 | 486,200 | Count | Match"
+   "Accounts | 731,452 | 731,452 | Count | Match"
+   "Transactions, 05 Oct | 214,380 | 214,380 | Count | Match"
+   "Transaction value, 05 Oct (IQD) | 86,412,500,000 | 86,412,500,000 | Sum | Match"
+   "Incoming wires, 05 Oct | 1,904 | 1,904 | Count | Match"
+   "Card transactions, 05 Oct | 41,220 | 41,220 | Count | Match"
+   "Letters of credit, open | 1,118 | 1,118 | Count | Match"
+   Each STATUS cell is a small green pill with a tick and the word "Match". Numbers right-aligned with tabular figures.
+- Right card, about 40 percent width, "Data quality issues": five rows, each with a coloured severity dot, a bold short title and a grey detail line:
+   red dot: "Transfer purpose missing" / "312 outgoing wires · affects wire transfer rules"
+   red dot: "Beneficial owner not recorded" / "41 companies · affects customer risk rating"
+   amber dot: "Occupation missing" / "1,904 individuals"
+   amber dot: "National ID format invalid" / "77 customers"
+   grey dot: "One phone number on many customers" / "12 numbers shared by more than 10 customers"
+   At the bottom a #1E4FA0 link "View all 23".
+
+ROW 3, full width, card "Feed volume, last 24 hours": a simple line chart in #1F8A8A of rows received per minute, x-axis from "14:30" yesterday to "14:30" today, low at night, peaking around 10:00, y-axis labelled "rows per minute" from 0 to 6,000. At the right end of this card a small boxed figure: "Field mapping: 212 of 215 required fields (98.6%)".

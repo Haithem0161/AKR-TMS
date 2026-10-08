@@ -1,0 +1,5 @@
+TYPOGRAPHY: a clean humanist sans-serif like IBM Plex Sans throughout; tabular figures for numbers; identifiers such as case numbers in a monospace face; card titles 16 px semibold #18202F; small labels 11-12 px uppercase with slight letter spacing in #5B6474; body text 13-14 px #18202F. All text crisp, legible and correctly spelled English, exactly as written in this description. Do not add any extra text that is not in this description.
+
+COLOURS: use only #0F2147, #1A2E5C, #1E4FA0, #1F8A8A, #C8A24B (active rail marker only), #F5F0E6, #FFFFFF, #18202F, #5B6474, #DDD6C9, #B3261E, #B26A00, #F2A33A, #2F7D4F, plus very light tints of these for chips and pills.
+
+MUST NOT APPEAR: blur, motion blur, fading or out-of-focus areas anywhere (every region is pin-sharp and flat), Arabic letters or any non-Latin script, gradients, glows, drop shadows, glassmorphism, 3D effects, perspective tilt, photos, people, emojis, decorative illustrations, lorem ipsum, browser chrome, laptop or monitor frames, watermarks.
