@@ -1,0 +1,107 @@
+Fixes applied to docs/plan/phase-22.md by the verification pass (DR-413). 25 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/22.txt)
+OLD: until the object is `scanned` it cannot be used in an answer
+NEW: until its `av_status` is `clean` it cannot be used in an answer
+
+=== F2 REP (from fixes/22.txt)
+OLD: and status scanned (`version_id` set)
+NEW: and `av_status = 'clean'` (`version_id` set)
+
+=== F3 REP (from fixes/22.txt)
+OLD: classification: personal, lang: none, bytes }
+NEW: classification: personal, lang: und, bytes }
+
+=== F4 REP (from fixes/22.txt)
+OLD: when it corrects a current claim through `corroborates`, phase 19 section 3.3 step 2
+NEW: when it corrects a current claim through `supersedes`, phase 19 section 3.3 step 2; `supersedes` must name a current claim of this RFI whose `source_kind` is `branch_officer`, else 422 `E_VALIDATION` at `/answers/{i}/supersedes`
+
+=== F5 REP (from fixes/22.txt)
+OLD: evidence_ids: Vec<Uuid> (0 to 5), corroborates: Option<Uuid> }` (the phase 19 `AnswerInput` with the branch's source kind fixed to `branch_officer`).
+NEW: evidence_ids: Vec<Uuid> (0 to 5), supersedes: Option<Uuid> }` (the phase 19 `AnswerInput` with `question_key` in place of `question_id`, the source kind fixed to `branch_officer`, corroboration `none` and no `corroborates`, which is the desk's (section 3.2 step 5); the route finds `question_id` through `casework.rfi_questions`, unique on `(rfi_id, question_key)`; the 500-character cap of `value` is this route's own, narrower than the 2000 of phase 19).
+
+=== F6 REP (from fixes/22.txt)
+OLD: InternalReportService::receive(tx, ReceiveCommand {
+NEW: InternalReportService::receive(tx, CreateInternalReport {
+
+=== F7 REP (from fixes/22.txt)
+OLD: through the register detail (Open doubts 9)
+NEW: through the rows that section 7.2 extends (Open doubts 9)
+
+=== F8 REP (from fixes/22.txt)
+OLD: through the phase 19 register detail, which has no observation fields today; the register detail gains them for M only (a read extension, not built here)
+NEW: in the rows of phase 19's `GET /internal-reports`, which section 7.2 of this phase extends with the observation fields for M only
+
+=== F9 REP (from fixes/22.txt)
+OLD: 3. The due timer of a returned report still fires; a report returned and not re-signed by the due day raises the overdue alarm.
+NEW: 3. The due timer of a returned report still fires; a report returned and not re-signed by the due day raises the overdue alarm. A return made after the timer has fired (the due day has passed) raises the same alarm in the return transaction, with the `AlarmService::raise` call of section 3.6 timer step 2; the live-alarm index keeps one alarm.
+
+=== F10 REP (from fixes/22.txt)
+OLD: `get(conn, code)`, `all(conn)`, `put_version(tx, NewVersion)`
+NEW: `get(conn, code)`, `get_version(conn, code, version) -> Option<NotificationTemplate>` (one stored version of `admin.notification_template_versions`, for the render of `NotificationService::list`), `all(conn)`, `put_version(tx, NewVersion)`
+
+=== F11 REP (from fixes/22.txt)
+OLD: both languages present; placeholders from the template's `params` only;
+NEW: both languages present (`E_MISSING_I18N`); placeholders from the template's `params` only (`unknown_key`);
+
+=== F12 REP (from fixes/22.txt)
+OLD: on both languages; the code exists.
+NEW: on both languages (`forbidden_term`, span only); the code exists (`unknown_key`).
+
+=== F13 REP (from fixes/22.txt)
+OLD: and the link `serve.public.base_url` (phase 01).
+NEW: and the link built from `AKR_PUBLIC_ORIGIN` (phase 01 environment variable).
+
+=== F14 REP (from fixes/22.txt)
+OLD: `serve.public.base_url` (phase 01), `bank.timezone` (phase 00).
+NEW: `AKR_PUBLIC_ORIGIN` (phase 01 environment variable, not a settings row), `bank.timezone` (phase 00).
+
+=== F15 REP (from fixes/22.txt)
+OLD: the producer names the code; the code is one of the two |
+NEW: the producer names the code; this row is the task shape, and the topic has two more shapes (section 7+) |
+
+=== F16 REP (from fixes/22.txt)
+OLD: `ObservationView` (for M and the desk only) carries the decrypted notes through the phase 02 sealing service.
+NEW: `ObservationView` (for M only, 7.2) carries the decrypted notes through the phase 02 personal seal (AAD = the observation id, as section 3.3 step 5 applies it).
+
+=== F17 REP (from fixes/22.txt)
+OLD: `closed` (the word of a withdrawn request), with no `due_at`
+NEW: `closed` (the word of any closed request), with no `due_at`
+
+=== F18 REP (from fixes/22.txt)
+OLD: 19 closes or withdraws it, for
+NEW: 19 closes it with its case (phase 19 section 7+), for
+
+=== F19 REP (from fixes/22.txt)
+OLD: `closed`, which a withdrawn
+NEW: `closed`, which a closed
+
+=== F20 REP (from fixes/22.txt)
+OLD: (phase 19 section 3.14, Cedar `followup.a2.report`)
+NEW: (phase 19 section 3.13, Cedar `followup.a2.report`)
+
+=== F21 REP (from fixes/22.txt)
+OLD: `set_email_state(tx, id, state, attempts, sent_at, error_code)`; `sweep_read_older_than(tx, days, limit)`
+NEW: `set_email_state(tx, id, state, attempts, sent_at, error_code)`; `get_for_update(tx, id) -> Option<Notice>` (the notice row `FOR UPDATE`, read by the job `notification_email`); `sweep_read_older_than(tx, days, limit)`
+
+=== F22 BLOCK (from fixes/22.txt)
+### 7.N Alarm row of the liaison report (V-22-04-a, MEDIUM; DR-413)
+Phase 19 section 7.3 has each owner add its row to the table of phase 19 section 3.10. This phase's row: `liaison_report_overdue` (no stage) | raised by the handler `timer_liaison_due` (section 3.6) and by a late return (section 3.7 step 3) | subject `liaison_report` | supervisor M | read by M.
+
+=== F23 BLOCK (from fixes/22.txt)
+### 7.N The three payload shapes of `notify.request` (V-22-06-a, V-22-06-b, MEDIUM; DR-413)
+The mapping row of section 3.8 describes one shape. The dispatcher tells the shapes apart by the keys of the payload.
+1. `{task_id, template_code, to}` (phase 04 remind and escalate): the row as written. The code is `task.overdue` or `task.waiting`; `to` is `holders` or `escalation_target`.
+2. `{workflow_instance_id, template_code, to}` (the `notify` effect, section 4.5 item 5 a): the source row is the instance and its resource, and the tier of step 3 is the resource's. `to: initiator` is the instance's initiator. `to: subject_team` is the case team (`casework.case_acl`, `revoked_at IS NULL`) when the resource kind is `case`, and the initiator alone for every other resource kind. The code is any closed code of section 1.2; steps 4 to 6 run as written, with `count` 1.
+3. `{template_code, count}` (phase 25 section 3.3: `security.break_glass_waiting`, `security.break_glass_opened`): the notice names no resource, so steps 2 and 3 do not run and step 5 never swaps the template. The recipients are the active holders of the roles of 7.1 with no visibility filter, and `count` is the payload's value (step 6 does not run).
+A payload of any other shape, or a code outside the closed list, is an error and the row stays undispatched (step 1).
+
+=== F24 BLOCK (from fixes/22.txt)
+### 7.N `desk.approval_waiting` has no fixed producer (V-22-05-c, LOW; DR-413)
+The seeded code `desk.approval_waiting` is sent by no step of this phase. It stays in the closed list as a code that a workflow definition's `notify` effect may name (payload shape 2 of the block above). An approver learns of an open deciding task through `task.waiting`.
+
+=== F25 BLOCK (from fixes/22.txt)
+### 7.N Observation read for the register list (V-22-07-c, LOW; DR-413)
+Section 2 `ObservationRepository` gains `by_internal_report(conn, internal_report_ids: &[Uuid]) -> Vec<Observation>`: one read of the observations whose `internal_report_id` is in the page of phase 19's register list, for the `observation` key of 7.2 (three fields: `indicator_groups`, `escalation_criteria`, `notes`). The key is set for M only.

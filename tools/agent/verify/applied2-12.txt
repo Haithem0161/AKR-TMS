@@ -1,0 +1,19 @@
+Replacements made in docs/plan/phase-12.md by the first re-check (DR-413). 3 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-12-1]
+WHY: R-12-1 | CONFIRMED LOW | block 7.8 quotes words of block 7.5 that are not there verbatim | quotation marks dropped, wording aligned
+OLD: In block 7.5, "the latest recon result for its object and field" is this read
+NEW: In block 7.5, the issue's latest recon result for its object and field is this read
+
+=== F2 [R-12-2a]
+WHY: R-12-2 | CONFIRMED LOW (raised MEDIUM) | the base trait and the step 7 call of `accepted_for` lack the `field` argument that block 7.5 gives the method | both lines gain it
+OLD:     async fn accepted_for(&self, conn: &mut PgConnection, source_id: Uuid, object: &str, kind: DqKind)
+NEW:     async fn accepted_for(&self, conn: &mut PgConnection, source_id: Uuid, object: &str, field: &str, kind: DqKind)
+
+=== F3 [R-12-2b]
+WHY: R-12-2 | CONFIRMED LOW (raised MEDIUM) | the base trait and the step 7 call of `accepted_for` lack the `field` argument that block 7.5 gives the method | both lines gain it
+OLD: `accepted_for(source, <rung>:<object>, kind = recon_break)`
+NEW: `accepted_for(source, <rung>:<object>, <field>, kind = recon_break)` (the field of the result, block 7.5)

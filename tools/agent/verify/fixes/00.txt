@@ -1,0 +1,79 @@
+Fixes for phase 00 (lead-reviewed from tools/agent/verify/draft/00.txt). 12 claims: 11 confirmed, 1 rejected.
+
+@@ REP 00
+SBOMs: `cargo-cyclonedx` per binary and Syft per image (CycloneDX), with maintainer and country per component
+@@ WITH
+SBOMs: `cargo-cyclonedx` per binary, the frontend packages from the pnpm lock file, and Syft per image (CycloneDX), with maintainer and country per component
+@@ END
+
+@@ BLOCK 00
+### 7.N SP-74: the VEX statement, and where models are listed (V-00-02-b, V-00-02-c, MEDIUM; DR-413)
+- CI step 7 (section 4): the bundle also holds one VEX statement per release (CycloneDX), beside the SBOMs and under the
+  manifest digests. It lists the known vulnerabilities of the release's components that are not exploitable in AKR-TMS,
+  each with its reason and owner, taken from the waiver register `deploy/waivers.toml` (step 2), which also holds the
+  waived Trivy findings of step 5.
+- `akr-ctl bundle verify` treats the VEX statement as part of the SBOM set: a bundle without it is refused as a bundle
+  without an SBOM is (phase 25 refusal code `sbom_missing`).
+- A model is not a release component: a release imports no model (DR-390). The signed manifest of a model version is
+  its bill of materials (phase 27 section 3.3; phase 28 section 3.9), so the release SBOM lists no model.
+@@ END
+
+@@ BLOCK 28
+### 7.N Publisher country in the model manifest (V-00-02-b, MEDIUM; DR-413)
+Section 3.9, import step 2: the manifest field `publisher` is an object `{name, country}`, and `country` is an ISO 3166-1
+alpha-2 code. A manifest without it is `manifest_invalid`. Reason: the supply-chain legal screen (VO-07, phase 00) needs
+the maintainer and country of every component, and a model is outside the release SBOM (DR-390).
+@@ END
+
+@@ BLOCK 00
+### 7.N A failing WAL archive pages the operator (V-00-03-a, MEDIUM; DR-413)
+From phase 03 on (the postgres exporter), `deploy/observability/` holds a third alert rule beside the two of 7.19: the
+WAL archiver reports a failure newer than its last success for 5 minutes (the exporter's `pg_stat_archiver` series). It
+is a P2 page to the operator (SP-84, the loud WAL-gap alarm). `backup_check` and its marker are unchanged: they cover the
+age of the last backup, not a gap in the archive.
+@@ END
+
+@@ BLOCK 00
+### 7.N Crypto port errors (V-00-05-a, MEDIUM; DR-413)
+Section 2 crypto port: the trait line is shorthand. Every method returns `Result<_, CryptoError>` (OpenBao or the key
+cannot be reached, or the tag and AAD check of `open` fails). `CryptoError` is the type phase 12's
+`CertificateSigner::sign` already names. A caller maps it to 503 `E_UNAVAILABLE`, as phase 02 section 3 does for its
+`Crypto` case, unless its own error section says otherwise.
+@@ END
+
+@@ BLOCK 00
+### 7.N The TopicHandler trait (V-00-06-a, MEDIUM; DR-413)
+Section 3 `OutboxDispatcher`, with 7.1: a topic handler implements
+`trait TopicHandler { async fn handle(&self, tx: &mut Transaction<'_, Postgres>, row: &OutboxRow) -> Result<(), JobError>; }`.
+`OutboxRow` is the claimed `admin.outbox` row that `OutboxStore::claim` returns; `tx` is the row's transaction of 7.1.
+Any `Err` leaves the row undispatched under the back-off of that section; `JobError::Permanent` is treated like
+`Retryable` here, because a row leaves the queue only by success or at `outbox.max_attempts`.
+@@ END
+
+@@ REP 00
+the update is guarded by `locked_by`.
+@@ WITH
+the update is guarded by `locked_by`. A heartbeat that matches no row (the reaper re-queued the job) changes nothing: the runner lets the handler finish, since handlers are idempotent (at-least-once, section 3), and a handler that uses `complete_in` (7.18) then rolls back.
+@@ END
+
+@@ BLOCK 00
+### 7.N Harness rows and retention sweeps emit no audit event (V-00-09-a, V-00-10-a, LOW; DR-413)
+Rows of `admin.jobs`, `admin.outbox`, `admin.timers` and `admin.idempotency_keys` are operational state, not business
+data. Their inserts, claims, fires, cancels, retries and retention deletes emit no audit event: the owner's own event
+records the business effect, and `job.dead` is the one harness event (section 4). The same holds for the
+`maintenance_sweep` deletes of 7.11 (a) and (b): the issue and the use of a step-up assertion are audit events already
+(phase 01), and a staging object that never became evidence has no record to keep. `maintenance_sweep` reports every
+delete count to metrics. Item (c) of 7.11 stays audited, because it changes a run's row.
+@@ END
+
+@@ REP 00
+AND locked_by = $2 AND locked_at = $3` in the handler's transaction (the values of this worker's claim).
+@@ WITH
+AND attempts = $2` in the handler's transaction (`$2` is the attempt number `JobContext` carries; every claim adds one to `attempts`, so it names this worker's claim, and `locked_at` cannot, because the heartbeat of 7.2 moves it).
+@@ END
+
+@@ REP 00
+keep a marker per item (phase 19 section 7+).
+@@ WITH
+make each item's own state change the marker, so a second attempt skips the items already done (phase 19 `hibernation_release` sets `released_at` per hit).
+@@ END

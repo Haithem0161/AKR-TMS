@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-16.md by the second re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-16-1]
+WHY: S-16-1 | CONFIRMED LOW | block 7.15 (the R-16-2 text) puts the `capacity` exception under "DSL D.3 holds"; D.3's Minor row has no such exception, the rule is the `reason_code` row of DSL D.1 (S-39) | the lead-in names both
+OLD: DSL D.3 holds: a set inside the band that does not loosen and has no `capacity` reason is minor and needs a replay;
+NEW: DSL D.3 holds, with the `capacity` rule of the `reason_code` row of DSL D.1 (S-39): a set inside the band that does not loosen and has no `capacity` reason is minor and needs a replay;

@@ -1,0 +1,188 @@
+Fixes for phase 31 after lead review of tools/agent/verify/draft/31.txt (verdicts in tools/agent/verify-verdict.md).
+26 confirmed: 0 HIGH, 8 MEDIUM, 18 LOW; 4 rejected (V-31-04-c, V-31-06-b, V-31-06-e, V-31-08-a). Lead decisions: the
+practice flag keeps `bool_or` and the label says what it means; the snapshot upsert is a derived rebuild with no audit
+row; the forecast takes no query type; no outcome `deferred` exists (the event row is written with the disable and a
+Kratos failure is the phase 03 retry); the daily replay counts are a read of this phase's `CapacityRepository`, so
+phase 16 is unchanged; the class mix of a simulation is required; an e-mail change is stored on the directory row and
+counted by the reconciliation in `directory.mismatch` (`email_count`); the surge percent is a floor on the sample size
+of a draw sized from the settings. REPs go to phase 19 (the column comment and block 7.5).
+
+@@ REP 31
+returns `passed_first`, `cases_passed_first`, `cases_attempted` and `attempts`.
+@@ WITH
+returns `passed_first`, `cases_passed_first`, `cases_attempted` and `attempts`. `passed_first` is TRUE when at least one case of the course was passed on its first attempt. It is not a course pass: the two counts beside it are the measure.
+@@ END
+@@ REP 31
+"passed on first attempt" with the number of cases passed first time out of the cases tried, "not passed on first attempt", or "no attempt";
+@@ WITH
+"passed on first attempt" (shown when `passed_first` is TRUE, that is, at least one case was passed first time) with the number of cases passed first time out of the cases tried, "not passed on first attempt" (cases tried, none passed first time), or "no attempt";
+@@ END
+@@ BLOCK 31
+### 7.N ClassAggregate and the snapshot reads of the forecast (V-31-02-a, MEDIUM; DR-413)
+Section 2.1: `ClassAggregate { pool_id: Uuid, work_kind: WorkKind, class_code: String, arrivals: i64, decided: i64, handling_minutes_sum: i64 }`. Each number is the sum over the window of the snapshot column of the same name, for pool rows only (the unassigned total is left out), grouped by pool, work kind and class. The type holds no person field. It is what `CapacityRepository::window_aggregate` returns and what step 1 of section 3.4 reads.
+Section 2.2: `CapacityRepository` gains two reads that steps 1, 6, 9 and 10 of section 3.4 need and no method gave.
+1. `snapshot_dates(from, to) -> Vec<NaiveDate>`: the distinct bank dates in the window that have a snapshot row. `W` of step 1 is the number of bank working days among them (phase 09 calendar).
+2. `recent_buckets(hours: i64) -> Vec<(CapacitySnapshot, DateTime<Utc>)>`: the rows of the latest `hours` complete buckets, each with its `computed_at`. The forecast calls it with 24. `B_0` of step 6 is the sum of `backlog_end` over the pool's rows of the newest bucket. The hourly totals of step 9 are the sums of `arrivals` and `decided` per pool and bucket. `data_as_of` of step 10 is the newest `computed_at`.
+@@ END
+@@ REP 31
+A re-run replaces the values of the bucket and does nothing else.
+@@ WITH
+A re-run replaces the values of the bucket and does nothing else. The snapshot is a derived rebuild of counts, so it writes no audit row (section 3.14 lists none for it), as the anchors of phase 02 write none; `computed_at` is its record.
+@@ END
+@@ REP 31
+Scope `{period}`; languages `ar` and `en`;
+@@ WITH
+Scope `{period}`: the body of `POST /packs` is the phase 06 `PackRequest` as `{kind, scope: {period}}`, answered by the phase 06 202 `PackAccepted`; `lang` is left out, and the build publishes one pack row per language. Languages `ar` and `en`;
+@@ END
+@@ REP 31
+The pack has kind `correspondent` or `validator`, status built, and a period that has ended (422 sub-code `pack_not_ready`).
+@@ WITH
+The pack is a row of `admin.packs` (a row exists only once its build is published: phase 02 `PackService::publish`, step 3; the table has no status column), of kind `correspondent` or `validator`, whose `scope.period` is a bank month that has ended. Anything else, a pack of another kind and an unknown id included, is refused with 422 sub-code `pack_not_ready`.
+@@ END
+@@ BLOCK 31
+### 7.N Repository methods of the correspondent list and the pack links (V-31-04-b, MEDIUM; DR-413)
+Section 2.2 gains two things.
+1. `RfiPackRepository` (new; it owns `casework.rfi_packs`): `insert(tx, rfi_id, pack_id, linked_by, at) -> bool` with `ON CONFLICT (rfi_id, pack_id) DO NOTHING`, and `for_rfis(conn, rfi_ids: &[Uuid]) -> Vec<(Uuid, Uuid, String)>` (RFI id, pack id and pack kind, joined to `admin.packs`). `insert` returns `false` for a repeat of the pair; section 3.9 step 5 then answers 200 with no version bump and no second audit row.
+2. The phase 19 `RfiRepository` gains `correspondent_page(conn, direction: Option<RfiDirection>, page) -> Vec<Rfi>`: the rows of `kind = 'correspondent'` under the same `visibility_sql` as `desk`, newest first. `desk` is not reused, because its filter is by status.
+Section 2.3: `RfiService::attach_pack(ctx, rfi_id, body: AttachPackBody, if_match, idem)` and `RfiService::correspondent_list(ctx, direction: Option<RfiDirection>, cursor)`, which returns a cursor page of `CorrespondentRfiRow`. That row has the fields of the list in section 3.9: `id`, `direction`, `status`, `deadline_at`, `recipient_ref`, `questions_answered`, `questions_total`, `overdue` and `packs` (pack id and kind). The two question counts come from the phase 19 question and answer repositories.
+@@ END
+@@ REP 19
+-- branch, staff or unit id (canonical; no foreign key)
+@@ WITH
+-- branch, staff or unit id; from phase 31 on, the canon.account id of a correspondent (canonical; no foreign key)
+@@ END
+@@ REP 31
+CHECK (outcome IN ('applied', 'ignored', 'refused', 'deferred'))
+@@ WITH
+CHECK (outcome IN ('applied', 'ignored', 'refused'))
+@@ END
+@@ REP 31
+'disable_deferred', 'unknown_user')),
+@@ WITH
+'unknown_user')),
+@@ END
+@@ REP 31
+`deferred` with reason `disable_deferred` when the Kratos step is deferred (phase 03 enqueues `offboard_finalize`);
+@@ WITH
+the outcome stays `applied` when the Kratos step after the commit fails (phase 03 enqueues `offboard_finalize`; the account is already disabled and its tokens revoked);
+@@ END
+@@ REP 31
+and the outcome is `deferred` (reason `disable_deferred`).
+@@ WITH
+and the outcome stays `applied`: the event row is written in the transaction of step 2 and never updated, the account is already disabled, and the phase 03 mirror refuses its sessions at their next request. No outcome `deferred` exists (DR-413).
+@@ END
+@@ REP 31
+(Cedar `user.disable`, not `user.offboard`; outcome `disable_deferred`)
+@@ WITH
+(Cedar `user.disable`, not `user.offboard`; the outcome is `applied`, and a Kratos failure after the commit is the phase 03 `offboard_finalize` retry, DR-413)
+@@ END
+@@ REP 31
+ctx: DirectoryCtx
+@@ WITH
+ctx
+@@ END
+@@ REP 31
+4. The Cedar check is on the directory path only (section 3.17, E0: action `user.disable`).
+@@ WITH
+4. `ctx` is the caller context that every service method takes; no new type is added. On the event path it holds the verified service principal `polis-directory`, and Cedar checks `user.disable` with `context.via == "webhook_hmac"` (section 3.17, E0). On the reconciliation path (section 3.11, item 1) it is the job's system context: no Cedar check runs, as for every job, and the audit actor is `System` (phase 02).
+@@ END
+@@ REP 31
+`finish_run(tx, id, status, result, completed_at)`.
+@@ WITH
+`run(id) -> Option<CapacityRun>`; `start_run(tx, id)` (sets `running`); `finish_run(tx, id, status, result, completed_at)`; `replay_daily_counts(replay_id) -> Vec<(NaiveDate, i64)>` (per `business_date`, the number of `scn.replay_results` rows of the replay with `would_alert = TRUE`; it selects no other column).
+@@ END
+@@ REP 31
+1. Mark the run `running`. Re-read the replay; a replay that is no longer `completed` fails the run.
+@@ WITH
+1. Mark the run `running` (`CapacityRepository::start_run`). This write has no audit row of its own: the pair `capacity.simulation_requested` and `capacity.simulation_completed` of section 3.14 brackets the run, and step 8 records how it ended. Re-read the replay with phase 16 `ReplayRepository::get`; a replay that is no longer `completed` fails the run.
+@@ END
+@@ REP 31
+2. Read `scn.replay_results` of the replay for the columns `business_date` and `would_alert` only
+@@ WITH
+2. Read `scn.replay_results` of the replay through `CapacityRepository::replay_daily_counts`, for the columns `business_date` and `would_alert` only
+@@ END
+@@ REP 31
+`class_mix` (shares of P0 to P3 that sum to 1; default: the measured mix of section 3.4)
+@@ WITH
+`class_mix` (shares of P0 to P3 that sum to 1; required, with no default: the requester states the mix, DR-342 and Open doubts 5; a missing mix or one that does not sum to 1 is 422 `E_VALIDATION` at `/inputs/class_mix`)
+@@ END
+@@ REP 31
+`compute(period_month) -> ExposureRunSummary`
+@@ WITH
+`compute(period_month) -> ExposureRunSummary` (`ExposureRunSummary { period_month, rows, suppressed_rows }`: the month, the rows upserted and those of them with `suppressed = TRUE`, which is the detail of `exposure.computed`)
+@@ END
+@@ REP 31
+- `update`: the display name is replaced; the e-mail of a `linked` user is not applied to the account (the identifier changes only through phase 03). The outcome is `applied`.
+@@ WITH
+- `update`: the display name and the directory e-mail (`user_name_enc`) of the directory row are replaced. The e-mail is never applied to an account, linked or not: `admin.users.email` changes only through phase 03, and the reconciliation counts the difference (item 3). The outcome is `applied`.
+@@ END
+@@ REP 31
+3. Linked, account offboarded, `directory_active = TRUE`: audit `directory.mismatch {count}` (SIEM true). Local wins; nothing is changed.
+@@ WITH
+3. Linked, account offboarded, `directory_active = TRUE`: audit `directory.mismatch {count, email_count}` (SIEM true). Local wins; nothing is changed. `email_count` is the second mismatch of DR-351: the linked rows (`DirectoryRepository::list` with state `linked`) whose decrypted `user_name_enc` differs from `admin.users.email` of the linked account, compared case-insensitively as link step 4 does. The job decrypts in memory and writes the two counts only; no e-mail is written or logged.
+@@ END
+@@ REP 31
+| `directory.mismatch` | `directory` | true | `count` |
+@@ WITH
+| `directory.mismatch` | `directory` | true | `count`, `email_count` |
+@@ END
+@@ REP 31
+Section 3.12 implements phase 03's
+@@ WITH
+The `directory` module of this phase (not section 3.12, which holds the disable only) implements phase 03's
+@@ END
+@@ REP 31
+takes `max(its rate, capacity.surge_qc_percent)`; otherwise it is unchanged.
+@@ WITH
+raises the size of a draw that takes its size from the settings to at least `ceil(N * capacity.surge_qc_percent / 100)` items (the formula is in phase 19 section 7.5); otherwise it is unchanged.
+@@ END
+@@ REP 31
+takes `max(qa rate, capacity.surge_qc_percent)` for the sampled population.
+@@ WITH
+samples at least `capacity.surge_qc_percent` percent of the population of a draw sized from the settings.
+@@ END
+@@ REP 19
+capacity.surge_qc_percent)`; no sample is removed by a surge. Open doubts 10 keeps the rest of M-54.
+@@ WITH
+capacity.surge_qc_percent)`; no sample is removed by a surge. Open doubts 10 keeps the rest of M-54. "Its rate" is the sampled share `n / N` of a draw that takes its size from the settings (section 3.8 step 2 with no requested `n`). During a surge that draw uses `n = min(N, max(n, ceil(N * capacity.surge_qc_percent / 100)))`. The percent is a share of the population, not a defect rate, so `qa.expected_defect_rate` is unchanged, and so is a draw with a requested `n` (V-31-12-a; DR-413).
+@@ END
+@@ REP 31
+`forecast(ctx, query: ForecastQuery { handling_pct, arrivals_pct })`
+@@ WITH
+`forecast(ctx)`
+@@ END
+@@ REP 31
+subject: ('pool', pool_id), stage: NULL
+@@ WITH
+subject_kind: pool, subject_id: pool_id, stage: NULL
+@@ END
+@@ REP 31
+per list in `ref.lists`, the versions activated in the period, and for each the hours from `loaded_at` to `activated_at` (phase 14)
+@@ WITH
+per list in `ref.lists`, the versions of `ref.list_versions` activated in the period, and for each version the hours from its `loaded_at` to its `activated_at` (phase 14)
+@@ END
+@@ REP 31
+Cedar: create for M only (section 3.16, E2).
+@@ WITH
+Cedar: create for M only (section 3.17, E2).
+@@ END
+@@ REP 31
+(partition pruning by business date and by creation month)
+@@ WITH
+(the BRIN index `idx_txn_business_brin` on `business_date`, phase 10, because `canon.txn` is partitioned by `booking_date`; `alert.alerts` is pruned by creation month)
+@@ END
+@@ REP 31
+(phase 03 `POST /admin/users/{id}/grants`
+@@ WITH
+(phase 04 `POST /admin/users/{id}/grants`
+@@ END
+@@ REP 31
+`directory_verifier: Arc<DirectoryWebhookVerifier>`
+@@ WITH
+`directory_verifier: Arc<DirectoryWebhookVerifier>`, `directory_link: Arc<dyn DirectoryLinkQuery>` (`PgDirectoryLinkQuery` while `pack.polis` is on, phase 03 `NoDirectory` while it is off)
+@@ END
+@@ REP 31
+`akr_retention` deletes practice attempts only through the retention run (a direct `DELETE` by `akr_app` fails with `insufficient_privilege`).
+@@ WITH
+`akr_retention` holds SELECT only on `train.practice_attempts` in this release (section 7.3), so no deletion path exists yet. A direct `DELETE` by `akr_app` fails with `insufficient_privilege`.
+@@ END

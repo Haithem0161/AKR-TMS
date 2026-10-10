@@ -1,0 +1,108 @@
+You are drafting part of the ADVERSARIAL CORRECTNESS PASS for the AKR-TMS implementation plan (an AML/KYC
+transaction-monitoring product for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Read first:
+.claude/rules/planning.md (section "Adversarial correctness pass"), tools/agent/b3-conventions.md,
+tools/agent/adv-plan.md.
+
+The plan is complete for coverage (every requirement is placed). This pass attacks the LOGIC: can two people, two
+requests, two jobs or one malicious insider make the planned system do something its rules forbid? You are a red team
+reading a specification, not code. A candidate flaw is a concrete sequence of steps that the phase text permits and
+that breaks a stated rule.
+
+YOUR RUN: run 6 = REPLAYED IDEMPOTENCY KEYS, AUDIT-CHAIN GAPS, OUTBOX REPLAY AND HANDLER IDEMPOTENCY. Targets:
+- Idempotency keys (phase 00 `admin.idempotency_keys`, the middleware, `idempotency.in_flight_lease_s`,
+  `idempotency.ttl_days`): a key replayed by another user, against another route, with another body, after its TTL,
+  while the first request is still in flight (lease expiry), or after the first request failed; a replay that returns a
+  response the second caller may not see (a masked record, another user's data); a mutation route that should carry
+  `Idempotency-Key` and does not; a key reused after the record it created was changed.
+- Audit chain (phase 02 `audit.audit_log`, `audit.access_event`, `AuditSink`, the chain head, anchors, `audit_verify`,
+  partitions): a mutation committed with no audit event; an audit event written in a transaction that rolls back while
+  the business change commits (or the reverse); two writers taking the chain head at once (a fork or a gap in the
+  hash chain); an event written outside the chain (a "standalone" write) that the verifier does not see; a partition
+  dropped or detached under retention that breaks verification; case chains (`casework.case_events`, phase 17 and 18)
+  with the same questions.
+- Outbox and handlers (phase 00 `admin.outbox`, dispatch, `outbox.max_attempts`, retention; consumers in phases 15, 19
+  and 22, and the topics they read): a message delivered twice (at least once) and the handler writes two rows, two
+  notices, two reviews or two alarms; a message delivered out of order (an update before its create; a close before
+  its open); a message that exhausts its attempts and is lost with nobody told; a handler that reads state changed since
+  the message was written and acts on the new state wrongly; an outbox row written outside the business transaction.
+
+Phases to read (grep first, then read the relevant sections in full): phase-00 (idempotency middleware and ledger,
+outbox, jobs, leases, dispatch, dead letters), phase-02 (`AuditSink`, chain, anchors, verifier, partitions,
+`emit_standalone`), phase-15 (outbox consumers: triggers into reviews, `TRG_REVIEW_REQUESTED`), phase-19 (topics it
+writes and reads, alarms), phase-22 (`NotificationDispatcher`, notices, digest and e-mail jobs). Phases 17 and 18 may be
+read for case chains (`casework.case_events`, `seq`). Grep "Idempotency-Key", "idempotency", "outbox", "dispatch",
+"at least once", "dedup", "ON CONFLICT", "chain", "prev_hash", "emit_standalone", "max_attempts", "dead" in each. Read
+the "Decisions" and "Open doubts" sections of those phases: a doubt already recorded is not a new flaw, but say if it
+is a real flaw left open. Note: runs 1 to 5 changed four-eyes, alerts, watermarks, clocks and masking (see section 7+
+blocks headed "Adversarial pass"); do not report those again.
+
+Lessons from runs 1 to 5 (the lead rejected or corrected these):
+- Read the CHECK or index itself. A constraint may apply to every row, not only to the outcome the text is discussing.
+  Quote its full expression before saying it does not cover a case.
+- Designed exceptions are not flaws. A behaviour is designed when a DR (docs/plan/research.md) or a stated rule in the
+  phase says so (for example, a job acting as the maker and a person as the checker). Grep research.md for the topic
+  before reporting; if a DR covers it, report it as GUARDED and cite the DR.
+- A sequence that is valid in serial order (each step correct when it commits, and a later step raises a new alert or
+  review) is not a race. Say what wrong final state remains.
+- Severity follows the outcome, not the mechanism: CRITICAL only when a forbidden decision or filing happens or a true
+  detection or a range of source data is lost with nobody told. If the item stays visible to a person (a flag, an open
+  alert, a stale banner), it is HIGH at most.
+- Before calling something a race, name the two transactions, the rows each locks, and the isolation level (READ
+  COMMITTED unless stated).
+- Propose the fix from the rule being broken, not from the mechanism you found. Check that your fix actually closes
+  the attack (run 3 had a fix that could not reach the case it described) and does not block ordinary work.
+- Read section heads and preambles, not only the step: a rule at the head of a section can guard every step
+  below it (run 4). Search the whole section before saying no guard exists.
+- Check which layer runs first: the authorize layer, the idempotency middleware and the transaction wrapper
+  run before the handler body (run 5). A guard in an earlier layer counts.
+- A reader named in a phase's tipping-off table or in a DR is a designed reader, not a leak (run 5).
+- Report GUARDED items in one line each.
+
+How to work, for each candidate:
+1. State the rule being attacked and quote where the plan states it (phase-NN.md:LINE, at most 20 words).
+2. Write the attack as numbered steps: who (role), what route or job, in what order, with what concurrency.
+3. Look for the guard that would stop it, in this order: a SQL CHECK constraint, a unique or partial unique index, a
+   guard trigger function (grep "RETURNS trigger"), a row lock or advisory lock and the lock order section, the
+   If-Match version check, a Cedar forbid policy, the idempotency ledger row and its lease, an `ON CONFLICT` clause,
+   a handler's re-read or marker test, a service step that re-reads and refuses, a step-up class. Quote the
+   guard you found, or the greps that found none.
+4. Verdict: FLAW (no guard stops it), GUARDED (a guard stops it; quote it), or DOUBT (the text is ambiguous; say
+   exactly which sentence and the two readings).
+5. For a FLAW: severity (CRITICAL: a mutation, decision or filing happens twice or without an audit event that
+   the verifier would catch, or an audit gap or fork goes undetected; HIGH: a duplicate or lost effect that is visible
+   somewhere (a second notice, a second review, an alarm), or a replay returns data the caller may not see; MEDIUM: a
+   race gives a wrong state that a person would notice; LOW: wording), and a fix as a
+   short section 7 text using the phase's own names (tables, columns, functions, Cedar actions, problem codes). Prefer
+   the smallest fix: one CHECK, one re-read under the lock, one Cedar forbid, one If-Match.
+
+Rules for honesty (the lead verifies every line; unverifiable claims are rejected):
+- Verify every name by grep. Never invent a table, column, route, function, Cedar action, problem code or setting. If
+  no phase names it, it does not exist; say so.
+- Quote the real text. Line numbers in Evidence and Check only, never inside the proposed fix text.
+- A guard in a later phase counts only from that phase on; say "from phase NN on" when relevant.
+- Do not report a GUARDED item as a flaw. Report GUARDED items briefly (one line each) so the lead sees what you
+  checked; the value of this run is in the FLAW and DOUBT items.
+- Never propose a new value for a closed list (step-up class, role code, problem code) when an existing one fits.
+- No suspicion data in canon or feat rows, nor in admin.registers. Suspicion-linked triggers use the neutral
+  `trigger_code` `TRG_REVIEW_REQUESTED`.
+
+Output file: tools/agent/adv-run6.md. Create it at the start with the header line
+"# Adversarial pass, run 6 (idempotency, audit chain and outbox replay; Haiku draft for lead review)" and append each candidate as
+soon as it is analysed (the machine may crash), in this format:
+
+### ADV-6-NN Short title   (verdict: FLAW | GUARDED | DOUBT; phase PP)
+- Rule: quote and phase-NN.md:LINE
+- Attack: numbered steps
+- Guard search: the guards found (quoted, with file:line) or the greps that found none
+- Severity (FLAW only): CRITICAL | HIGH | MEDIUM | LOW
+- Proposed 7.x text (FLAW only): "### 7.N <title>" and the change stated concretely
+
+Aim for depth over count: 10 to 20 candidates, each traced to the guard. Cover every phase listed above at least once.
+
+At the end append "## Summary": counts by verdict, FLAW items by severity, and the DOUBT items in one line each.
+
+Other rules:
+- Write ONLY tools/agent/adv-run6.md. Do not edit any other file.
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Do not read cbs-discovery/ or test-poc/ (not needed).
+- Your final reply: the counts and the file path, nothing else.

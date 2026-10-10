@@ -19,7 +19,7 @@ matching under 25 ms at p99 (C-56, N-50). Data freshness per class F0-F5 with `d
 | Service shape | Modular monolith, four binaries over shared crates | `akr-api` (analyst, MLRO, admin, reports; BFF), `akr-worker` (jobs), `akr-ingestd` (the only process that reaches the CBS), `akr-assess` (phase-2 assessment API). Separate binaries for security zoning, not scale; no inter-service RPC (they meet in PostgreSQL and the object store). DBS decision D14 kept in spirit |
 | DB access | SQLx 0.8, compile-time checked (`query!`, `query_as!`, offline `.sqlx`) | For AKR-TMS's own database. **One written exception:** CBS reads are generated from the mapping, parsed with `sqlparser` to prove a single read-only `SELECT` over approved objects, and tested against fixtures (the CBS schema belongs to the bank) |
 | Primary DB | PostgreSQL 17, primary + standby | Schemas `raw`, `canon`, `feat`, `scn`, `alert`, `casework`, `kyc`, `ref`, `rpt`, `assess`, `audit`, `admin`; roles `akr_app`, `akr_ingest`, `akr_assess`, `akr_audit_writer`, `akr_readonly`, `akr_migrate`; monthly range partitions; collation and ICU locale fixed at `initdb` and verified for Arabic |
-| CBS drivers | One `SourceReader` port, feature-gated adapters | `sqlx` (PostgreSQL), `tiberius` (SQL Server), `oracle` crate with an `odbc-api` second backend (Oracle), `odbc-api` (Db2, Sybase). Vendor client libraries are the bank's, mounted read-only, never redistributed. Blocking calls on a bounded pool sized to the bank's signed load budget |
+| CBS drivers | One `SourceReader` port, feature-gated adapters | `sqlx` (PostgreSQL), `tiberius` (SQL Server), `oracle` crate with an `odbc-api` second backend (Oracle), `odbc-api` (Db2, Sybase). Vendor client libraries are the bank's, mounted read-only, never redistributed. Blocking calls on a bounded pool sized to the bank's signed load budget. Oracle 11.2 sources are read through OCI 19 (Instant Client 19; 21 and later need 12.1 or later) with client character set AL32UTF8, the Arabic round trip checked at connect (DR-36). A source may have no optimizer statistics (the discovery database ran rule-based plans), so reads are single-table key-range SELECTs and joins run in the AKR-TMS store (DR-40) |
 | Change data capture | Only where the bank agrees | Debezium Server as the one JVM sidecar (Oracle, Db2), sinking over HTTP or NATS JetStream. No Kafka. A bank's own Kafka can be read as a source, never written |
 | Queue and pipeline | PostgreSQL `jobs` (`FOR UPDATE SKIP LOCKED`) + transactional outbox + timers | The DBS harness. The raw landing table is the replay log. No message broker in the default design |
 | Cache | Valkey 9 (BSD-3) | Replaces Redis (licence). Cache, rate limits and SSE fan-out only; never a queue |
@@ -27,6 +27,7 @@ matching under 25 ms at p99 (C-56, N-50). Data freshness per class F0-F5 with `d
 | Scenario engine | Versioned JSON scenario documents (JSON Schema, `jsonschema` with no remote refs) | Aggregate logic from a closed operator set compiled to parameterised SQL over canonical partitions; event logic in CEL; profile logic over feature tables. No free SQL. Detail in docs/DSL.md |
 | Screening | One Rust normalisation library + immutable in-memory index + Rust scorer | Same library for ingestion, batch screening and the assessment API, with a SQL twin kept in parity; `pg_trgm` for analyst search only |
 | ML scoring | ONNX Runtime through `ort` | Models trained offline inside the bank, served as ONNX; gradient-boosted trees with monotonic constraints by default; TreeSHAP implemented in house with golden tests. Models rank rule alerts only in phase 1 |
+| Language model runtime (optional) | llama.cpp server (`llama-server`) with one signed GGUF model, on premises | Phase 28 assistant pack, off by default. Own zone without egress, reached by the worker only; CPU by default, GPU an optional profile; a second `llama-eval` server for verification and evaluation; weights on a read-only volume, never downloaded at run time; release tag pinned at the phase 00 smoke test; the model is chosen by the bank's golden evaluation. No external AI API |
 | Graph | PostgreSQL edge tables + recursive CTEs + `petgraph` | No graph database |
 | Documents and PDF | Gotenberg (custom image with Arabic fonts), clamd | As the DBS: report packages and board packs rendered from HTML templates; antivirus on every upload |
 | Regulatory output | goAML XML generated and validated against the Office's published XSD (profile registry, never hard-coded) | File 23 |
@@ -35,7 +36,7 @@ matching under 25 ms at p99 (C-56, N-50). Data freshness per class F0-F5 with `d
 
 | Component | Choice | Notes |
 |---|---|---|
-| Identity | ORY Kratos (standalone by default) | Mandatory MFA (WebAuthn preferred, TOTP minimum); DBS offboarding flow; quarterly access review. Generic OIDC upstream as configuration (Entra ID, ADFS, Keycloak); Ory Polis optional for SAML and SCIM |
+| Identity | ORY Kratos (standalone by default) | Mandatory MFA (WebAuthn preferred, TOTP minimum); DBS offboarding flow; quarterly access review. Generic OIDC upstream as configuration (Entra ID, ADFS, Keycloak); Ory Polis optional for SAML and SCIM (phase 31: Polis is the OIDC upstream for a SAML IdP, flag `pack.polis`; SCIM creates no account and a deactivation disables, never offboards; own database, admin interface off) |
 | Tokens / OIDC | ORY Hydra | Also the OIDC provider for platform tools (Gitea, Grafana) |
 | Browser sessions | BFF in `akr-api` | As the DBS: Kratos browser flows, CSRF bound to the session |
 | Step-up | AAL2 as a single-use ledger row | Enforced locally even with federated login: opening suspicion-tier records, decisions, approvals, exports |
@@ -62,7 +63,7 @@ matching under 25 ms at p99 (C-56, N-50). Data freshness per class F0-F5 with `d
 |---|---|---|
 | Containers | Docker images, one set for both profiles | Same images for compose and K3s |
 | Profile S: compose bundle | One server + a backup server; Caddy edge; bootstrap, release and rollback scripts | The DBS production pattern; pilots and smaller banks |
-| Profile M/L: K3s + Helm | Three K3s servers with embedded etcd; default-deny NetworkPolicies; cert-manager from the bank's CA | Banks that need the phase-2 API highly available; automated PostgreSQL failover (Patroni + pgBackRest or CloudNativePG, chosen in a proof of concept) |
+| Profile M/L: K3s + Helm | Three K3s servers with embedded etcd (Traefik and ServiceLB disabled, Caddy stays the edge, WireGuard flannel); default-deny NetworkPolicies rendered from `deploy/zones.yaml`; cert-manager from the bank's CA; Kyverno `verifyImages` admission (sigstore policy-controller the alternative); one catalogue renders compose and the chart | Banks that need the phase-2 API highly available; automated PostgreSQL failover with strict synchronous commit (Patroni + pgBackRest the provisional default, CloudNativePG only if it wins the proof of concept; phase 30 DR-320) |
 | Secrets / KMS | OpenBao (MPL-2.0) | Replaces Vault (licence). Shamir unseal or auto-unseal (second OpenBao, bank HSM through PKCS#11); transit KEK; DEKs per table family cached in process; HMAC match-key hashes; Ed25519 signing keys for anchors, certificates, decisions and packages; never in the request hot path |
 | Encryption | TLS everywhere, mTLS between zones; AES-256 at rest; field-level envelope encryption for personal data | |
 | Network zones | Z0-Z7, default deny | `akr-ingestd` alone in the CBS-facing zone with the read-only credentials; `akr-assess` in the gateway zone |
@@ -108,7 +109,8 @@ flip DNS) and said so to the bank; automated on M and L.
 **React (web)**
 ```
 1. Lint/type check -> eslint, tsc --noEmit, OpenAPI/Orval drift check
-2. Test             -> vitest, response-budget and glyph-coverage tests
+2. Test             -> vitest, response-budget and glyph-coverage tests, Playwright with axe-core (every route,
+                       both languages; DR-77), token contrast check, design lint
 3. Build            -> vite build -> static assets -> image -> bundle
 ```
 
@@ -130,4 +132,7 @@ Vault no longer ship. Oracle and IBM client libraries are supplied by the bank a
 - The Silo build under the WORM and security regression suites; SeaweedFS and RustFS as exits under the same suites.
 - `ort` is still a release candidate; `tract` as fallback for small models; ONNX-ML tree operator coverage unverified.
 - sqlparser's generic dialect for Db2 statements.
+- Oracle change capture (Debezium Server): Debezium's Oracle connector does not support 11g (research/25), and the
+  discovered CBS is Oracle 11.2 in ARCHIVELOG mode as a single primary; supplemental logging and a standby were not
+  examined. Polling (DR-37) is the plan for 11.2 sources; prove capture read-only before it is offered for Oracle.
 - Hardware sizes from each bank's discovery data and a load test on the target hardware.

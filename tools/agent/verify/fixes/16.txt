@@ -1,0 +1,116 @@
+Fixes for phase 16 (lead-reviewed from tools/agent/verify/draft/16.txt). 16 claims: 14 confirmed, 2 rejected.
+
+@@ BLOCK 16
+### 7.N Bank scenario create: the insert and a taken code (V-16-01-a, MEDIUM; DR-413)
+Section 3.15, Bank scenarios, step 2: the scenario row is inserted with the phase 06
+`ScenarioRepository::insert_missing(tx, &[new])`. A result of 0 means the `code` is already in use: 409
+`E_NOT_ALLOWED_IN_STATE` with reason `code_taken` (the answer phase 05 gives for a taken source code), and nothing is
+written. Section 3.17: `code_taken` joins the reason list of `E_NOT_ALLOWED_IN_STATE`. No new repository method.
+@@ END
+
+@@ REP 16
+`ScenarioCreate`, `ScenarioView` (register fields plus the
+@@ WITH
+`ScenarioCreate { code, family, name, summary, typologies, needs, external_needs, observational, visibility, document }` (`owner_id` is the caller and `research_grade` is `D`, section 3.15 step 1), `ScenarioView` (register fields plus the
+@@ END
+
+@@ BLOCK 16
+### 7.N Refusals of the owner and reason checks (V-16-01-c, V-16-03-a, MEDIUM; DR-413)
+- Section 3.15, Bank scenarios, step 1: an owner who is not an active CFG user answers 422 `E_VALIDATION` with reason
+  `owner_not_active`, as phase 06 section 3.4 does for a declaration owner.
+- Section 3.5 step 4: a reason code that is inactive, or not of family `tuning` or `change`, answers 422
+  `E_VALIDATION` with reason `reason_not_allowed`, and no draft is inserted (phase 04 gives the same answer at proposal).
+- Section 3.17: the `E_VALIDATION` entry gains the reasons `owner_not_active` and `reason_not_allowed`; its `errors[]`
+  codes stay the DSL codes.
+@@ END
+
+@@ REP 16
+5. Insert `draft` with `set_version` = the next number for the version (`ParameterSetRepository::next_version`).
+@@ WITH
+5. Lock the scenario row (`FOR UPDATE`, as section 3.13 step 3 does), so that two drafts cannot take the same number; then insert `draft` with `set_version` = the next number for the version (`ParameterSetRepository::next_version`).
+@@ END
+
+@@ BLOCK 16
+### 7.N A minor parameter set needs the replay only (V-16-03-d, LOW; DR-413)
+DSL D.3 holds: a set inside the band that does not loosen is minor and needs a replay; the below-the-line sample is
+required for a set outside the band, for any loosening and for every `capacity` reason (section 3.5 step 4; phase 04
+derives `required_evidence` by class). L-18 is met this way: the replay records the before and after alert counts of
+every set, and the below-the-line evidence is taken wherever a change can lose alerts.
+@@ END
+
+@@ BLOCK 16
+### 7.N Reasons of the shadow start and of the pack refusal (V-16-04-a, V-16-06-a, LOW; DR-413)
+Section 3.11 step 1: a version that is not `testing` answers 409 `E_NOT_ALLOWED_IN_STATE` with reason `not_testing`.
+The unit cases need no refusal of their own: the status CHECK of section 1.1 keeps `tests_passed_at` set on every
+`testing` version. Section 3.17: `not_testing` and `pack_not_enabled` (block 7.2, G9) join the reason list of
+`E_NOT_ALLOWED_IN_STATE`.
+@@ END
+
+@@ BLOCK 16
+### 7.N Run of the unit cases on `POST .../test` (V-16-05-a, MEDIUM; DR-413)
+1. Authorize: Cedar `scenario.version.write`, scope `config.author` (the route row of section 2).
+2. State: the version is `draft` (section 3.3; `VersionStatus::transition_allowed` refuses any other source), else 409
+   `E_NOT_ALLOWED_IN_STATE`.
+3. Validate: section 3.1 rules 1 to 16. Any error answers 422 `E_VALIDATION` with the `errors[]` of section 3.1, and
+   the version stays `draft`.
+4. Run: for each entry of `tests.unit` (`name`, `fixture`, `expect`), run section 3.12 step 2 on the named fixture and
+   read the alert count and the severity; the sink is not called and no `scenario_runs` row is written. A case passes
+   by the criterion of section 3.12 step 3.
+5. Write: when every case passes and the three positive and three negative counts hold (section 3.3), the version
+   moves to `testing` and `tests_passed_at` is set. Otherwise 422 `E_VALIDATION` with the `errors[]` code
+   `E_TESTS_MISSING`, and the version stays `draft`.
+6. Audit `scenario.version_tested`, once for the run.
+The automatic cases of DSL A.9 (null, currency, reversal and late data) are added by the studio (section 5) as
+ordinary `tests.unit` entries with their fixtures before the document is saved; this run treats them like the
+author's cases.
+@@ END
+
+@@ REP 16
+a finding refuses the decision.
+@@ WITH
+a finding refuses the decision as 422 `E_VALIDATION` with the `errors[]` code `E_PROTECTED_ATTRIBUTE` (the code of section 3.1 rule 6).
+@@ END
+
+@@ REP 16
+'mode','batch_id','trigger_ref','window_from',
+@@ WITH
+'mode','batch_id','touch_id','trigger_ref','window_from',
+@@ END
+
+@@ REP 16
+`{batch_id, source_id, entity_kinds, business_date}` | `scenario_fanout:<batch_id>`
+@@ WITH
+`{batch_id, touch_id, source_id, entity_kinds, business_date}` | `scenario_fanout:<touch_id>` (7.9)
+@@ END
+
+@@ REP 16
+batch_id?, window_to?}` | `scenario_run:<version>:<mode>:<batch or window_to>`
+@@ WITH
+batch_id?, touch_id?, window_to?}` | `scenario_run:<version>:<mode>:<touch_id or window_to>` (7.9)
+@@ END
+
+@@ REP 16
+1. Read the batch from the payload (`batch_id`, `source_id`, `entity_kinds`, `business_date`).
+@@ WITH
+1. Read the batch from the payload (`batch_id`, `touch_id`, `source_id`, `entity_kinds`, `business_date`).
+@@ END
+
+@@ REP 16
+"not operating as intended" (section 3.16).
+@@ WITH
+"not operating as intended" (DSL A.3).
+@@ END
+
+@@ REP 16
+operating as intended" (section 3.16). Test:
+@@ WITH
+operating as intended" (DSL A.3). Test:
+@@ END
+
+@@ BLOCK 17
+### 7.N The closed-case skip of the fold is built here (V-16-12-a, LOW; DR-413)
+Phase 16 block 7.11 assigns one change to this phase: `DetectionKeyRepository::open_bucket` skips a key whose alert
+sits in a case with status `closed` (the join `alert.alert_index` to `alert.alerts` to `casework.case_alerts` to
+`casework.cases`). It is built and tested with this phase; the test is the one of that block (a repeat four days after
+the case closed opens a new case with `case.linked_prior`, section 3.5).
+@@ END

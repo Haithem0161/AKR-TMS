@@ -1,0 +1,57 @@
+Fixes applied to docs/plan/phase-08.md by the verification pass (DR-413). 13 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/04.txt)
+OLD: polled every 30 s while visible
+NEW: polled every 60 s while visible
+
+=== F2 BLOCK (from fixes/04.txt)
+### 7.N Risk or capacity tag on the change-request screens (V-04-06-a, LOW; DR-413)
+Screen G10 shows the tag of the reason (`ReasonTag`, phase 04; `ref.reason_codes.tag`: `risk` or `capacity`) beside
+the reason code, on the list and on the detail, as a badge with words (UX-60). A capacity tag carries the
+capacity-wording flag of DESIGN-SYSTEM section 7.17.
+
+=== F3 REP (from fixes/08.txt)
+OLD: `E_CLAIMED`, `E_STALE_ASSIGNEE` and `E_SELF_APPROVAL` are explained in words
+NEW: `E_CLAIMED` and `E_STALE_ASSIGNEE` are explained in words, and 403 `E_SELF_APPROVAL` is explained in words
+
+=== F4 REP (from fixes/08.txt)
+OLD: Text columns sort through `collator()`;
+NEW: Text columns sort through `collator()` (a header sort reorders the rows loaded so far; the list routes take no sort parameter and each keeps the server order its phase states);
+
+=== F5 REP (from fixes/08.txt)
+OLD: a 401 `E_STEPUP_REQUIRED` on any request (an assertion spent or expired meanwhile) reopens the
+NEW: a 401 `E_STEPUP_REQUIRED` on any request except `POST /auth/step-up/verify` (an assertion spent or expired meanwhile) reopens the
+
+=== F6 REP (from fixes/08.txt)
+OLD: dialog with the class from the problem body and retries once with the same `Idempotency-Key`. Assertions are held only
+NEW: dialog with the class from the problem body and retries once with the same `Idempotency-Key`. A refused proof on `POST /auth/step-up/verify` is not resent: the dialog asks for a new code. Assertions are held only
+
+=== F7 REP (from fixes/08.txt)
+OLD: API refuses otherwise and the screen says why).
+NEW: API answers 202 with the check id and the source stays paused until that check passes, and the screen says why).
+
+=== F8 REP (from fixes/08.txt)
+OLD: resume is refused until a fresh check passes, with the reason in words.
+NEW: resume answers 202 and the source stays paused until a fresh check passes, with the reason in words.
+
+=== F9 REP (from fixes/08.txt)
+OLD: The preferences it writes (`density`, `locale`,
+NEW: The preferences it writes (`density`,
+
+=== F10 REP (from fixes/08.txt)
+OLD: `prose_digits`, `shortcuts`, `theme`) are the phase 01 `PreferencesV1` fields through `PATCH /me/preferences`.
+NEW: `prose_digits`, `shortcuts`, `theme`) are the phase 01 `PreferencesV1` fields through `PATCH /me/preferences`. `locale` is not a `PreferencesV1` field: it is the `admin.users.locale` column of phase 01, written by the same `PATCH /me/preferences`.
+
+=== F11 BLOCK (from fixes/08.txt)
+### 7.N The code points of scanControls (V-08-08-a, LOW; DR-413)
+`scanControls(s)` in the section 3.3 `bidi.ts` row returns offsets only and changes no text. `bidi` flags U+202A to U+202E, U+2066 to U+2069, U+200E, U+200F and U+061C. `zero_width` flags U+200C, U+200D and U+FEFF. The sets are those of research/31-analyst-ux.md section 4.2 rule 4 and of research/22-arabic-name-matching.md section 6.2 (row "Invisible format characters"). Removal for matching is phase 14 N3 (section 3.1).
+
+=== F12 BLOCK (from fixes/08.txt)
+### 7.N The board pack rail entry (V-08-10-a, LOW; DR-413)
+The CH rail entry `board pack` of DESIGN-SYSTEM 8.2 is the R4 screen (`/packs`, the board pack and evidence pack builder of DESIGN-SYSTEM 8.1). It takes `RailGroup` `reports`, the group of the R series; the closed union of section 7.2 gains no value.
+
+=== F13 BLOCK (from fixes/08.txt)
+### 7.N The transliteration under a name (V-08-11-a, MEDIUM; DR-413)
+The `Name` component shows what the source gives. The original is the party's `canon.party_name` row in Arabic or Kurdish script; the transliteration beneath it is the row of the same party and `name_type` with `script = 'lat'`, when the source supplied one, and its source label is the label of that row's `source_field` (the mapped source column, phase 10). A party with no Latin row shows no second line. The product generates no Latin form, so the label `generated` of DESIGN-SYSTEM 7.6 is not used in this plan; phase 14's back-transliteration serves matching only.

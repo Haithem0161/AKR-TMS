@@ -1,0 +1,96 @@
+Fixes applied to docs/plan/phase-06.md by the verification pass (DR-413). 23 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 BLOCK (from fixes/06.txt)
+### 7.N The CatalogueQuery method (V-06-01-a, MEDIUM; DR-413)
+`CatalogueQuery` (AppState, section 4) has one method, `list(&self, conn: &mut PgConnection) -> Result<Vec<CatalogueItemView>, RepoError>`, which serves `GET /cbi-catalogue`. It returns each item of `CatalogueRepository::active` with its `scenarios` codes (the `full` and `partial` links whose scenario has `visibility = 'normal'`, as `CatalogueItemView` defines them), ordered by `ref`. It reads no grade, coverage kind or restricted code.
+
+=== F2 REP (from fixes/06.txt)
+OLD: principal.kind == "human" && principal.active };
+NEW: principal.kind == "human" && principal.status == "active" };
+
+=== F3 REP (from fixes/06.txt)
+OLD: `delegated_roles`, `kind`, `active`;
+NEW: `delegated_roles`, `kind`, `status`;
+
+=== F4 BLOCK (from fixes/06.txt)
+### 7.N Required and optional fields of cbi-gap-report.v1.json (V-06-03-b, LOW; DR-413)
+Section 3.5 step 4 names the keys of the document. Required: the six top-level keys `cover`, `summary`, `items`, `bank_request`, `vendor_annex` and `outcomes`, and every key that step 4 names inside them, except these optional keys: an item's `declaration` (present only when its blocking scenarios carry one; its `detail` is null when no `interim_detail` was given), and the `code` and `name` of a `linked` entry (absent for a restricted scenario, which carries `restricted: true`).
+Value types: ids are UUID strings; timestamps are RFC 3339 strings; counts are integers of 0 or more; shares are numbers from 0 to 1; `title`, `text` and labels are `{ar, en}` objects of strings; `items`, `linked`, `bank_request` and `vendor_annex` are arrays. The values of `outcomes` are nullable (null until phases 17 to 21 fill them).
+
+=== F5 REP (from fixes/06.txt)
+OLD: 1. `start`; a run that is not `queued` -> done.
+NEW: 1. `start` (a progress marker of the job with no audit event; the lifecycle events of section 3.8 cover the run); a run that is not `queued` -> done.
+
+=== F6 REP (from fixes/06.txt)
+OLD:    - `cover`: bank name (phase 01 settings), catalogue
+NEW:    - `cover`: bank name (both languages, from the installation file `deploy/branding.json` of phase 08 section 4, which the akr-worker service mounts read-only; an unreadable file is `fail(internal)`), catalogue
+
+=== F7 REP (from fixes/06.txt)
+OLD: `E_STEPUP_REQUIRED` (declaration, download); `E_IDEMPOTENCY_REPLAY`
+NEW: `E_STEPUP_REQUIRED` (declaration, download); the replay
+
+=== F8 BLOCK (from fixes/06.txt)
+### 7.N The fields of Grading (V-06-04-a, LOW; DR-413)
+`Grading { scenarios: Vec<GradeUpsert>, items: Vec<ItemGrade> }`. `scenarios` holds one row per scenario and scope: the bank scope and each source scope that has a completed profile run (the rows that section 3.3 step 3 writes). `items` holds one row per catalogue item for the bank scope, `ItemGrade { catalogue_item_id: Uuid, grade: Grade, reasons: Vec<Reason>, missing_fields: Vec<AttributeKey> }`: `reasons` carries `no_scenario` when item rule 1 gives D, and `missing_fields` follows item rule 3. The term follows from the grade (`Term`).
+
+=== F9 REP (from fixes/06.txt)
+OLD: "state": "missing" | "unpopulated"
+NEW: "state": "absent" | "unpopulated"
+
+=== F10 REP (from fixes/06.txt)
+OLD: grades D, as `missing` does.
+NEW: grades D, as `absent` does.
+
+=== F11 REP (from fixes/06.txt)
+OLD: `scenario: {code, family, name}` or the masked form of section 3.8)
+NEW: `scenario: {code, family, name}`)
+
+=== F12 BLOCK (from fixes/06.txt)
+### 7.N The DeclarationService method (V-06-08-a, LOW; DR-413)
+`DeclarationService::declare(&self, ctx: &AuthContext, id: Uuid, input: DeclarationInput, expected_version: i32) -> Result<ReadinessGrade, AppError>` is the service's only method. The handler has checked that `If-Match` is present (428 `E_PRECONDITION_REQUIRED` otherwise) and passes its version; the method consumes the step-up assertion (step 1) and does steps 2 to 5 of section 3.4 in one transaction. The `coverage_sweep` job calls `ReadinessRepository::expire_due` itself and does not go through the service.
+
+=== F13 REP (from fixes/06.txt)
+OLD: as DS -> 403 `E_FORBIDDEN`
+NEW: as DS -> 403 `E_SCOPE`
+
+=== F14 REP (from fixes/06.txt)
+OLD: event keeps the previous values' hash, and the sealed report
+NEW: event of the earlier declaration keeps the previous values, and the sealed report
+
+=== F15 REP (from fixes/06.txt)
+OLD: section 4.5's "Phase 01: two step-up action classes"
+NEW: section 4's "Phase 01: two step-up action classes"
+
+=== F16 BLOCK (from fixes/06.txt)
+### 7.N The grader's mapping input (V-06-11-a, MEDIUM; DR-413)
+From phase 10 on, `grade` (section 3.2) takes one more parameter after `catalogue_attrs`, `mapping: &[MappingCompleteness]`, with one row per source and monitored attribute, as phase 10 section 3.8 defines the type; section 3.3 step 1 loads these rows with its other inputs. The sentence "this phase reads availability only" in section 3.2 holds until then. Section 7.6 gives the rule.
+
+=== F17 REP (from fixes/06.txt)
+OLD: API.md 3.6
+NEW: API.md 3.8
+
+=== F18 REP (from fixes/06.txt)
+OLD: **Complexity:** M (13 routes;
+NEW: **Complexity:** M (14 routes;
+
+=== F19 REP (from fixes/06.txt)
+OLD: `catalogue::router()` (3 routes)
+NEW: `catalogue::router()` (4 routes)
+
+=== F20 REP (from fixes/06.txt)
+OLD: tags `catalogue` (3 operations)
+NEW: tags `catalogue` (4 operations)
+
+=== F21 REP (from fixes/06.txt)
+OLD: 13 in all, each with `x-akr-action`
+NEW: 14 in all, each with `x-akr-action`
+
+=== F22 REP (from fixes/06.txt)
+OLD: Swagger UI lists 13 new operations (119 with
+NEW: Swagger UI lists 14 new operations (120 with
+
+=== F23 REP (from fixes/06.txt)
+OLD: with this row of the section 3.8 route table:
+NEW: with this row of the section 2 route table:

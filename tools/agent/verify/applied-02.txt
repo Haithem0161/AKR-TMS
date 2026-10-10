@@ -1,0 +1,125 @@
+Fixes applied to docs/plan/phase-02.md by the verification pass (DR-413). 18 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 BLOCK (from fixes/02.txt)
+### 7.N AccessReceipt is an opaque proof (V-02-01-a, LOW; DR-413)
+`AccessReceipt` has no public field and no public constructor. Only `AccessScope::record` returns it (section 3,
+step 4), after the access events are written, and `Accessed::new(receipt, body)` needs one.
+
+=== F2 REP (from fixes/02.txt)
+OLD: router mounts `GET /api/v1/_test/sensitive/{id}` to exercise `AccessScope` (section 6).
+NEW: router mounts `GET /api/v1/_test/sensitive/{id}` to exercise `AccessScope` (section 6). Its scope is `none (dev only)`, as `POST /api/v1/_echo` has in the phase 00 route table, and it has no Cedar action (section 3).
+
+=== F3 REP (from fixes/02.txt)
+OLD: **Cedar actions:** none; this phase adds no route.
+NEW: **Cedar actions:** none; the one route this phase adds (the `cfg(test)` route of section 2) has none.
+
+=== F4 BLOCK (from fixes/02.txt)
+### 7.N PartitionMaintenance: handler and a failing table (V-02-03-a, V-02-03-b, LOW; DR-413)
+`PartitionMaintenance` implements the phase 00 `JobHandler` for kind `partition_maintenance`: `run(&self, ctx:
+JobContext, payload: Value) -> Result<(), JobError>` walks the `PartitionRegistry` entries of 7.4 in order. A factory
+call that fails returns `JobError::Retryable`, so the attempt ends at that table; the tables after it get their months
+on the retry, and until then the writer creates a missing month itself (7.4).
+
+=== F5 BLOCK (from fixes/02.txt)
+### 7.N Catalogue values for the kinds of phases 00, 01 and 02 (V-02-04-a, MEDIUM; DR-413)
+The audit tables of phases 00, 01 and 02 have no severity or SIEM column, and 7.5 covers phases 03 to 31. For their
+kinds:
+- Detail keys: the names in parentheses in the kind's row. `restore_drill.recorded` carries `result` and
+  `evidence_sha256` (the SHA-256 of the file named by `--evidence`).
+- Severity: `Info`, except `Warning` for `auth.login_failed`, `auth.account_locked`, `stepup.denied` and `job.dead`,
+  `Notice` for `setting.updated` and `flag.updated`, and the phase 02 kinds whose row says critical.
+- SIEM flag set: the sign-in and step-up kinds SP-18 needs (`auth.login_succeeded`, `auth.login_failed`,
+  `auth.account_locked`, `stepup.issued`, `stepup.denied`); the account and credential changes
+  (`auth.password_changed`, `auth.mfa_enrolled`, `auth.mfa_removed`, `session.revoked`, `token.created`,
+  `token.revoked`, `user.bootstrapped`, `user.unlocked`, `user.disabled`, `role_grant.created` and the three
+  `service_client.*` kinds); `setting.updated`, `flag.updated` and `restore_drill.recorded` (as phase 30 flags
+  `failover_drill.recorded`); and the phase 02 kinds whose row says SIEM. No other kind of these three phases is
+  exported.
+
+=== F6 BLOCK (from fixes/02.txt)
+### 7.N RenderJob fields (V-02-05-a, LOW; DR-413)
+`RenderJob` holds what steps 1 and 2 of `RenderService::render` read: `html` (the rendered `index.html`), `assets` (the
+bundled asset files by name), and the `dir` and `lang` the caller set. It has no template name and no template
+version: the caller renders the template before the call.
+
+=== F7 BLOCK (from fixes/02.txt)
+### 7.N The two render errors that are not retried (V-02-05-b, LOW; DR-413)
+Step 3 of `RenderService::render` gives the retry for `Unavailable` and `Timeout`. `Refused` (the URL refusal of
+step 1) and `FontMissing` are permanent: the same HTML or font set fails the same way on every attempt. The calling job
+returns `JobError::Permanent` for both, so it goes to `dead` without a retry (phase 00 job harness).
+
+=== F8 BLOCK (from fixes/02.txt)
+### 7.N ShredOutcome (V-02-07-a, LOW; DR-413)
+`ShredOutcome` is what `shred` returns (7.3): `{ shredded_at: DateTime<Utc> }`, the instant the same transaction wrote
+to the row's `shredded_at` column.
+
+=== F9 REP (from fixes/02.txt)
+OLD: the one phase 23 section 1.1 defines
+NEW: the one phase 23 section 1.2 defines
+
+=== F10 REP (from fixes/02.txt)
+OLD: the trigger of this section refuses
+NEW: the trigger of section 1 (`admin.evidence_objects_guard`) refuses
+
+=== F11 BLOCK (from fixes/02.txt)
+### 7.N The case_event anchor, step by step (V-02-09-a, MEDIUM; DR-413)
+`AnchorService::run` for stream `case_event` seals case heads, not rows (7.7, DR-122). It differs from the steps of
+section 3 as follows.
+- Step 2, settle point. Case events are written under the case row lock, not under a stream lock, so the stream lock
+  key of `case_event` is used in two modes. An append takes it in share mode (`pg_advisory_xact_lock_shared`) and
+  assigns `at` under it (phase 17 section 7+). The settle transaction takes it exclusively, reads the database clock as
+  `head` and commits. Every event at or before `head` is then committed, and appends still do not wait for each other.
+  The settle runs with `SET LOCAL lock_timeout = '2s'`; on a time-out the run ends for this stream and the next slot
+  retries (the lag gauge of step 12 shows a stream that never settles).
+- Step 4 reads `(case_id, seq, at, hash)` from `casework.case_events` for `at > prev_range_to AND at <= head`, ordered
+  by `(at, case_id)`. When more than `audit.anchor_max_entries` rows exist, `head` is lowered to the `at` of the last
+  row inside the limit and every row at or before it is read. The table is not partitioned, so there is one segment,
+  and `partition_name` is `case_events`. The heads are the last row read of each case, as `{case_id, last_seq,
+  head_hash}`, sorted by `case_id`.
+- Step 5 does not apply: each chain is checked by the trigger `case_events_chain_guard` and by `CaseChain::verify`
+  (phase 17).
+- Step 6: one leaf per head, leaf = `SHA-256(0x00 || canonical JSON of the head)`. This root is the digest of the
+  heads that DR-122 names; the statement of step 7 gains no key.
+- Step 7 and the anchor row: `entry_count` is the number of rows read; `range_from` and `range_to` are the `at` of the
+  first and of the last row; `first_entry_id` and `last_entry_id` are the `case_id` of the first and of the last head;
+  `last_entry_hash` is the last head's `head_hash`.
+- `Verifier::run`: step 1 skips this stream (the chains are verified by phase 17's `case_chain_check`); step 2
+  rebuilds the heads from the rows of `[range_from, range_to]` and compares the count, the ids, the last hash and the
+  root (`anchor_root_mismatch`).
+
+=== F12 BLOCK (from fixes/02.txt)
+### 7.N Verifier reads on akr-anchors (V-02-10-a, MEDIUM; DR-413)
+Section 4, Store bullet: the `akr-worker` writer credential also holds `s3:ListBucketVersions` and
+`s3:GetObjectRetention` on `akr-anchors`. Step 3 of `Verifier::run` needs the first for the delete-marker and orphan
+checks and the second for the retain-until check. The S3 guard already passes both kinds of request (phase 00, object
+store port and S3 guard).
+
+=== F13 REP (from fixes/02.txt)
+OLD: `GET /api/v1/evidence/{id}` is phase 18 (it calls `EvidenceStore::open`)
+NEW: `GET /api/v1/cases/{id}/evidence/{evidence_id}/content` is phase 18 (it calls `EvidenceStore::open`)
+
+=== F14 REP (from fixes/02.txt)
+OLD: `GET /evidence/{id}` (K3) is phase 18
+NEW: `GET /cases/{id}/evidence/{evidence_id}/content` (K3) is phase 18
+
+=== F15 BLOCK (from fixes/02.txt)
+### 7.N Repository row types (V-02-11-c, LOW; DR-413)
+`StagedRow`, `FinalRow`, `EvidenceOpenRow` and `NewPackRow` are plain structs of the columns that the step using them
+sets or reads, and they hold nothing else: `StagedRow` the `admin.evidence_objects` columns `stage` sets in its step
+5; `FinalRow` the same columns as `put_generated` inserts them clean, with the `CleanFacts` fields; `EvidenceOpenRow`
+the columns `open` reads in its steps 1 to 4; `NewPackRow` the `admin.packs` columns that step 3 of
+`PackService::publish` sets.
+
+=== F16 REP (from fixes/02.txt)
+OLD: (retention R12, phase 23)
+NEW: (no sweep deletes it, section 4; it leaves only with its owner's disposal, the `owner` clock of phase 23)
+
+=== F17 REP (from fixes/24.txt)
+OLD: | `validation_pack`, `training_record` | 24 | - |
+NEW: | `validation_pack`, `training_record`, `register_export` | 24 | - |
+
+=== F18 REP (from fixes/25.txt)
+OLD: `release` (phase 25, the evidence of a `platform_release` request; phase 04 7.7).
+NEW: `release` (phase 25, the evidence of a `platform_release` request; phase 04 7.7) and `access_review` (phase 25 section 3.1 snapshot step 4: the quarterly snapshot, owner id the review id; its `EvidenceResolver` is phase 25's and admits the readers of the review).

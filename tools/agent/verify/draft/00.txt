@@ -1,0 +1,72 @@
+Fixes for the claims of tools/agent/verify/phase-00.md (drafted from tools/agent/verify/refute-00.md; lead review pending).
+@@ REP 00
+SBOMs: `cargo-cyclonedx` per binary and Syft per image (CycloneDX), with maintainer and country per component
+@@ WITH
+SBOMs: `cargo-cyclonedx` per binary, a CycloneDX SBOM of the frontend packages from the pnpm lock file (the one `pnpm install --frozen-lockfile` reads, 7.10), and Syft per image (CycloneDX), merged into one release SBOM, with maintainer and country per component
+@@ END
+# V-00-02-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `pnpm install --frozen-lockfile` phase-00.md:972 (7.10); `cargo-cyclonedx` and Syft phase-00.md:740 (same line); SBOM of the frontend packages research/30-security-privacy.md:951; SP-74 research/30-security-privacy.md:1447 | NEW: none
+# V-00-02-a note: the fix place is section 4, CI step 5 (phase-00.md:740). The refuter wrote section 6 step 5, but section 6 step 5 is the curl suite. The plan names no frontend SBOM tool, and the text names none. The country field for frontend packages has no source in the plan, the same gap as for models (V-00-02-b).
+
+# DECIDE V-00-02-b | option A: the release SBOM lists each registered model version as a CycloneDX machine-learning component, taken from its phase 28 manifest; the weights stay outside the bundle (DR-390, docs/plan/research.md:401; the bundle contents at phase-00.md:747-751 name no model) | option B: the phase 28 import writes that component beside the signed artifact (phase-28.md:758), and the release SBOM stays bundle-only (DR-390). Both options need a country field in the manifest field list of phase-28.md:581 (VO-07, research/07-vendor-landscape-overview.md:319). DR-390 overrides research/30-security-privacy.md:1227 ("imported through the release bundle"), so that line does not decide it. The fix place for the SBOM step is section 4 CI step 5 (phase-00.md:740), not section 6 step 5.
+
+@@ BLOCK 00
+### 7.N VEX statement per release (V-00-02-c, HIGH; DR-413)
+CI step 7 (section 4): the bundle also holds one VEX statement per release, in CycloneDX form, next to the SBOMs. It says which known vulnerabilities (the `cargo audit` findings of step 2 and the Trivy findings of step 5) are not exploitable in AKR-TMS, and why, using the reason and owner recorded in the waiver register (`deploy/waivers.toml`, step 2). The manifest digests cover it.
+"Bundle verification at the bank" (section 4): `akr-ctl bundle verify` also confirms that the VEX statement is present. A missing VEX refuses the bundle, as a missing SBOM does.
+@@ END
+# V-00-02-c | HIGH | names used and where they exist: `deploy/waivers.toml` and `cargo audit` phase-00.md:733-734 (CI step 2); Trivy phase-00.md:741 (CI step 5); bundle contents phase-00.md:747-748 (CI step 7); `akr-ctl bundle verify` phase-00.md:752-754; SP-74 research/30-security-privacy.md:1447 | NEW: `VEX statement` (the term comes from SP-74 and research/30-security-privacy.md:951; docs/plan does not name it before this fix)
+# V-00-02-c note: the fix places are section 4 CI step 7 and "Bundle verification at the bank". The refuter wrote section 6 step 7, which is the restore drill. The VEX format (CycloneDX) follows the plan's SBOM format; the lead should confirm that choice.
+
+# DECIDE V-00-03-a | option A: an age gauge for the last archived WAL segment, read from PostgreSQL's archiver status and set by backup_check, with a page to the operator when it is older than five minutes (WAL ships every 60 seconds, phase-00.md:694) | option B: pgBackRest's own gap report, as the DBS design uses it (a page when WAL is dropped at the queue limit and the gap is reported; research/30-security-privacy.md:1122, "AKR-TMS keeps that behaviour and pages the operator"). The refuter's premise is not in the plan: backup_check checks only the age of the heartbeat marker (phase-00.md:684-685), and no text writes that marker (phase-00.md:260; phase-00.md:826 "a touched marker"). `pgbackrest check` appears only as a phase 30 test (phase-30.md:153). The signal and the threshold are both open, so no fix is written. The place for either fix is 7.19 item 1 (phase-00.md:1047-1048).
+
+@@ BLOCK 00
+### 7.N Crypto `open` reports a failure (V-00-05-a, MEDIUM; DR-413)
+Section 2 crypto port: the return type of `open` in the trait line becomes `Result<Vec<u8>, CryptoError>`. A decryption or AAD failure is a `CryptoError`, and it maps to 503 `E_UNAVAILABLE`, as phase 02 section 3 already maps a `Crypto` failure. `seal`, `keyed_hash`, `sign` and `verify` keep their signatures.
+@@ END
+# V-00-05-a | MEDIUM | names used and where they exist: `CryptoError` phase-12.md:562 (already used by `CertificateSigner::sign`, not defined before this fix); `E_UNAVAILABLE` phase-00.md:505; the `Crypto` to 503 mapping phase-02.md:957 (section 3) | NEW: none (the name exists in phase 12; this fix defines it)
+# V-00-05-a note: a 500 `E_INTERNAL` mapping (phase-00.md:504) is the other reasonable answer for an AAD failure. It needs phase-02.md:957 split, so it is not written here. The refuter also noted that seal, keyed_hash, sign and verify return no Result (phase-00.md:587-588). The claim names only open, so they are left alone; phase-12.md:562 already expects a Result from the signer, so a later claim on sign would be the consistent follow-up.
+
+@@ BLOCK 00
+### 7.N TopicHandler trait (V-00-06-a, MEDIUM; DR-413)
+Section 2 `OutboxDispatcher`, with 7.1: a topic handler is this trait, and the dispatcher runs the registered list for a row inside the row's transaction.
+`trait TopicHandler { async fn handle(&self, tx: &mut Transaction<'_, Postgres>, outbox_row: &OutboxRow) -> Result<(), JobError>; }`
+`OutboxRow` is the claimed `admin.outbox` row. Any error leaves the row undispatched under the back-off of this section, so the topic handlers use the harness's `JobError` and no second error type is needed.
+@@ END
+# V-00-06-a | MEDIUM | names used and where they exist: `Transaction<'_, Postgres>` phase-00.md:535; `JobError` phase-00.md:541; the `JobHandler` shape phase-00.md:540-541 (the model for this trait); `register(topic, handler)` in 7.1 phase-00.md:836; `handle(tx, outbox_row)` phase-22.md:583 (the one consumer) | NEW: `OutboxRow` (no row type is named in the plan; the claim query returns admin.outbox rows)
+
+# DROP V-00-07-a | the thing exists in the plan, so the REFUTED verdict stands: the kind name is the `KIND` constant of `trait JobHandler` (phase-00.md:540); concurrency is `JobKind::concurrency` (phase-00.md:539, "sized by `JobKind::concurrency`"); the lease override is "per-kind override in the registry" (phase-00.md:546); max attempts is a job field (`NewJob { kind, payload, run_at, max_attempts` at phase-00.md:535; column at phase-00.md:107), not a kind field. No struct is needed.
+
+@@ REP 00
+the update is guarded by `locked_by`.
+@@ WITH
+the update is guarded by `locked_by`. When it matches no row, the runner takes no action of its own; the handler's completion write then matches no row either, and 7.18 rolls the attempt back.
+@@ END
+# V-00-07-b | LOW | grep -c -F gave 1 | names used and where they exist: `JobStore::heartbeat(id, locked_by)` phase-00.md:847; zero-row rule and rollback in 7.18 phase-00.md:1041-1043; at-least-once rule phase-00.md:547 | NEW: none
+# V-00-07-b note: the choice is that the runner does not cancel the handler. The plan has no cancel signal, so stopping the handler when the heartbeat matches no row would need a mechanism the plan does not define. Apply with V-00-12-a, which edits the 7.18 predicate.
+
+@@ BLOCK 00
+### 7.N Audit event for the (a) and (b) sweep deletes (V-00-09-a, MEDIUM; DR-413)
+Section 7.11 items (a) and (b): a run of `maintenance_sweep` that deletes rows under (a), or objects under (b), writes one audit event `maintenance_sweep.deleted {scope, count}` for each scope it deletes from. `scope` is `stepup_assertions` or `staging_objects`, and `count` is the number deleted in the run. The event carries no ids.
+@@ END
+# V-00-09-a | MEDIUM | names used and where they exist: `admin.stepup_assertions` and `stepup.retention_days` phase-01.md:238 and 377; `akr-quarantine` staging and `evidence.staging_ttl_h` phase-02.md:518 and 850; the form of item (c), `goaml_check.transient_deleted` with `by: sweep`, phase-00.md:982 and phase-07.md:717; the count-per-run form `evidence.orphan_found` phase-23.md:762 | NEW: `maintenance_sweep.deleted` (one kind for both deletes; `goaml_check.transient_deleted` is goAML only, `evidence.orphan_deleted` phase-23.md:817 is for orphans, and phase-23.md:765 says pending staging objects are not orphans, so neither is reused)
+# V-00-09-a note: the base sweep deletes (idempotency, jobs, outbox, timers) are not covered here. They follow the harness decision of V-00-10-a.
+
+# DECIDE V-00-10-a | option A: harness tables are audited (timers, jobs, outbox, idempotency). Name events for the timer cancel, the fire and the fired_at write, and for the base sweep deletes. Evidence for A: one audit event per mutation (tools/agent/b3-conventions.md:58) and "a change is never committed without its record" (phase-02.md:682). | option B: section 2 states an exemption. Harness rows are operational state; the owner's own event records the business effect, and the owner's re-check is the guarantee (phase-00.md:566, "cancelling is an optimisation, the re-check is the guarantee"). Evidence for B: the phase 00 audit list names four kinds and no harness kind (phase-00.md:647-655), and the plan audits sweep deletes of domain data only (phase-00.md:982, the goAML file). The answer also settles the base sweep deletes in V-00-09-a. The places for either fix are section 2 TimerService (phase-00.md:561-566) or 7.16 (phase-00.md:1011-1012).
+
+@@ REP 00
+AND locked_by = $2 AND locked_at = $3` in the handler's transaction (the values of this worker's claim).
+@@ WITH
+AND attempts = $2` in the handler's transaction (`$2` is the attempt that `JobContext` carries; `locked_at` moves with each heartbeat of 7.2, so it cannot identify the claim).
+@@ END
+# V-00-12-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `JobContext` carries the attempt phase-00.md:541; the claim sets `attempts = attempts + 1` phase-00.md:442; the heartbeat refreshes `locked_at` phase-00.md:847 and phase-30.md:480; `complete_in` phase-00.md:1039-1040 | NEW: none
+# V-00-12-a note: this is not the refuter's fix. Adding `locked_at` to `JobContext` would bake in a defect. The heartbeat of 7.2 refreshes `locked_at` every third of the lease, so a completion guarded by the claimed `locked_at` matches no row after the first heartbeat, and every job that runs longer than a third of its lease would roll back and retry. `attempts` changes on every claim and needs no new field. This fix changes 7.18 only and adds no JobContext field.
+
+@@ REP 00
+keep a marker per item (phase 19 section 7+).
+@@ WITH
+record each item's own state change in that transaction as its marker (phase 19 does this: a hibernation hit's `released_at`).
+@@ END
+# V-00-12-b | LOW | grep -c -F gave 1 | names used and where they exist: `released_at` set per hit in one transaction phase-19.md:1194 ("Release of the hits", one transaction per hit); `rating_compute` phase-00.md:1044 | NEW: none
+# V-00-12-b note: the pointer to phase 19 section 7+ is wrong. phase-19.md:1836-1934 names no marker, and no other phase defines a per-item marker. A marker table in phase 00 was the other option; the rules avoid a new table where an existing column can carry the fact.
+
+# SUMMARY: fixes written 8 (REP 4, BLOCK 4); DECIDE 3; DROP 1; claims covered: V-00-02-a, V-00-02-b, V-00-02-c, V-00-03-a, V-00-05-a, V-00-06-a, V-00-07-a, V-00-07-b, V-00-09-a, V-00-10-a, V-00-12-a, V-00-12-b

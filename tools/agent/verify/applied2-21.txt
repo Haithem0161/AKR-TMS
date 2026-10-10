@@ -1,0 +1,46 @@
+Replacements made in docs/plan/phase-21.md by the first re-check (DR-413). 8 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [L-21-1a]
+WHY: L-21-1 | CONFIRMED MEDIUM (lead) | the seed gives `CLS_CTR_EXCLUDED_CANCELLED` and `CLS_CTR_EXCLUDED_REVERSED` the family `exclusion`; the prefix `CLS_` is the family `closure` (phase 09 section 3 codes rule), and phase 12 would accept them as register codes and then fail its `^EXC_` CHECK | family `closure` in the seed
+OLD:  ('CLS_CTR_EXCLUDED_CANCELLED', 'exclusion',
+NEW:  ('CLS_CTR_EXCLUDED_CANCELLED', 'closure',
+
+=== F2 [L-21-1b]
+WHY: L-21-1 | CONFIRMED MEDIUM (lead) | the seed gives `CLS_CTR_EXCLUDED_CANCELLED` and `CLS_CTR_EXCLUDED_REVERSED` the family `exclusion`; the prefix `CLS_` is the family `closure` (phase 09 section 3 codes rule), and phase 12 would accept them as register codes and then fail its `^EXC_` CHECK | family `closure` in the seed
+OLD:  ('CLS_CTR_EXCLUDED_REVERSED', 'exclusion',
+NEW:  ('CLS_CTR_EXCLUDED_REVERSED', 'closure',
+
+=== F3 [R-21-1a]
+WHY: R-21-1 | CONFIRMED LOW (raised HIGH) | 7.8 and the table comment say the manifest holds the PDF hash; the manifest is built before the PDF, which prints the manifest hash | the manifest holds the hashes of the XML and the attachments
+OLD: The manifest holds the PDF hash and is built after the sign (section 3.8 steps 4 and 5),
+NEW: The manifest holds the hashes of the XML and the attachments and is built after the sign (section 3.8 step 4; the PDF of step 5 prints the manifest hash, so the manifest cannot hold the PDF hash),
+
+=== F4 [R-21-1b]
+WHY: R-21-1 | CONFIRMED LOW (raised HIGH) | 7.8 and the table comment say the manifest holds the PDF hash; the manifest is built before the PDF, which prints the manifest hash | the manifest holds the hashes of the XML and the attachments
+OLD: -- bilingual rendering. Both are sealed through put_generated (phase 02) and their hashes are in the manifest.
+NEW: -- bilingual rendering. Both are sealed through put_generated (phase 02); the manifest holds the hashes of the XML and the attachments.
+
+=== F5 [R-21-2]
+WHY: R-21-2 | CONFIRMED LOW (raised MEDIUM) | the trailer still excepts "owner methods" of 4.5 item 9, which adds none | the trailer names the one port method `LetterRequester::delivered`
+OLD: - No change to phase 20's freeze, refrain or ops-task tables or routes, except the owner methods of section 4.5 item 9, which phase 20's columns already allow; the freeze clocks are phase 20's.
+NEW: - No change to phase 20's freeze, refrain or ops-task tables or routes; this phase only implements the phase 20 port method `LetterRequester::delivered` (section 4.5 item 9). The freeze clocks are phase 20's.
+
+=== F6 [R-21-3]
+WHY: R-21-3 | CONFIRMED LOW (raised LOW) | the guard comment says the approval is written once; a revise clears it | comment corrected
+OLD: -- Reports: the approval and the frozen version are written once.
+NEW: -- Reports: the approval and the frozen version are written once per submission; a revise from rejected or returned back to draft clears the approval.
+
+=== F7 [R-21-4]
+WHY: R-21-4 | CONFIRMED LOW (raised LOW) | 7.4 item 1 still says the engine's excluded set adds the drafter and the authors | the subject refuses them (7.12)
+OLD: 1. The excluded set of the `sign` task adds the report's `created_by` and the `created_by` of every version of the
+   report (403 `E_SELF_APPROVAL`).
+NEW: 1. The `sign` task also refuses the report's `created_by` and the `created_by` of every version of the
+   report (403 `E_SELF_APPROVAL`). The workflow subject carries this rule, not the engine's excluded set (section 7.12).
+
+=== F8 [R-21-5]
+WHY: R-21-5 | CONFIRMED LOW (raised LOW) | the comment on `rpt.report_links` names only the STR for an escalated link | "STR or SAR"
+OLD: previous, amending, superseding and the STR escalated from a UTR (which cites its number).
+NEW: previous, amending, superseding and the STR or SAR escalated from a UTR (which cites its number).

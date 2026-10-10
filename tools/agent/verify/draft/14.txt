@@ -1,0 +1,90 @@
+# DROP V-14-01-a | docs/plan/phase-14.md:806 "`AlertService` (claim, decide, bulk decide)" names the method; its input is docs/plan/phase-14.md:695 "`BulkDecisionRequest { alert_ids: Vec<Uuid> (1 to 50), outcome: Incorrect, reason_codes, text? }`"; its rule is docs/plan/phase-14.md:1033 "**Bulk incorrect**"; its handler is docs/plan/phase-14.md:873 "post(bulk_decide)"
+
+@@ REP 14
+A mixed selection is refused for the whole batch (422 `E_VALIDATION`, `bulk_not_identical`).
+@@ WITH
+A mixed selection is refused for the whole batch (422 `E_VALIDATION`, `bulk_not_identical`), and so is a batch on a freeze list (422 `E_VALIDATION`, `freeze_list_excluded`, as in section 3.8).
+@@ END
+# V-14-01-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `freeze_list_excluded` docs/plan/phase-14.md:1046 (3.8) and 1183 (3.14 row); `bulk_not_identical` docs/plan/phase-14.md:1033 and 1183 | NEW: none. The freeze check of section 3.6 ("the list is not a freeze list") now names the code that section 3.8 already uses for the same exclusion (header L-36: "freeze lists excluded from good-guy rules and bulk decisions").
+
+# DECIDE V-14-01-c | Option A: the service is the only refusal for a good-guy proposal on a freeze list: 422 `E_VALIDATION`, `freeze_list_excluded`, before the insert (evidence docs/plan/phase-14.md:1046); the Cedar forbid `screening.goodguy_no_freeze` (docs/plan/phase-14.md:1142) then never matches POST /screening/good-guys, which has no path id and so takes `ResourceSpec::System` (docs/plan/phase-03.md:692), and it stays only as a rule for a future call that builds a `GoodGuyRule`; the table CHECK (docs/plan/phase-14.md:405) refuses the freeze codes in any case | Option B: the handler builds a `GoodGuyRule` resource with `touches_freeze` set from `list_codes` before the service call, so the forbid answers 403 `E_FORBIDDEN` (deny `freeze_list`, docs/plan/phase-03.md:716) first and the 422 is not reached for this case; section 3.14 (docs/plan/phase-14.md:1183) must then say which status wins. The freeze_list deny needs no 3.14 row because phase 03 maps other denies to 403 `E_FORBIDDEN`, so that part of the claim is refuted and not drafted.
+
+@@ BLOCK 14
+### 7.N Step-up action constants of this phase (V-14-01-d, LOW; DR-413)
+This block gives the declaration that section 4.5 (the phase 01 row) lacks. Each step-up route of this phase passes a `StepUpAction { name, class }` constant (phase 01) to `StepUpService::consume`: `StepUpAction::Decision` = `{ name: "screening.alert.decide", class: decision }`, used by the decision of section 3.6 step 1 and by the bulk decision of section 3.6; `StepUpAction::PairApprove` = `{ name: "screening.pair.approve", class: decision }`, used by the approval of section 3.7; `StepUpAction::ListUpload` = `{ name: "screening_list.upload", class: approval }` and `StepUpAction::ListActivate` = `{ name: "screening_list.activate", class: approval }`, used by the upload and activation routes of section 2.8. Each name is the Cedar action of section 3.11.
+@@ END
+# V-14-01-d | LOW | names used and where they exist: `StepUpAction` docs/plan/phase-01.md:427 and 711; classes `decision` and `approval` docs/plan/phase-01.md:709; the every-SU-operation rule docs/plan/phase-01.md:712-713; `StepUpService::consume` docs/plan/phase-14.md:1021; Cedar actions docs/plan/phase-14.md:1085 and 1098 (3.11 permits); upload and activation rows docs/plan/phase-14.md:821 and 823 | NEW: `StepUpAction::PairApprove`, `StepUpAction::ListUpload`, `StepUpAction::ListActivate` (Rust identifiers in the style of `StepUpAction::Decision`; the name strings are existing Cedar actions; phase 01 requires every SU operation to name a declared action, so the other three are needed too)
+@@ BLOCK 14
+### 7.N Count mismatch in list_parse (V-14-02-a, MEDIUM; DR-413)
+Section 3.2 `list_parse` step 4: the parsed row count, taken before identical rows are removed, is compared with `expected_count` where the format gives one. A difference fails the version with `count_mismatch` (status `failed`), writes the audit event `list.failed {failure_code: count_mismatch}` (section 3.13), and the last good version stays active. A null `expected_count` skips the comparison.
+@@ END
+# V-14-02-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `count_mismatch` docs/plan/phase-14.md:100 (failure_code CHECK, section 1.1); `expected_count` docs/plan/phase-14.md:102; `list.failed` docs/plan/phase-14.md:1162 (3.13); step 4 docs/plan/phase-14.md:950 | NEW: none. The version fails rather than warns, because `count_mismatch` is a failure code and the plan has no warning code for it. The REFUTED part (parse error in step 3) is not drafted.
+
+# DECIDE V-14-02-b | Option A: the incident is the `list.failed` record of section 3.13 with its `failure_code`, and the alarm is a new gauge `akr_list_parse_failed{list}` added to section 4.4 (the metrics line, docs/plan/phase-14.md:1233), with the same critical rule as a stale freeze list; no row in `casework.ops_incidents` (evidence docs/plan/phase-14.md:948, 1162, 1233) | Option B: DR-164 makes process failures incidents in `casework.ops_incidents`, one open per kind and subject (docs/plan/research.md:175); then from phase 20 on, a failed version opens one incident with a new kind `list_parse_failed` and subject_kind `list_version`, both added to the CHECKs of the phase 20 table (docs/plan/phase-20.md:203-204, owner phase 20), and the open incident is the alarm; before phase 20 only the `list.failed` record exists. The event name is already given (docs/plan/phase-14.md:1162), so the missing parts are the kind, the subject and the alarm; U-02 asks for a schema-change alarm (research/04-basel-wolfsberg-egmont-un.md:1591), so either option needs one.
+
+@@ BLOCK 14
+### 7.N Fields of the request, filter and result types of sections 2.1 to 2.5 (V-14-03-a, MEDIUM; DR-413)
+- `VersionFilter` and `PairFilter` have no query field: `GET /lists/{id}/versions` and `GET /screening/pair-memory` take the keyset page only. The masking predicate of section 3.15 applies in SQL to the pair list.
+- `AlertFilter { view: AlertSavedView }`, where `AlertSavedView` is `open`, `potential`, `needs_more_data` or `mine`, the four saved views of section 5 (S2). The masking predicate of section 3.15 applies.
+- `HarnessFilter { list_version_id: Option<Uuid> }`, the field of `HarnessRunRequest` (section 2.3).
+- `IdentifierInput` is the raw form of `Identifiers` (section 2.1), hashed on receipt: `{ birth: Vec<{ year, month?, day? }>, documents: Vec<{ doc_type, number }>, nationality: Vec<IsoCountry>, gender?, mother_chain?: String, family_no?: String }`. Precision and default-date flags are derived from the birth input (N-19).
+- `MatchComponents` (the `components` of `ScoreResult`, section 2.1) is `{ name_score: f32, evidence_bits: f32, identifier_adjustment: f32, threshold: &'static str }`, where `threshold` is `name_only` or `with_identifiers` (section 3.4 rules 4, 5, 6 and 8).
+- `FeedError` is `Transport { status: Option<u16>, reason: String }` (writes `list.feed_failed`, section 3.2 step 2), `NotAllowed` (host or path outside the `source_ref` allow-list) or `TooLarge` (body above `screening.feed_max_bytes`).
+- `BankListRow` is one mapped row of the bank's list: `entry_key` and the identifying fields of section 3.2 step 6 (names with aliases, birth, documents, nationality, mother chain, program). The approved mapping document names the bank column for each field.
+@@ END
+# V-14-03-a | MEDIUM | names used and where they exist: `GET /lists/{id}/versions` docs/plan/phase-14.md:820 and `GET /screening/pair-memory` docs/plan/phase-14.md:835 (no query terms named); `GET /screening/alerts` docs/plan/phase-14.md:830; `GET /screening/harness-runs` docs/plan/phase-14.md:841; saved views docs/plan/phase-14.md:1258 (S2; S3 and S4 have no filter control); masking predicate docs/plan/phase-14.md:1193 (3.15); `HarnessRunRequest` docs/plan/phase-14.md:697; `SearchRequest` docs/plan/phase-14.md:692; `Identifiers` docs/plan/phase-14.md:677; `ScoreResult` docs/plan/phase-14.md:678; `ListFeedSource::fetch` docs/plan/phase-14.md:782; `list.feed_failed`, the `source_ref` allow-list and the size limit docs/plan/phase-14.md:941; `BankListReader` docs/plan/phase-14.md:788 and "Rows map through the approved mapping" docs/plan/phase-14.md:955 | NEW: `AlertSavedView`, `MatchComponents` (the rename below). Phase 17 defines a different `ScoreComponents` (docs/plan/phase-17.md:781) with other fields, so phase 14 renames its own struct instead of touching phase 17. The other 17 names need no change.
+
+@@ REP 14
+components: ScoreComponents,
+@@ WITH
+components: MatchComponents,
+@@ END
+# V-14-03-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `MatchComponents` (the block above); `ScoreResult` docs/plan/phase-14.md:678 | NEW: `MatchComponents` (see the note on the block above)
+@@ REP 14
+pair memory and good-guy rules with approver, expiry and the QA sample; never on freeze lists
+@@ WITH
+pair memory and good-guy rules with approver, expiry and the QA sample; good-guy rules never on freeze lists, per DR-102
+@@ END
+# V-14-04-a | HIGH | grep -c -F gave 1 | names used and where they exist: `DR-102` docs/plan/research.md:113 (freeze limits for good-guy rules and bulk decisions only); `alert.pair_memory` docs/plan/phase-14.md:356 (`list_kind` may be `freeze`, section 1.3) | NEW: none
+
+@@ BLOCK 14
+### 7.N Pair memory on freeze-list entries (V-14-04-a, HIGH; DR-413)
+A pair memory row may name a freeze-list entry (`list_kind = 'freeze'`, section 1.3). DR-102 keeps freeze lists out of good-guy rules and bulk decisions and says nothing about pair memory, so no refusal applies. The proposal of such a row takes the four-eyes approval of section 3.7, and every such row whose last suppression falls in the ISO week is drawn into the weekly QA sample (section 7.3).
+@@ END
+# V-14-04-a | HIGH | names used and where they exist: `alert.pair_memory` docs/plan/phase-14.md:356 and `list_kind` docs/plan/phase-14.md:362 (section 1.3); four-eyes approval `screening.pair.approve` docs/plan/phase-14.md:1038 (3.7); the weekly sample of freeze-list rows docs/plan/phase-14.md:1318 (7.3) | NEW: none
+# NOTE V-14-04-a: the refusal reading (422 `freeze_list_excluded` for a freeze-list pair, as section 3.8 does for good-guy rules) adds a restriction that DR-102 does not state, so it needs DR-102 changed in docs/plan/research.md first; the lead decides. The header REP above and section 7.3 already follow the rule drafted here.
+
+# DECIDE V-14-04-b | Option A: SS and M propose a revoke through the existing `POST /screening/good-guys` (scope `screening.work`, Cedar `screening.goodguy.propose`, CR `good_guy_rule`), and `GoodGuyProposal` (docs/plan/phase-14.md:696) takes a second form, the revoke body `{"action": "revoke", "rule_id": …}` of section 3.8 (docs/plan/phase-14.md:1047); evidence: route row docs/plan/phase-14.md:840 and Cedar permits docs/plan/phase-14.md:1085 and 1098 | Option B: only CFG proposes the revoke, through the phase 04 generic route `POST /change-requests` (docs/plan/phase-04.md:778, scope `config.author`), which needs `GoodGuyTarget.generic_create()` true (docs/plan/phase-04.md:645) and a Cedar permit for CFG on `screening.goodguy.propose`; section 3.11 gives CFG no such permit (docs/plan/phase-14.md:1111), so B also changes the Cedar file; `config.author` admits CFG, DS and MRO (docs/plan/phase-14.md:814).
+
+# DECIDE V-14-05-a | Option A: the labelled pairs are a read-only query over `alert.screening_decisions` (docs/plan/phase-14.md:302), joined to `alert.screening_alerts` (docs/plan/phase-14.md:251), giving outcome, reason codes, list kind and subject and entry ids with no names (the outcome and reason codes are already stored per decision, which is the REFUTED part); they feed the threshold review and the hard-negative set, and the MLRO's acceptance into the corpus becomes a change request on the corpus object, which needs a target and a route that section 2.8 does not have (evidence docs/plan/phase-14.md:1057 and 1452) | Option B: the corpus stays synthetic (N-38; docs/plan/phase-14.md:1054 "synthetic and invented"), so the MLRO's acceptance step is dropped from this phase; the labelled pairs feed the threshold review only, the hard-negative set stays a synthetic corpus built by the team, and the bank-specific variant table of N-44 (research/22-arabic-name-matching.md:1244) waits for the governed variant object of N-57 (docs/plan/phase-14.md:955).
+@@ REP 14
+audit `setting.changed` from phase 00
+@@ WITH
+audit `setting.updated` from phase 00
+@@ END
+# V-14-05-b | LOW | grep -c -F gave 1 | names used and where they exist: `setting.updated` docs/plan/phase-00.md:651 (`SettingsService::apply`); docs/plan/phase-04.md:915 uses the same name for a change-request activation | NEW: none. The refuter's correction is not right on this point: section 3.10 (docs/plan/phase-14.md:1075) does name the event "from phase 00", so it needs the same fix as the section 3.13 row below.
+
+@@ REP 14
+`setting.changed`, `list_setting.changed`, `screening_policy.changed`, `good_guy_rule.activated` | CR activation
+@@ WITH
+`setting.updated`, `list_setting.changed`, `screening_policy.changed`, `good_guy_rule.activated` | CR activation
+@@ END
+# V-14-05-b | LOW | grep -c -F gave 1 | names used and where they exist: as above; section 3.13 row at docs/plan/phase-14.md:1172 | NEW: none. The list and policy event names stay as they are.
+
+# DECIDE V-14-07-a | Option A: name, for each feed format of section 3.2 step 3, the publisher's delisting-date field; the plan and the research give none: the UN file drops a delisted entry with no date ("Delistings simply disappear from the file", research/04-basel-wolfsberg-egmont-un.md:1435), and the Iraqi endpoint carries `isExcluded` and `excludeAttachment` but no date (research/01-iraq-regulatory-framework.md:1260), so option A needs a source the lead must obtain | Option B: state that no closed feed format of this release carries a delisting date (docs/plan/phase-14.md:949, the format set), so `delisted_on` stays null and a delisting is by absence only (section 7.6, docs/plan/phase-14.md:1337-1338); this matches DR-376 ("delisted_on only from a publisher date", docs/plan/research.md:387) and DR-162, which releases a freeze on absence or on `delisted_on` (docs/plan/research.md:173). The `listed_on` part is refuted (no logic reads it) and is not drafted.
+
+@@ BLOCK 14
+### 7.N Registry entry of the name search (V-14-08-a, MEDIUM; DR-413)
+Phase 14 registers its sensitive operation, `POST /api/v1/screening/search` (the route that carries `x-akr-access: screening_search`, section 7.9), in `api::access::SENSITIVE`, as phase 02 section 3 requires of each phase that adds a sensitive route. Its fixture request is `POST /api/v1/screening/search` as `ss@bank.test` with the header `X-Access-Purpose: assigned_work` and the body `{"name": "Ahmed Kareem Hassan"}`. The fixture writes exactly one access event, as section 7.9 describes: action `search_hit`, resource type `screening_search`, tier `restricted`, no `subject_party`.
+@@ END
+# V-14-08-a | MEDIUM | names used and where they exist: the registry and its fixture rule docs/plan/phase-02.md:737-741 (section 3 of phase 02); `x-akr-access: screening_search` in section 7.9 (docs/plan/phase-14.md:1362); route row docs/plan/phase-14.md:829; purpose `assigned_work` docs/plan/phase-14.md:1277; dev user `ss@` tools/agent/b3-conventions.md:70 | NEW: none
+# DECIDE V-14-09-a | Option A: a stored marker, a new column `rescreen_late_at TIMESTAMPTZ` on `ref.list_versions` (its DDL at docs/plan/phase-14.md:92-128 has no such column), set by the sweep in the same transaction as the event and only where it is NULL, with `GRANT UPDATE (rescreen_late_at) ON ref.list_versions TO akr_app` in migration 0045 (section 1.1); this reverses the "no column" sentence of section 7.10 (docs/plan/phase-14.md:1370) | Option B: an audit-trail check: the sweep writes `list.rescreen_late` only when no earlier such event exists for the version id, which needs a read path from akr_app to the audit table that phase 02 owns (docs/plan/phase-02.md:4); section 7.10 then stays as written. Either option also settles `list.stale` (section 3.2, docs/plan/phase-14.md:937 "once per transition"), which has no mechanism either (docs/plan/phase-14.md:682, "never stored").
+
+@@ BLOCK 14
+### 7.N Re-screen time in the list version view (V-14-09-b, MEDIUM; DR-413)
+`ListVersionView` (section 2.7) carries `rescreen_seconds` for its version. The value is null until the look-back run of section 7.10 step 1 completes; then it is the run's `finished_at` minus the version's `activated_at`, computed by the server when the view is built. `GET /lists/{id}/versions` (section 2.8) returns it, and the S3 list status of section 7.10 step 5 reads it there. No route, table or timer is added.
+@@ END
+# V-14-09-b | MEDIUM | names used and where they exist: `ListVersionView` docs/plan/phase-14.md:810 (named in 2.7, no fields); `rescreen_seconds` docs/plan/phase-14.md:1376 (7.10 step 2); `finished_at` of `alert.screening_runs` docs/plan/phase-14.md:243; `activated_at` docs/plan/phase-14.md:116; `GET /lists/{id}/versions` docs/plan/phase-14.md:820 | NEW: none. Alternative for the lead: `ScreeningRunView` (docs/plan/phase-14.md:810) instead of `ListVersionView`; the version view is drafted because S3 shows the active version.
+
+# NOTE V-14-03-a, V-14-04-a and V-14-05-b each have two entries, one per place in the plan; the lead applies each pair together.
+# SUMMARY: fixes written 11 (REP 5, BLOCK 6); DECIDE 6; DROP 1; claims covered: V-14-01-b, V-14-01-c, V-14-01-d, V-14-02-a, V-14-02-b, V-14-03-a, V-14-04-a, V-14-04-b, V-14-05-a, V-14-05-b, V-14-07-a, V-14-08-a, V-14-09-a, V-14-09-b (all 14 STANDS and PARTLY), V-14-01-a (REFUTED, DROP)

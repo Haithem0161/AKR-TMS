@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-30.md by the third re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [L3-30-1]
+WHY: L3-30-1 | CONFIRMED LOW (lead) | phase 30 section 3.1 says "Inputs (both in `deploy/`, the first new in this phase)", but the first bullet is `zones.yaml` (phase 00) and the second is `catalogue.yaml` (new). A wrong ordinal in base text, seen while checking T-30-1; each bullet labels itself, so nothing is built wrong | "the second new in this phase"
+OLD: Inputs (both in `deploy/`, the first new in this phase):
+NEW: Inputs (both in `deploy/`, the second new in this phase):

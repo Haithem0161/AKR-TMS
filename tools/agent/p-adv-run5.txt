@@ -1,0 +1,108 @@
+You are drafting part of the ADVERSARIAL CORRECTNESS PASS for the AKR-TMS implementation plan (an AML/KYC
+transaction-monitoring product for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Read first:
+.claude/rules/planning.md (section "Adversarial correctness pass"), tools/agent/b3-conventions.md,
+tools/agent/adv-plan.md.
+
+The plan is complete for coverage (every requirement is placed). This pass attacks the LOGIC: can two people, two
+requests, two jobs or one malicious insider make the planned system do something its rules forbid? You are a red team
+reading a specification, not code. A candidate flaw is a concrete sequence of steps that the phase text permits and
+that breaks a stated rule.
+
+YOUR RUN: run 5 = EXISTENCE MASKING LEAKS. The rule (phase 03 section 3.6, DR-48, SP-27): a person outside the
+access of a masked record (customer, alert, case, report, evidence, RFI, freeze, and the kinds later phases add) must
+not be able to tell it exists. A refusal gives the same 404 as a missing record, byte for byte and no faster
+(`authz.mask_floor_ms`); lists filter masked rows and return no total. Attack every OTHER channel that can carry the
+same fact. Targets:
+- Counts and totals: badge counts (`CountsHub`, `GET /events/counts`), dashboard tiles, queue sizes, pagination
+  totals or "has more" flags, report statistics and small-number cells that differ when a masked record exists.
+- Search and lookup: customer search, party or account lookup, case search, duplicate or merge candidates, "already
+  exists" or uniqueness errors (409 on a value only a masked record holds), autocomplete and sort order.
+- Exports and packs: CSV/PDF exports, evidence packs, periodic and board packs, examiner packs, the branch monthly
+  draft: rows or cells derived from masked records, or a count that betrays them.
+- Events and notices: SSE payloads, in-app notifications, the e-mail relay, outbox topics, the branch window's three
+  neutral statuses: a notice whose recipient list, timing, text or mere arrival tells a person (branch staff, a
+  customer-facing role, the reporter, the subject) that a case, an STR or a freeze exists (tipping-off).
+- Error codes and side paths: a 409, 422, 403, `E_PURPOSE_REQUIRED`, `E_STEPUP_REQUIRED`, `E_CASE_SEALED` or a
+  validation pointer that differs between masked and missing; a write route (assign, link, attach, merge target,
+  RFI target) that accepts or refuses an id differently when the record exists but is masked; ETag or If-Match answers;
+  timing differences outside the 404 path.
+
+Phases to read (grep first, then read the relevant sections in full): phase-03 (section 3.6 `MaskingLayer`, lists,
+the inference harness `MASKED_KINDS`, `AuthReason::masks`, section 3 step 8), phase-13 (customer search and lookup),
+phase-17 (alerts, `CountsHub`, `GET /events/counts`, merge and duplicate candidates, the masking of suspicion tier),
+phase-18 (case search, case ACL, sealed cases), phase-19 (RFIs, internal reports, the reporter's identity), phase-21
+(reports, statistics, `report.small_number_threshold`), phase-22 (the branch window, neutral statuses,
+`NotificationDispatcher`, SSE and e-mail notices), phase-24 (dashboards and packs). Grep "mask", "MASKED_KINDS",
+"E_NOT_FOUND", "404", "total", "count", "tipping", "neutral", "SSE", "notify" in each. Read the "Decisions" and "Open
+doubts" sections of those phases: a doubt already recorded is not a new flaw, but say if it is a real flaw left open.
+Note: runs 1 to 4 changed four-eyes, alerts, watermarks and clocks (see section 7+ blocks headed "Adversarial pass");
+do not report those again.
+
+Lessons from runs 1 to 4 (the lead rejected or corrected these):
+- Read the CHECK or index itself. A constraint may apply to every row, not only to the outcome the text is discussing.
+  Quote its full expression before saying it does not cover a case.
+- Designed exceptions are not flaws. A behaviour is designed when a DR (docs/plan/research.md) or a stated rule in the
+  phase says so (for example, a job acting as the maker and a person as the checker). Grep research.md for the topic
+  before reporting; if a DR covers it, report it as GUARDED and cite the DR.
+- A sequence that is valid in serial order (each step correct when it commits, and a later step raises a new alert or
+  review) is not a race. Say what wrong final state remains.
+- Severity follows the outcome, not the mechanism: CRITICAL only when a forbidden decision or filing happens or a true
+  detection or a range of source data is lost with nobody told. If the item stays visible to a person (a flag, an open
+  alert, a stale banner), it is HIGH at most.
+  For this run, use the masking scale in step 5 below. A fact the caller is already entitled to see is not a leak.
+- Before calling something a race, name the two transactions, the rows each locks, and the isolation level (READ
+  COMMITTED unless stated).
+- Propose the fix from the rule being broken, not from the mechanism you found. Check that your fix actually closes
+  the attack (run 3 had a fix that could not reach the case it described) and does not block ordinary work.
+- Read section heads and preambles, not only the step: a rule at the head of a section can guard every step
+  below it (run 4). Search the whole section before saying no guard exists.
+- Report GUARDED items in one line each.
+
+How to work, for each candidate:
+1. State the rule being attacked and quote where the plan states it (phase-NN.md:LINE, at most 20 words).
+2. Write the attack as numbered steps: who (role), what route or job, in what order, with what concurrency.
+3. Look for the guard that would stop it, in this order: a SQL CHECK constraint, a unique or partial unique index, a
+   guard trigger function (grep "RETURNS trigger"), a row lock or advisory lock and the lock order section, the
+   If-Match version check, a Cedar forbid policy, the list filter predicate of the kind, the `MaskingLayer` 404, the
+   neutral text or recipient rule of the notice, a service step that re-reads and refuses, a step-up class. Quote the
+   guard you found, or the greps that found none.
+4. Verdict: FLAW (no guard stops it), GUARDED (a guard stops it; quote it), or DOUBT (the text is ambiguous; say
+   exactly which sentence and the two readings).
+5. For a FLAW: severity (CRITICAL: a person outside the record's access learns that a suspicion case, an STR,
+   a freeze or an internal report exists, or the subject or branch staff can be tipped off; HIGH: a masking rule can be
+   bypassed with deliberate effort (many requests, a crafted filter), or a count, code or answer differs between masked
+   and missing; MEDIUM: a leak of a non-suspicion masked kind, or one that needs data the caller already has; LOW: wording), and a fix as a
+   short section 7 text using the phase's own names (tables, columns, functions, Cedar actions, problem codes). Prefer
+   the smallest fix: one CHECK, one re-read under the lock, one Cedar forbid, one If-Match.
+
+Rules for honesty (the lead verifies every line; unverifiable claims are rejected):
+- Verify every name by grep. Never invent a table, column, route, function, Cedar action, problem code or setting. If
+  no phase names it, it does not exist; say so.
+- Quote the real text. Line numbers in Evidence and Check only, never inside the proposed fix text.
+- A guard in a later phase counts only from that phase on; say "from phase NN on" when relevant.
+- Do not report a GUARDED item as a flaw. Report GUARDED items briefly (one line each) so the lead sees what you
+  checked; the value of this run is in the FLAW and DOUBT items.
+- Never propose a new value for a closed list (step-up class, role code, problem code) when an existing one fits.
+- No suspicion data in canon or feat rows, nor in admin.registers. Suspicion-linked triggers use the neutral
+  `trigger_code` `TRG_REVIEW_REQUESTED`.
+
+Output file: tools/agent/adv-run5.md. Create it at the start with the header line
+"# Adversarial pass, run 5 (existence masking leaks; Haiku draft for lead review)" and append each candidate as
+soon as it is analysed (the machine may crash), in this format:
+
+### ADV-5-NN Short title   (verdict: FLAW | GUARDED | DOUBT; phase PP)
+- Rule: quote and phase-NN.md:LINE
+- Attack: numbered steps
+- Guard search: the guards found (quoted, with file:line) or the greps that found none
+- Severity (FLAW only): CRITICAL | HIGH | MEDIUM | LOW
+- Proposed 7.x text (FLAW only): "### 7.N <title>" and the change stated concretely
+
+Aim for depth over count: 10 to 20 candidates, each traced to the guard. Cover every phase listed above at least once.
+
+At the end append "## Summary": counts by verdict, FLAW items by severity, and the DOUBT items in one line each.
+
+Other rules:
+- Write ONLY tools/agent/adv-run5.md. Do not edit any other file.
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Do not read cbs-discovery/ or test-poc/ (not needed).
+- Your final reply: the counts and the file path, nothing else.

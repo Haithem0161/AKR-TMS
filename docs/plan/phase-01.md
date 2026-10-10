@@ -5,7 +5,7 @@ machine (password, a mandatory second factor with WebAuthn first and TOTP as the
 confidentiality undertaking); the session cookie and CSRF filling the phase 00 auth slot; idle and absolute session
 limits; the single-use step-up ledger bound to an action class; personal access tokens and client-credential service
 principals; the principal mirror with role grants, pools and delegations; the bootstrap CLI for the first
-administrator and security officer; and the CBI password, lockout and session minima as floors, with every identity
+administrator and security officer; and the CBI password and lockout minima as floors and the session limits as hard bounds (DR-34), with every identity
 mutation naming its audit event.
 
 **Dependencies:** Phase 00
@@ -19,6 +19,7 @@ with the leave ledger), SP-18 (sign-in and step-up events carry what the anomaly
 25), SP-71 (unauthenticated-route coverage), SP-101 (acknowledgement at first login; staff-monitoring visibility in
 phase 24), TS-25 (standalone Kratos and local step-up; OIDC upstream in phase 25, Ory Polis in phase 31), UX-35 and
 UX-36 (server half; the dialogs in phase 08)
+- Gap pass 1 (coverage), partly implemented: VA-46 (personal access tokens with the user's roles and read scopes, audited).
 
 Parallel-track note: phase 02 runs beside this phase. Every event below goes through `audit::AuditSink`; until phase
 02 merges they land on the `TracingSink` stub, afterwards they persist, and no call site changes.
@@ -739,7 +740,8 @@ action's own transaction:
 
 `fresh_until(ctx) -> Option<DateTime<Utc>>` = the newest `issued_at` for the caller's user and session plus
 `stepup.fresh_window_s`: the "fresh step-up within 10 minutes" for restricted and suspicion opens (SP-15). Phase 03
-puts it in the Cedar context; a `record_open` step-up proves presence and is never consumed.
+puts it in the Cedar context. Reading `fresh_until` spends nothing; an assertion of the class `record_open` is spent
+by `consume` like one of any other class, in the handler of the open (phase 17 section 3.10).
 
 **`TokenService`** (personal access tokens; DR-28):
 
@@ -1043,7 +1045,120 @@ when `AKR_ENV != production`): a test fixture for section 6, not a screen.
 
 ## 7+. Gap Additions
 
-_None yet._
+Gap pass 1 (2026-10-10), run 1, from tools/agent/gap1-run1.md; lead-verified (tools/agent/gap1-run1-verdict.md).
+
+### 7.1 identity_sweep: resets, branch consistency and dormancy basis
+- Step 1 (dormancy) measures from `greatest(last_authenticated_at, enabled_at, created_at)` instead of
+  `coalesce(last_authenticated_at, created_at)`, so a re-enabled account gets a full `auth.dormancy_days` to sign in
+  (`enabled_at` is added by phase 03 section 1; the expression is phase 03 section 3.7).
+- Step 5 (pending credential resets): a `credential_resets` row in state `pending` with `expires_at <= now()` becomes
+  `expired`, audited as `credential_reset.expired` with the system principal (phase 03 section 3.8).
+- Step 6 (consistency check, no fix): pool branch lists and grant branch scopes that name an archived or unknown branch
+  produce an error log and a cockpit count. Nothing is changed silently (phase 03 section 4).
+
+### 7.2 akr-ctl db provision: additional logins, database and grants
+`akr-ctl db provision` also does the following, in addition to the Ory databases above:
+(a) creates the LOGIN role `akr_monitor` with the password in OpenBao `db/akr_monitor`; it is a member of
+    `pg_monitor` only and has no privilege on any AKR schema (phase 03 section 4; phase 00 7.4);
+(b) creates the LOGIN role `akr_retention_login` with the password in OpenBao `db/akr_retention_login`; it is a member
+    of `akr_retention` (NOLOGIN, phase 23 migration 0072) and of `akr_audit_writer` (phase 23 sections 1.2 and 4.5);
+(c) creates the database `polis`, owned by the LOGIN role `polis` with the password in OpenBao `ory/polis`; it runs only
+    when `pack.polis` is switched on, not before (phase 31 section 4.5 item 2);
+(d) runs `GRANT akr_audit_writer TO akr_app, akr_ingest, akr_assess` (INHERIT); `db check` asserts it (phase 02 section 4);
+(e) the read-only pool needs no new role: `akr_readonly` already receives LOGIN in this provisioning step (phase 00 section 1).
+
+### 7.3 admin.role_grants: support session source (documentation of migration 0081)
+Phase 25 migration 0081 changes this table; its ALTER statements are in phase 25 section 1.2 and stay there (the
+support session table `admin.support_sessions` is created by phase 25, so the foreign key cannot appear in this file).
+After 0081 the `source` CHECK is `IN ('bootstrap', 'change_request', 'support_session')`, the column
+`support_session_id` exists, and `role_grants_support_session_check` ties the two. Add a line under the DDL of this
+section that says so, and change the `source` CHECK text above to show the three values with the note "(0081)".
+
+### 7.4 Dev seed: fixed users beyond one per role
+`identity seed-dev` creates one user per role (section 3) and these fixed extra users, all from `fixtures/dev-users.yaml`:
+- `a2b@bank.test`, a second A2 user for the existence-masking test (phase 07 section 4);
+- `sec2@bank.test`, a second SEC holder for four-eyes steps (phase 25 section 6);
+- `vs@bank.test`, a vendor user with no role; the support session is its only grant (phase 25 section 6);
+- `as@bank.test`, role AS, for the assessor pack and the training register (phase 24 section 6; grant valid one day).
+Each has the fixed development password and TOTP seed of the other dev users.
+
+### 7.5 Rate limiter when Valkey is unavailable
+If Valkey does not answer, the limiter allows the request (fail open) and increments
+`akr_rate_limit_unavailable_total`. The sign-in lockout (`auth.lockout_max_failures`, counted in `admin.users`) and the
+step-up checks do not depend on the limiter and keep working. (Phase 30 section 4.5 item 9.)
+
+### 7.6 OpenAPI extensions for the generated client
+- Every step-up operation carries the extension `x-akr-stepup` with its action class name from the closed list (section 3).
+- The document declares the schemas `ActionClass` (the closed list) and `ProblemCode` (the closed list of problem codes).
+- The document carries `x-akr-role-scopes`: the role-to-scope table of `common::scopes::scopes_for_roles` (section 2), so
+  the browser reads it instead of parsing descriptions.
+- Every operation names its scopes in `security`.
+The phase 08 client and the policy-matrix drift check read these (phase 08 section 4). Phase 03 adds `x-akr-action` to
+the same operations.
+
+### 7.7 default_queue_id rule
+Replace the sentence "`default_queue_id` must be null until queues exist in phase 17" with: "`default_queue_id` is null or the
+id of an active queue visible to the caller. Until phase 17 creates queues, only null is accepted; from phase 17 the id is
+checked, and a refusal is 422 `E_VALIDATION` at `/default_queue_id`. The field stays inside the preferences object (no
+column, no foreign key)." (Phase 17 section 4.5 item 4.)
+
+Adversarial pass (2026-10-10), run 1 (four-eyes and self-approval), from tools/agent/adv-run1.md; lead-verified (tools/agent/adv-run1-verdict.md).
+
+### 7.8 Decision step-ups name their resource (ADV-1-04, LOW; DR-407)
+For the action classes `decision`, `approval`, `signing` and `filing`, `consume` step 2 matches the resource exactly:
+`resource_ref IS NOT DISTINCT FROM $6` in place of `(resource_ref IS NULL OR resource_ref = $6)`. An assertion started
+without a resource is then good only for an action that passes none. The other classes keep the current predicate.
+Test: an assertion of class `decision` started without `resource_ref` is 401 `E_STEPUP_REQUIRED` on a task decision.
+
+Verification pass (2026-10-10), from tools/agent/verify/; lead-verified (tools/agent/verify-verdict.md).
+
+### 7.9 Service client commands, step by step (V-01-02-a, MEDIUM; DR-413)
+The three `akr-ctl identity client` commands of section 3 run as follows (the Hydra admin API through `common::ory`,
+`HYDRA_ADMIN_URL`).
+1. `client create`: validate (the owner is an active human; scopes within the token allow-list; `--expires` in the
+   future, else exit 2 with the field named). Create the Hydra client (grant `client_credentials`, the scopes,
+   audience `akr-api`, a generated secret). Then in one transaction insert the `admin.users` row (`kind = 'service'`,
+   `display_name` with both keys set to `--name`, `hydra_client_id`, `owner_user_id`, `expires_at`) and audit `service_client.created {client_id, owner_user_id,
+   scopes, expires_at}`. A failed transaction deletes the Hydra client. The secret is printed once; AKR-TMS stores no
+   copy. `--name` is also the Hydra client name. A name held by a service principal that is not disabled is refused
+   (exit 2), and `rotate` and `disable` find the principal by it (`kind = 'service'`, `status = 'active'` and
+   `display_name ->> 'en'`), so a disabled principal that still carries the name is never the one rotated or disabled
+   (the rerun of `disable` in step 3 is the one read of disabled principals by name: it only deletes their Hydra
+   clients).
+2. `client rotate --name`: Hydra replaces the client's secret with a new generated one. The old secret stops working at
+   once; access tokens already issued run to their expiry (15 minutes). Audit `service_client.rotated {client_id}`;
+   the new secret is printed once. No `admin.users` row changes.
+3. `client disable --name`: in one transaction set the principal's `status = 'disabled'` with `disabled_reason =
+   'admin'` and audit `service_client.disabled {client_id}`; after commit delete the Hydra client (the order phase 03
+   uses when offboarding disables a user's service principals). `authenticate` already refuses a principal that is not
+   active, so a failed Hydra call leaves no access and the command can be run again: when no active principal carries
+   the name, `disable` reads the disabled service principals that carry it and repeats only the Hydra delete, for the
+   `hydra_client_id` of each (a client that Hydra no longer has counts as deleted). The rerun changes no row and writes
+   no second audit event.
+
+### 7.10 Actions for heartbeat and logout (V-01-04-a, MEDIUM; DR-413)
+The pinned list of section 3 left two routes that need an action without one (the two public routes need none).
+`POST /auth/session/heartbeat` uses
+`session.read` (it returns the `SessionView` of the caller's own session) and `POST /auth/logout` uses `session.revoke`
+on the current session (the same act as `DELETE /me/sessions/{id}` for the current one). No action is added; the
+phase 03 retrofit registers both `RouteAction` rows with resource `User(self)`.
+
+### 7.11 The token limit is counted under a lock (V-01-05-a, MEDIUM; DR-413)
+`TokenService::create`: the `pat.max_per_user` test of step 2 moves into the transaction of step 3. After `consume`
+the transaction takes `pg_advisory_xact_lock(hashtext('pat:' || user_id))`, counts the user's active tokens and
+answers the same 422 (`limit_reached`) before the insert. Two concurrent creates with two step-up assertions can
+then not both pass the count. The other tests of step 2 stay where they are.
+
+### 7.12 The Kratos admin port gains a traits update (V-03-05-a, MEDIUM; DR-413)
+From phase 03 on the admin API of `IdentityProvider` (section 2) has `update_traits(id, traits)`, with the same
+`traits` type as `create_identity`: Kratos `PUT /admin/identities/{id}` with the identity's current state and schema
+and the new traits. `UserAdminService::update` (phase 03 section 3.7) calls it for an e-mail change before its commit;
+a Kratos failure aborts the request. When a later step of the same request fails, the handler calls `update_traits`
+again with the old traits before it returns the error (the compensation pattern `create` uses with
+`delete_identity`).
+
+### 7.13 SessionView carries the heartbeat interval (V-08-06-a, MEDIUM; DR-413)
+`SessionView` (section 2) gains `heartbeat_min_interval_s` (seconds), the current value of the setting `session.heartbeat_min_interval_s`, as `warning_s` carries `session.warning_s`. `GET /auth/session` and `POST /auth/session/heartbeat` return it, so the client applies the heartbeat rule of phase 08 section 3.6 from the session view alone. The idle timeout reaches the client as `idle_expires_at`. No route is added and no setting changes.
 
 ## What This Phase Does NOT Touch
 

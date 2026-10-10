@@ -1,0 +1,30 @@
+Replacements made in docs/plan/phase-08.md by the first re-check (DR-413). 5 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-08-1]
+WHY: R-08-1 | CONFIRMED LOW (raised MEDIUM) | the G10 list has no reason-code column for the tag to sit beside | on the list the tag sits beside the class badge
+OLD: the reason code, on the list and on the detail, as a badge with words (UX-60).
+NEW: the reason code on the detail and beside the class badge on the list (the list has no reason-code column), as a badge
+with words (UX-60).
+
+=== F2 [R-08-2]
+WHY: R-08-2 | CONFIRMED LOW (raised LOW) | "asks for a new code" ignores the WebAuthn proof | "a new proof (a new TOTP code or a fresh security-key touch)"
+OLD: A refused proof on `POST /auth/step-up/verify` is not resent: the dialog asks for a new code.
+NEW: A refused proof on `POST /auth/step-up/verify` is not resent: the dialog asks for a new proof (a new TOTP code, or a fresh security-key touch).
+
+=== F3 [R-08-3]
+WHY: R-08-3 | CONFIRMED LOW (raised MEDIUM) | section 1 says the phase writes `shortcuts` and `theme`; the screens write neither | the list is `density` and `prose_digits`
+OLD: `prose_digits`, `shortcuts`, `theme`) are the phase 01 `PreferencesV1` fields through `PATCH /me/preferences`.
+NEW: `prose_digits`) are phase 01 `PreferencesV1` fields through `PATCH /me/preferences`; it writes neither `shortcuts` (the shortcut layer is P1) nor `theme` (hidden while DS-O1 is open).
+
+=== F4 [R-08-4]
+WHY: R-08-4 | CONFIRMED LOW (raised LOW) | 7.2 says one `RailGroup` value per rail entry; 7.8 puts two entries in `reports` | "one value per rail group"
+OLD: `RailGroup` is a closed union, one value per rail entry of DESIGN-SYSTEM 8.2:
+NEW: `RailGroup` is a closed union, one value per rail group of DESIGN-SYSTEM 8.2 (two entries may share a group, section 7.8):
+
+=== F5 [R-08-5]
+WHY: R-08-5 | CONFIRMED MEDIUM (raised MEDIUM) | the source label of the transliteration is "the label of `source_field`", and no such label exists | the label is the word `typed`; `card`, `passport` and `generated` are not used in this plan
+OLD: and its source label is the label of that row's `source_field` (the mapped source column, phase 10). A party with no Latin row shows no second line. The product generates no Latin form, so the label `generated` of DESIGN-SYSTEM 7.6 is not used in this plan;
+NEW: and its source label is the word `typed`: a Latin name held in a CBS column was keyed by staff, and no mapped field says that it was read from a card or a passport (`source_field` is a bare column name, phase 10). A party with no Latin row shows no second line. The product generates no Latin form and reads no document, so the labels `card`, `passport` and `generated` of DESIGN-SYSTEM 7.6 are not used in this plan;

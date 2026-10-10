@@ -1,0 +1,25 @@
+Replacements made in docs/plan/phase-00.md by the first re-check (DR-413). 4 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-00-1]
+WHY: R-00-1 | CONFIRMED MEDIUM | the heartbeat is guarded by `locked_by` alone; the reaper re-queues without clearing it, so a late heartbeat still matches the row, against the block's own premise | guard is `status = 'running'` and `locked_by`
+OLD: the update is guarded by `locked_by`. A heartbeat that matches no row
+NEW: the update is guarded by `status = 'running'` and `locked_by` (the reaper leaves `locked_by` as it was, so the status test is what stops a late heartbeat). A heartbeat that matches no row
+
+=== F2 [R-00-2]
+WHY: R-00-2 | CONFIRMED LOW | `job.dead` is in the audit-event table of section 3, not section 4 | pointer
+OLD: `job.dead` is the one harness event (section 4).
+NEW: `job.dead` is the one harness event (section 3, the audit-event table).
+
+=== F3 [R-06-3b]
+WHY: R-06-3 | CONFIRMED HIGH | the cover reads `deploy/branding.json` "which akr-worker mounts", but section 4 says compose is unchanged and the phase 00 volume list has no such mount, so every run would fail | the mount is added in phase 06 section 4 and phase 00 section 7.8
+OLD: - Volumes: `model-store`, read-only, mounted into `akr-worker` at `/var/akr/models` with `AKR_MODEL_STORE` set
+NEW: - Volumes: the installation file `deploy/branding.json`, a read-only bind mount into `akr-worker` at
+  `/etc/akr/branding.json` (phase 06 section 4); `model-store`, read-only, mounted into `akr-worker` at `/var/akr/models` with `AKR_MODEL_STORE` set
+
+=== F4 [R-30-7]
+WHY: R-30-7 | CONFIRMED MEDIUM (raised LOW) | "it is encrypted, phase 00": the phase 00 `pgbackrest` row states no encryption, though SP-84 asks for an encrypted repository | the phase 00 row states the pgBackRest cipher and the passphrase held off the server
+OLD: repository on the backup server plus offsite (SP-84) |
+NEW: repository on the backup server plus offsite, both encrypted by pgBackRest (`repo-cipher-type = aes-256-cbc`) with the passphrase held off the server (SP-84) |

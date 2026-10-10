@@ -1,0 +1,55 @@
+You are drafting part of GAP PASS 1 for the AKR-TMS implementation plan (an AML/KYC transaction-monitoring product
+for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Read first: .claude/rules/planning.md (section
+"Gap Analysis Methodology"), tools/agent/b3-conventions.md, tools/agent/gap1-plan.md.
+
+YOUR RUN: run 1 = backward amendments whose TARGET is phase 00, phase 01 or phase 02
+(docs/plan/phase-00.md, phase-01.md, phase-02.md).
+
+Background. Phases 03 to 31 were written after phases 00-02. Many of them say that an earlier phase "gains" something:
+a new owner kind of the phase 02 EvidenceStore, a new audit kind, a new timer kind, a zone row in deploy/zones.yaml, an
+OpenBao AppRole or KV path, a volume, a dev user, a role, a settings key family, a job-harness change, a database
+provisioning step, a key purpose, a partition registry entry, and so on. Those obligations were never written into
+phases 00-02. Your job is to find every such obligation on phases 00, 01 and 02, check whether the target phase already
+has it, and draft the exact Section 7 text for the ones that are missing.
+
+Where to look for obligations (do all four):
+1. In every docs/plan/phase-NN.md for NN = 03..31: section 4.5 (titled like "Existing entity, schema, route and code
+   updates") and section 4.4 (zones, compose, secrets), plus any line that names "Phase 00", "Phase 01", "Phase 02",
+   "phase 00", "phase 01" or "phase 02" together with a verb such as gains, adds, extends, extended, widened, new,
+   "gap pass 1". Use grep, e.g. grep -n -i "phase 0[012]" docs/plan/phase-*.md.
+2. tools/agent/gap-items.md (items (a) to (aa)): every part that names phase 00, 01 or 02.
+3. docs/plan/research.md: DR rows that mention "gap pass 1" and phase 00, 01 or 02.
+4. docs/plan/status.md: the "Tables ~" column of the phase table (the 7th column) for phases 03-31.
+
+For each obligation:
+- grep the target phase file for it (the exact name: kind, key, role, path). If the target already has it, do not
+  write a finding (only count it).
+- If it is missing, write a finding. Merge obligations that change the same thing in the target into ONE finding (for
+  example, all new phase 02 evidence owner kinds from all phases go in one finding with a table: kind, owning phase,
+  source line). Keep one finding per target phase and subject.
+
+Finding format (markdown, exactly):
+
+### G1-PP-NN Short title
+- Severity: HIGH | MEDIUM | LOW   (HIGH: a later phase cannot build or run without it, e.g. a missing CHECK value,
+  role, zone edge, timer kind, owner kind, AppRole path; MEDIUM: a rule or document of the target contradicts a later
+  phase; LOW: wording or a list that is only informative)
+- Category: one of Missing Table, Missing Fields, Missing Endpoint, Missing Logic, Missing Integration, Missing Event,
+  Missing Audit Event, Missing Policy, Incomplete Coverage
+- Target: phase-PP.md section X.Y (the section of the target that must change)
+- Sources: phase-NN.md:LINE (and more), each with a short quote of at most 15 words
+- Check: the grep you ran on the target and its result (for example: grep -n "ops_drill" docs/plan/phase-02.md -> none)
+- Proposed 7.x text: the exact text to append to the target phase's "## 7+. Gap Additions" section, as a subsection
+  "### 7.N <title>" with the change stated concretely (SQL for a CHECK or a seed row, using the column names of the
+  target's own DDL, which you must read; a list of kinds; the zone row; the steps). Do not invent names: use the names
+  exactly as the source phase writes them. If two sources disagree, say so and propose nothing (mark UNCLEAR).
+
+Rules:
+- Write ONLY tools/agent/gap1-run1.md. Do not edit any other file. Create it at the start with a header line
+  "# Gap pass 1, run 1 (targets 00, 01, 02; Haiku draft for lead review)" and append each finding as soon as you have
+  it (the machine may crash; nothing may be held only in memory).
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Do not read cbs-discovery/ or test-poc/ (not needed).
+- At the end append a "## Summary" with: findings by severity, the number of obligations already present (skipped),
+  and a list of anything UNCLEAR.
+- Your final reply: the counts by severity and the file path, nothing else.

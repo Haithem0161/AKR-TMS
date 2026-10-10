@@ -1,0 +1,26 @@
+import re
+p='docs/plan/research.md'
+s=open(p).read()
+rows=[
+("DR-232","The eleven phase 25 tables are in `admin` (migrations 0080-0082); a break-glass grant is its own table, not a `casework.case_acl` row; the access-review snapshot is a phase 02 evidence object; release approval reuses the phase 04 change request; support approval is a step-up route","None of these records has a case; `case_acl` has a closed reason list, no expiry and refuses sealed cases"),
+("DR-233","Break-glass: `admin.break_glass_grants` row with a case id and no FK, unique per (case, requester) while requested or active; the requester reaches the case through the team clause only under purpose `break_glass` (SQL clause and Cedar adapter alike); `bg.read_only` forbids every action outside a 15-action read allow-list under that purpose; 4 h is a CHECK; the predicate stops at `expires_at`; every request answers the same 202","No existence signal, no bypass of phase 17/18 rules (lead review: per-case unique key leaked and blocked; deny list missed team checks; clause lacked the purpose)"),
+("DR-234","The quarterly access review snapshots `AccessMatrixBuilder::build(at)` and the grants in force as one evidence object; items hold grant ids; SEC decides every item, M business-role items, nobody their own grant; a revocation is a phase 04 change request (`role_grant` op `revoke`, route `cr_access_adm`); overdue is one phase 24 register warning","Evidence cannot drift; revocation keeps four eyes"),
+("DR-235","SIEM forwarding and the pull API read through SECURITY DEFINER `audit.siem_page` (owner `akr_migrate`, `search_path = pg_catalog`): `siem`-flagged kinds only, no `case_id`, no tier value, `resource_id`, `resource_key` and `details` dropped for every non-normal row; cursor survives restarts; back-pressure holds the cursor; refused lines dead-lettered by id; reserved topic `siem.export` released","Phase 02 line 995 extended to restricted rows; the label `suspicion` never leaves (lead review)"),
+("DR-236","Release verification calls the phase 00 `bundle verify` code path; approval is a change request of target `platform_release` on route `cr_access`; the apply is the operator's record; no call-home, no pull, no remote push","The platform and the bank's CLI cannot disagree; SP-66"),
+("DR-237","`VS` exists only as a `support_session` grant (`admin.role_grants.support_session_id`, source `support_session`, CHECK: VS only with a session and `valid_to`); Cedar forbids every action outside group `self` for VS; sessions at most 8 h, SEC approval with step-up `access_change`, automatic end","Phase 04 still refuses VS; a forbid naming what is allowed covers later actions"),
+("DR-238","Support bundles are built by `akr-ctl support-bundle` on the bank host (allow-list, per-bundle pseudonym key in OpenBao), confirmed by manifest hash, signed, recorded in `admin.support_bundles` under step-up `export`; the archive is deleted after `support.bundle_retention_days` (floor 30), the record stays","The phase 19 M-37 register holds case-related authority disclosures only; SP-52, SP-65"),
+("DR-239","Generic OIDC upstream is Kratos configuration; a federated person is linked to a local identity only by an audited admin command; roles never read upstream; upstream `amr` never satisfies AAL2, step-up or `record_open`; upstream disable reaches the platform only through unlink or offboarding (stated limit)","An automatic link by e-mail would allow takeover; SAML and SCIM are phase 31"),
+("DR-240","Help articles and \"what changed\" entries ship in the signed release bundle, written once at verification, class `public`; never fetched","Works in a closed network; as trustworthy as the release"),
+("DR-241","Inspector accounts reuse phase 24 role `AS` with `valid_to` and a bank-approved change request; the RFC 3161 token is an extra per-anchor record, off by default (`audit.rfc3161_enabled`)","No role added to a closed list; a TSA is an external dependency a bank may not want"),
+("DR-242","Break-glass approvers are CH and SEC (never the requester); the MLRO is notified; the requester is A2 only","Research 30 s.7.6 over M3's \"SEC + M\"; phase 17 rule 1 admits only A1, A2, M to a case row and M needs no grant (lead review)"),
+("DR-243","Two notice codes join the closed phase 22 list (`security.break_glass_waiting`, `security.break_glass_opened`, counts only); the list grows 15 to 17","The closed list is the control on what a notice may say"),
+("DR-244","New ops cockpit tiles (SIEM lag and dead letters, release currency, open support sessions, active break-glass grants) and two phase 24 control-report counts are live reads with the report's small-number suppression","A tile never stores a copy; break-glass counts are IA's signal as counts only"),
+("DR-245","The SIEM pull API needs service-principal scope `siem.pull` (API.md s.2); the route is not mounted for a client without it; a user token gets `E_SCOPE`; Cedar reads `principal.kind == \"service\"`","First consumer of phase 01 `ClientCredentials`; no role invented"),
+]
+anchor=re.search(r'^\| DR-231 \|.*\n',s,re.M)
+assert anchor
+add=''.join(f"| {d} | 2026-10-09 | {a} | {b} |\n" for d,a,b in rows)
+assert '| DR-232 |' not in s
+s=s[:anchor.end()]+add+s[anchor.end():]
+open(p,'w').write(s)
+print('ok',len(rows))

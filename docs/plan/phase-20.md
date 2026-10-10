@@ -1,0 +1,1198 @@
+# Phase 20: Operations Tasks & Freezes
+
+**Goal:** Bank operations get neutral tasks and nothing more: a restriction, hold or release is an instruction with a clock, a reference and a completion that carries the core-system reference, and the copy of the data (not the operator) proves it: the achieved verification level V0 to V3 is stored per task and read back from the canonical copy. A true sanctions match on a freeze list starts a freeze with its clocks (8-hour task by default, never beyond 24 hours; the Committee report at 48 hours with a copy to the Office; the second report two calendar months after the first), watches for any debit after the order time, fees included, and ends only in a recorded, four-eyed release after delisting. Refrain instructions from the Office run a 7-working-day clock, failures open incidents for the MLRO, and screens W9 (operations tasks) and S5 (freeze board) are built.
+
+**Dependencies:** Phase 00 (`admin.timers`, `TimerService` with `cancel_for_owner`, jobs, settings, cron schedules), Phase 01 (`StepUpService` and its closed action classes, the role `OPS`, `admin.role_grants`), Phase 02 (`EvidenceStore::stage` and `open`, the evidence owner registry, `admin.evidence_objects`, `AuditSink`), Phase 03 (Cedar bundle and schema, purpose codes), Phase 04 (`WorkflowEngine::act`, `WorkflowSubject` with the phase 18 `check_before_decision` hook, `TerminalEffect`, `Holders`, `admin.workflow_instances`, the task routes `/tasks/{id}/actions/*`), Phase 09 (`BusinessClock::add` and `BankCalendarClock`, the closed `ClockRegistry`, `PolicyPackService::scan` with scope `task`, reason-code families `decision` and `closure`, authority-matrix decision types `freeze.decision` and `ops.verify`), Phase 10 (read-only canonical tables `canon.account`, `canon.account_party_role`, `canon.account_hold`, `canon.balance_snapshot`, `canon.txn`), Phase 14 (`alert.screening_alerts` with `list_kind`, `entry_id` and `case_id`, `alert.screening_decisions`, `ref.lists`, `ref.list_versions`, `ref.list_entries.delisted_on`, the `FreezeTrigger` port and `RecordingFreezeTrigger`, which this phase replaces), Phase 17 (`casework.cases`, `casework.effective_tier`, `alert.screening_alerts.case_id` as set by `ScreeningCaseLinker`), Phase 18 (`casework.case_acl`, the `CaseWorkflowSubject` pattern, the lock order of phase 18 section 3.16, the sealed-case rule), Phase 19 (`casework.alarms` and `AlarmService::raise`, whose kind CHECK gains three kinds here), Phase 21 (letters: `LetterRequester` is a port defined here, implemented by phase 21; a recording stub ships here)
+
+**Macro-phase:** P1
+**Complexity:** L (22 routes: 11 rows of API.md 3.14 built here, 11 rows added; five tables and one alarm-register extension; one workflow subject, two terminal effects, four workflow definitions)
+**Binaries touched:** akr-api (routers `ops_tasks`, `freezes`, `refrain_instructions`, `incidents`; the `FreezeService` replaces `RecordingFreezeTrigger` in `AppState`; the workflow act of a freeze release and of an attestation runs in the request transaction) | akr-worker (jobs `ops_canon_check`, `ops_check_sweep`, `freeze_backfill` and the five timer handlers of section 4.2) | akr-ingestd and akr-assess unchanged
+**Requirements carried:**
+- Implemented here: M-32 (neutral operations tasks with authority, clock and completion; the read-only CBS is phases 05 and 10), M-33 (task contract, completion with the CBS reference, verification levels V0 to V3 with the achieved level stored, failure incident to the MLRO, sections 3.1, 3.3 and 3.8), M-34 (true match on a freeze list starts the freeze task and the Committee clocks; the block is verified and debits after the order time are watched), C-60 (freeze after a true match: the task, the verification of the block from the copy, the post-order debit check), C-63 (the sanctions-guideline duties of the freeze clock: default 8 hours, 24 hours at most from the listing decision, Committee report and second report; the earlier three-day clock of file 25 is superseded), RP-45 (refrain instruction, 7-working-day clock, confirmation by completion and a post-check from the copy, letter referral), RP-55 (freeze task with the 8-hour default clock, neutral wording, post-freeze verification: hold on every account, no debit including fees, exception raises an alarm), RP-56 (the first report to the Committee within 48 hours with a copy to the Office, the second at two months: as data and as a letter request through `LetterRequester`; the IQTFS channel is a bank setting, Open doubts), RP-58 (referral to the Committee's technical committee for a match the bank cannot resolve), RP-59 (release after delisting only on a recorded decision, with date, time and approver)
+- Partly implemented (the rest is in Open doubts with its target phase): M-32 (the completion event is stored; the CBS-side reconciliation of tasks that were never completed is an Open doubt), RP-56 (the letters are requested here and generated by phase 21; the channel to the Office is phase 21's and a bank setting), RP-58 (the referral is a person's act here; a rule that refers unresolved matches automatically is Open doubts)
+- Not carried here: M-35 (UTR watch, phase 19), M-36 (exit proposals and register, phase 15: `POST /exit-register`; this phase only registers the `create_ops_task` effect that the `exit_decision` definition calls), C-61, C-62 (adapter packs, phases 05 and 11), C-64 (time regression, phases 10 and 12)
+- Gap pass 1 (coverage), partly implemented: E-02 (freeze tasks and verification levels from the canonical copy); U-06 (the freeze service, the operations task, the replica check and release after delisting).
+- Gap pass 1 (coverage), implemented here: UX-69 (the operations-task inbox with the neutral instruction only); VA-05 (freeze and other measures as operations tasks with clock, owner and verification against the CBS copy).
+
+---
+
+## 1. SQLx Migration Changes
+
+Two migrations, `0066_ops_records` and `0067_ops_guards_grants`, numbered after phase 19's `0065` (no other phase uses 0066 or 0067; 0068 is free and unused). The schema `casework` exists (phase 00); no new schema. Tables created here: `casework.ops_tasks`, `casework.ops_verifications`, `casework.freezes`, `casework.refrain_instructions`, `casework.ops_incidents`, and the sequence `casework.ops_ref_seq` (references `T-`, `FRZ-` and `REF-` numbers). Existing table changed: `casework.alarms` (the kind and subject-kind CHECKs are widened; the rows are unchanged). No table of phases 00 to 19 is recreated.
+
+**Reconciliation with DATA-MODEL section 13 (aligned in the same change, see DR-158 and DR-166):**
+- `ops_tasks`: DATA-MODEL's columns, with `action` unchanged (`exit` stays because phase 15's `exit_decision` calls the `create_ops_task` effect), `neutral_text_code` narrowed to the three codes of section 3.2, and added `task_ref` (the reference the W9 screen shows), `source_kind` and `source_id` (the freeze, the refrain or the exit instance), `state`, `claimed_*`, `completed_*`, `due_at`, `second_person_only`, `result`, `created_by`, `updated_at` and `version`. `timer_id` is not a column: a clock lives on its owner (a `freezes` or `refrain_instructions` row, through its `admin.timers` rows), and the task reads its owner's due time.
+- `ops_verifications`: DATA-MODEL's `checked_at`, `level` and `post_order_debits`; `evidence jsonb` is replaced by counts (`accounts_checked`, `holds_matched`, `canon_as_of`) and by `evidence_id`, the attestation screenshot held in `admin.evidence_objects` (phase 02), so no evidence bytes sit in a JSON column.
+- `freezes`: DATA-MODEL's columns kept under the same names (`screening_alert_id`, `listing_decision_at`, `freeze_due_at`, `frozen_at`, `committee_report_due_at`, `committee_report_letter_id`, `second_report_due_at`, `second_report_letter_id`, `released_at`, `release_decision_id`). Added: `freeze_ref`, `case_id` (a link for the team, DR-147), the subject, the list and the entry, `freeze_limit_at`, `state`, `ops_task_id`, `verification_level`, the report and referral times, `release_reason_code` and `delisting_list_version_id`. `release_decision_id` holds the `admin.workflow_instances` id of the `freeze_release` instance (phase 04), not a table of this phase.
+- New tables not in DATA-MODEL: `casework.refrain_instructions` (the Office refrain of RP-45) and `casework.ops_incidents` (the failure incidents of M-33).
+- Retention: DATA-MODEL gives `ops_tasks` and `ops_verifications` R6 and `freezes` R7. This phase assigns R7 (screening and sanctions records, ARCHITECTURE section 17, the class phase 14 uses) to all five tables, with clocks that start only when the record ends: `freezes` at `released_at`, `refrain_instructions` and `ops_incidents` at `closed_at`, `ops_tasks` and `ops_verifications` as their owner record (DR-166; Open doubts 12). A freeze in force is never due for deletion (lead review).
+
+### 1.1 `0066_ops_records.sql`
+
+```sql
+-- migration 0066_ops_records.sql
+-- Phase 20. Operations tasks, verifications, freezes, refrain instructions and failure incidents (M14), and the alarm kinds
+-- that the freeze clocks add to the phase 19 register.
+
+-- Alarm register (phase 19 section 1.1). The phase 19 CHECKs are inline, so PostgreSQL named them alarms_kind_check and
+-- alarms_subject_kind_check. Both are dropped by name and recreated (idempotent: the DROP is IF EXISTS).
+ALTER TABLE casework.alarms DROP CONSTRAINT IF EXISTS alarms_kind_check;
+ALTER TABLE casework.alarms ADD CONSTRAINT alarms_kind_check CHECK (kind IN (
+    'touch_breach', 'work_item_breach', 'chain_broken', 'conflict_declared', 'flat_line', 'qa_critical',
+    'post_order_debit', 'freeze_overdue', 'refrain_overdue'));
+ALTER TABLE casework.alarms DROP CONSTRAINT IF EXISTS alarms_subject_kind_check;
+ALTER TABLE casework.alarms ADD CONSTRAINT alarms_subject_kind_check CHECK (subject_kind IN (
+    'alert', 'work_item', 'case', 'scenario', 'qa_review', 'freeze', 'refrain', 'ops_task'));
+
+CREATE SEQUENCE IF NOT EXISTS casework.ops_ref_seq;
+
+-- Operations tasks (M-32, M-33). A neutral instruction to bank operations. OPS sees the neutral view only (the views of section 2).
+-- The row is written in the transaction that creates its owner (a freeze, a refrain or an exit instance).
+CREATE TABLE IF NOT EXISTS casework.ops_tasks (
+    id                  UUID PRIMARY KEY,
+    task_ref            TEXT NOT NULL UNIQUE CHECK (task_ref ~ '^T-[0-9]{4}-[0-9]{4,}$'),
+    case_id             UUID REFERENCES casework.cases(id) ON DELETE RESTRICT,   -- team navigation only; never in the OPS view
+    source_kind         TEXT NOT NULL CHECK (source_kind IN ('freeze', 'refrain', 'exit')),
+    source_id           UUID NOT NULL,                  -- freezes.id, refrain_instructions.id or the exit_decision instance; no FK
+    action              TEXT NOT NULL CHECK (action IN ('freeze', 'hold', 'restrict', 'exit', 'release')),
+    neutral_text_code   TEXT NOT NULL CHECK (neutral_text_code IN ('ops.restrict.account', 'ops.hold.account', 'ops.release.account')),
+    target_accounts     UUID[] NOT NULL CHECK (cardinality(target_accounts) BETWEEN 1 AND 500),   -- canon.account ids
+    authority_ref       TEXT NOT NULL CHECK (length(btrim(authority_ref)) BETWEEN 1 AND 60),
+    effective_at        TIMESTAMPTZ NOT NULL,           -- the order time: post-order debits are counted from its booking date
+    due_at              TIMESTAMPTZ NOT NULL,           -- mirrors the owner's clock (section 1 reconciliation)
+    state               TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'claimed', 'completed')),
+    claimed_by          UUID REFERENCES admin.users(id) ON DELETE RESTRICT,
+    claimed_at          TIMESTAMPTZ,
+    cbs_reference       TEXT CHECK (cbs_reference IS NULL OR length(btrim(cbs_reference)) BETWEEN 1 AND 40),
+    completed_by        UUID REFERENCES admin.users(id) ON DELETE RESTRICT,
+    completed_at        TIMESTAMPTZ,
+    verification_level  TEXT CHECK (verification_level IN ('v0', 'v1', 'v2', 'v3')),   -- the achieved level; only rises
+    second_person_only  BOOLEAN NOT NULL DEFAULT FALSE,   -- TRUE while the level is V0 by second-person confirmation
+    verified_at         TIMESTAMPTZ,
+    result              JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(result) = 'object'),   -- codes and counts only
+    created_by          UUID REFERENCES admin.users(id) ON DELETE RESTRICT,   -- NULL = created by the system
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    version             INT NOT NULL DEFAULT 1,
+    CHECK (due_at >= effective_at),
+    CHECK (state <> 'claimed' OR claimed_by IS NOT NULL),
+    CHECK ((state = 'completed') = (completed_at IS NOT NULL)),
+    CHECK ((completed_at IS NULL) = (completed_by IS NULL)),
+    CHECK (cbs_reference IS NULL OR completed_at IS NOT NULL),
+    CHECK (verification_level IS NULL OR state = 'completed'),
+    CHECK ((verified_at IS NULL) = (verification_level IS NULL)),
+    CHECK (NOT second_person_only OR verification_level = 'v0')
+);
+CREATE INDEX IF NOT EXISTS idx_ops_tasks_state_due ON casework.ops_tasks (state, due_at) WHERE state <> 'completed';
+CREATE INDEX IF NOT EXISTS idx_ops_tasks_source    ON casework.ops_tasks (source_kind, source_id);
+CREATE INDEX IF NOT EXISTS idx_ops_tasks_case      ON casework.ops_tasks (case_id) WHERE case_id IS NOT NULL;
+
+-- Verifications (M-33, RP-55). Append-only. A row exists only when a level is reached (a check that reaches no level writes
+-- its counts to the audit event `ops.verification_checked`, not to this table). `canonical_check` rows are V1 or V2 (V1 is
+-- the hold in place, V2 adds no post-order debit from a current copy); `second_person` rows are V0; `attestation` rows are V3.
+CREATE TABLE IF NOT EXISTS casework.ops_verifications (
+    id                    UUID PRIMARY KEY,
+    ops_task_id           UUID NOT NULL REFERENCES casework.ops_tasks(id) ON DELETE RESTRICT,
+    kind                  TEXT NOT NULL CHECK (kind IN ('second_person', 'canonical_check', 'attestation')),
+    level                 TEXT NOT NULL CHECK (level IN ('v0', 'v1', 'v2', 'v3')),
+    checked_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    actor_id              UUID REFERENCES admin.users(id) ON DELETE RESTRICT,   -- NULL = the system check
+    canon_as_of           DATE,                          -- latest balance_snapshot.business_date of the targets (freshness of the copy)
+    accounts_checked      INT NOT NULL CHECK (accounts_checked >= 0),
+    holds_matched         INT NOT NULL DEFAULT 0 CHECK (holds_matched >= 0),
+    post_order_debits     JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(post_order_debits) = 'array'),   -- financial
+    evidence_id           UUID REFERENCES admin.evidence_objects(id) ON DELETE RESTRICT,   -- attestation only
+    workflow_instance_id  UUID REFERENCES admin.workflow_instances(id) ON DELETE RESTRICT, -- attestation only
+    CHECK ((kind = 'second_person') = (level = 'v0')),
+    CHECK ((kind = 'attestation') = (level = 'v3')),
+    CHECK (kind <> 'canonical_check' OR level IN ('v1', 'v2')),
+    CHECK ((kind = 'attestation') = (evidence_id IS NOT NULL AND workflow_instance_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_ops_verifications_task ON casework.ops_verifications (ops_task_id, checked_at);
+
+-- Freezes (M-34, RP-55, RP-56, RP-59). One freeze per screening alert (the true decision on a freeze list). The clocks are
+-- absolute instants computed at listing (section 3.4). `case_id` is set only for party subjects that have a case (DR-147).
+CREATE TABLE IF NOT EXISTS casework.freezes (
+    id                          UUID PRIMARY KEY,
+    freeze_ref                  TEXT NOT NULL UNIQUE CHECK (freeze_ref ~ '^FRZ-[0-9]{4}-[0-9]{4,}$'),
+    screening_alert_id          UUID NOT NULL UNIQUE REFERENCES alert.screening_alerts(id) ON DELETE RESTRICT,
+    case_id                     UUID REFERENCES casework.cases(id) ON DELETE RESTRICT,
+    subject_kind                TEXT NOT NULL CHECK (subject_kind IN ('party', 'counterparty', 'payment_party')),
+    subject_id                  UUID NOT NULL,           -- no FK: canonical tables are bi-temporal (DR-87)
+    list_id                     UUID NOT NULL REFERENCES ref.lists(id) ON DELETE RESTRICT,
+    list_code                   TEXT NOT NULL CHECK (list_code IN ('iq_national', 'un', 'ofac_sdn', 'eu', 'uk')),
+    entry_id                    UUID NOT NULL REFERENCES ref.list_entries(id) ON DELETE RESTRICT,
+    entry_key                   TEXT NOT NULL CHECK (length(entry_key) BETWEEN 1 AND 120),
+    listing_decision_at         TIMESTAMPTZ NOT NULL,
+    listing_decided_by          UUID NOT NULL REFERENCES admin.users(id) ON DELETE RESTRICT,
+    freeze_due_at               TIMESTAMPTZ NOT NULL,    -- listing + ops.freeze_task_hours (default 8)
+    freeze_limit_at             TIMESTAMPTZ NOT NULL,    -- listing + 24 hours (ClockRegistry, fixed)
+    committee_report_due_at     TIMESTAMPTZ NOT NULL,    -- listing + 48 hours (ClockRegistry, fixed)
+    ops_task_id                 UUID REFERENCES casework.ops_tasks(id) ON DELETE RESTRICT,   -- NULL only when no target account (section 3.4)
+    verification_level          TEXT CHECK (verification_level IN ('v0', 'v1', 'v2', 'v3')),
+    frozen_at                   TIMESTAMPTZ,             -- first level reached (V0 or better) on the freeze task (section 3.4, on_level)
+    post_order_debit_count      INT NOT NULL DEFAULT 0 CHECK (post_order_debit_count >= 0),
+    committee_report_letter_id  UUID,                    -- phase 21 letter id; no FK until phase 21
+    committee_report_at         TIMESTAMPTZ,             -- the Committee letter was requested (the start of the two-month clock)
+    second_report_due_at        TIMESTAMPTZ,             -- committee_report_at + 2 calendar months (section 3.4)
+    second_report_letter_id     UUID,
+    second_report_at            TIMESTAMPTZ,
+    referral_letter_id          UUID,
+    referred_at                 TIMESTAMPTZ,
+    state                       TEXT NOT NULL DEFAULT 'listed' CHECK (state IN ('listed', 'frozen', 'released')),
+    released_at                 TIMESTAMPTZ,
+    release_decision_id         UUID REFERENCES admin.workflow_instances(id) ON DELETE RESTRICT,   -- freeze_release instance
+    release_reason_code         TEXT REFERENCES ref.reason_codes(code) ON DELETE RESTRICT,
+    delisting_list_version_id   UUID REFERENCES ref.list_versions(id) ON DELETE RESTRICT,
+    created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    version                     INT NOT NULL DEFAULT 1,
+    CHECK (subject_kind = 'party' OR case_id IS NULL),
+    CHECK (freeze_due_at > listing_decision_at),
+    CHECK (freeze_limit_at >= freeze_due_at),
+    CHECK (committee_report_due_at >= listing_decision_at),
+    CHECK (state <> 'frozen' OR frozen_at IS NOT NULL),
+    CHECK ((state = 'released') = (released_at IS NOT NULL)),
+    CHECK ((state = 'released') = (release_decision_id IS NOT NULL)),
+    CHECK ((state = 'released') = (release_reason_code IS NOT NULL)),
+    CHECK (state <> 'released' OR delisting_list_version_id IS NOT NULL),
+    CHECK ((second_report_due_at IS NULL) = (committee_report_at IS NULL)),
+    CHECK (second_report_at IS NULL OR second_report_due_at IS NOT NULL),
+    CHECK ((referred_at IS NULL) = (referral_letter_id IS NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_freezes_state_due ON casework.freezes (state, freeze_due_at) WHERE state <> 'released';
+CREATE INDEX IF NOT EXISTS idx_freezes_case      ON casework.freezes (case_id) WHERE case_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_freezes_subject   ON casework.freezes (subject_kind, subject_id);
+
+-- Refrain instructions (RP-45). Registered from an instruction of the Office; the clock is 7 working days (ClockRegistry, fixed).
+CREATE TABLE IF NOT EXISTS casework.refrain_instructions (
+    id                  UUID PRIMARY KEY,
+    refrain_ref         TEXT NOT NULL UNIQUE CHECK (refrain_ref ~ '^REF-[0-9]{4}-[0-9]{4,}$'),
+    office_reference    TEXT NOT NULL CHECK (length(btrim(office_reference)) BETWEEN 1 AND 60),
+    received_at         TIMESTAMPTZ NOT NULL,
+    party_ids           UUID[] NOT NULL CHECK (cardinality(party_ids) BETWEEN 1 AND 50),
+    target_accounts     UUID[] NOT NULL CHECK (cardinality(target_accounts) BETWEEN 1 AND 500),
+    case_id             UUID REFERENCES casework.cases(id) ON DELETE RESTRICT,
+    ops_task_id         UUID REFERENCES casework.ops_tasks(id) ON DELETE RESTRICT,
+    refrain_due_at      TIMESTAMPTZ NOT NULL,            -- BusinessClock::add(received_at, 7, WorkingDays)
+    state               TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'confirmed', 'referred', 'closed')),
+    confirmed_at        TIMESTAMPTZ,                     -- the hold reached V1 (confirmation and post-check)
+    referral_letter_id  UUID,
+    referred_at         TIMESTAMPTZ,
+    closed_at           TIMESTAMPTZ,
+    closed_by           UUID REFERENCES admin.users(id) ON DELETE RESTRICT,
+    closure_reason_code TEXT REFERENCES ref.reason_codes(code) ON DELETE RESTRICT,
+    registered_by       UUID NOT NULL REFERENCES admin.users(id) ON DELETE RESTRICT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    version             INT NOT NULL DEFAULT 1,
+    CHECK (refrain_due_at >= received_at),
+    CHECK (state <> 'confirmed' OR confirmed_at IS NOT NULL),
+    CHECK (state <> 'referred' OR referred_at IS NOT NULL),
+    CHECK ((referred_at IS NULL) = (referral_letter_id IS NULL)),
+    CHECK ((state = 'closed') = (closed_at IS NOT NULL)),
+    CHECK ((closed_at IS NULL) = (closed_by IS NULL)),
+    CHECK ((state = 'closed') = (closure_reason_code IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_refrain_state_due ON casework.refrain_instructions (state, refrain_due_at) WHERE state <> 'closed';
+
+-- Failure incidents (M-33): one open incident per kind and subject; the MLRO closes it. Payloads carry ids, codes, counts and
+-- amounts only.
+CREATE TABLE IF NOT EXISTS casework.ops_incidents (
+    id                  UUID PRIMARY KEY,
+    kind                TEXT NOT NULL CHECK (kind IN ('post_order_debit', 'hold_absent', 'limit_missed', 'report_missed', 'task_failed')),
+    subject_kind        TEXT NOT NULL CHECK (subject_kind IN ('ops_task', 'freeze', 'refrain')),
+    subject_id          UUID NOT NULL,
+    raised_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    raised_by           UUID REFERENCES admin.users(id) ON DELETE RESTRICT,   -- NULL = the system
+    state               TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'closed')),
+    payload             JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(payload) = 'object'),   -- financial (amounts)
+    closed_at           TIMESTAMPTZ,
+    closed_by           UUID REFERENCES admin.users(id) ON DELETE RESTRICT,
+    closure_reason_code TEXT REFERENCES ref.reason_codes(code) ON DELETE RESTRICT,
+    version             INT NOT NULL DEFAULT 1,
+    CHECK ((state = 'closed') = (closed_at IS NOT NULL)),
+    CHECK ((closed_at IS NULL) = (closed_by IS NULL)),
+    CHECK ((state = 'closed') = (closure_reason_code IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ops_incidents_open ON casework.ops_incidents (kind, subject_kind, subject_id) WHERE state = 'open';
+CREATE INDEX IF NOT EXISTS idx_ops_incidents_subject ON casework.ops_incidents (subject_kind, subject_id);
+```
+
+### 1.2 `0067_ops_guards_grants.sql`
+
+```sql
+-- migration 0067_ops_guards_grants.sql
+-- Phase 20. Guards (the database refuses what the services must never do), grants per write path, settings, the reason codes
+-- that this phase's decisions cite, classification and retention.
+
+CREATE OR REPLACE FUNCTION casework.ops_tasks_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'operations tasks are kept' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF (OLD.id, OLD.task_ref, OLD.case_id, OLD.source_kind, OLD.source_id, OLD.action, OLD.neutral_text_code,
+        OLD.target_accounts, OLD.authority_ref, OLD.effective_at, OLD.created_by, OLD.created_at)
+       IS DISTINCT FROM
+       (NEW.id, NEW.task_ref, NEW.case_id, NEW.source_kind, NEW.source_id, NEW.action, NEW.neutral_text_code,
+        NEW.target_accounts, NEW.authority_ref, NEW.effective_at, NEW.created_by, NEW.created_at) THEN
+        RAISE EXCEPTION 'the identity of an operations task does not change' USING ERRCODE = 'check_violation';
+    END IF;
+    IF OLD.state = 'completed' AND NEW.state <> 'completed' THEN
+        RAISE EXCEPTION 'a completed operations task is terminal' USING ERRCODE = 'check_violation';
+    END IF;
+    IF OLD.cbs_reference IS NOT NULL AND NEW.cbs_reference IS DISTINCT FROM OLD.cbs_reference THEN
+        RAISE EXCEPTION 'the core-system reference is written once' USING ERRCODE = 'check_violation';
+    END IF;
+    IF OLD.verification_level IS NOT NULL AND NEW.verification_level < OLD.verification_level THEN
+        RAISE EXCEPTION 'a verification level does not fall' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_ops_tasks_guard ON casework.ops_tasks;
+CREATE TRIGGER trg_ops_tasks_guard BEFORE UPDATE OR DELETE ON casework.ops_tasks
+    FOR EACH ROW EXECUTE FUNCTION casework.ops_tasks_guard();
+
+CREATE OR REPLACE FUNCTION casework.ops_verifications_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'verifications are kept: append only' USING ERRCODE = 'insufficient_privilege';
+END $$;
+DROP TRIGGER IF EXISTS trg_ops_verifications_guard ON casework.ops_verifications;
+CREATE TRIGGER trg_ops_verifications_guard BEFORE UPDATE OR DELETE ON casework.ops_verifications
+    FOR EACH ROW EXECUTE FUNCTION casework.ops_verifications_guard();
+
+CREATE OR REPLACE FUNCTION casework.freezes_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    rank_old INT;
+    rank_new INT;
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'freezes are kept' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF (OLD.id, OLD.freeze_ref, OLD.screening_alert_id, OLD.case_id, OLD.subject_kind, OLD.subject_id, OLD.list_id,
+        OLD.list_code, OLD.entry_id, OLD.entry_key, OLD.listing_decision_at, OLD.listing_decided_by,
+        OLD.freeze_due_at, OLD.freeze_limit_at, OLD.committee_report_due_at, OLD.created_at)
+       IS DISTINCT FROM
+       (NEW.id, NEW.freeze_ref, NEW.screening_alert_id, NEW.case_id, NEW.subject_kind, NEW.subject_id, NEW.list_id,
+        NEW.list_code, NEW.entry_id, NEW.entry_key, NEW.listing_decision_at, NEW.listing_decided_by,
+        NEW.freeze_due_at, NEW.freeze_limit_at, NEW.committee_report_due_at, NEW.created_at) THEN
+        RAISE EXCEPTION 'the identity and the clocks of a freeze do not change' USING ERRCODE = 'check_violation';
+    END IF;
+    rank_old := CASE OLD.state WHEN 'listed' THEN 1 WHEN 'frozen' THEN 2 ELSE 3 END;
+    rank_new := CASE NEW.state WHEN 'listed' THEN 1 WHEN 'frozen' THEN 2 ELSE 3 END;
+    IF rank_new < rank_old THEN
+        RAISE EXCEPTION 'a freeze state does not move back (listed, frozen, released)' USING ERRCODE = 'check_violation';
+    END IF;
+    IF OLD.committee_report_at IS NOT NULL AND NEW.committee_report_at IS DISTINCT FROM OLD.committee_report_at THEN
+        RAISE EXCEPTION 'the Committee report is requested once' USING ERRCODE = 'check_violation';
+    END IF;
+    IF OLD.second_report_at IS NOT NULL AND NEW.second_report_at IS DISTINCT FROM OLD.second_report_at THEN
+        RAISE EXCEPTION 'the second report is requested once' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_freezes_guard ON casework.freezes;
+CREATE TRIGGER trg_freezes_guard BEFORE UPDATE OR DELETE ON casework.freezes
+    FOR EACH ROW EXECUTE FUNCTION casework.freezes_guard();
+
+CREATE OR REPLACE FUNCTION casework.refrain_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'refrain instructions are kept' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF (OLD.id, OLD.refrain_ref, OLD.office_reference, OLD.received_at, OLD.party_ids, OLD.target_accounts, OLD.case_id,
+        OLD.refrain_due_at, OLD.registered_by, OLD.created_at)
+       IS DISTINCT FROM
+       (NEW.id, NEW.refrain_ref, NEW.office_reference, NEW.received_at, NEW.party_ids, NEW.target_accounts, NEW.case_id,
+        NEW.refrain_due_at, NEW.registered_by, NEW.created_at) THEN
+        RAISE EXCEPTION 'the identity of a refrain instruction does not change' USING ERRCODE = 'check_violation';
+    END IF;
+    IF OLD.state = 'closed' AND NEW.state <> 'closed' THEN
+        RAISE EXCEPTION 'a closed refrain instruction is terminal' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_refrain_guard ON casework.refrain_instructions;
+CREATE TRIGGER trg_refrain_guard BEFORE UPDATE OR DELETE ON casework.refrain_instructions
+    FOR EACH ROW EXECUTE FUNCTION casework.refrain_guard();
+
+CREATE OR REPLACE FUNCTION casework.ops_incidents_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'incidents are kept' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF (OLD.id, OLD.kind, OLD.subject_kind, OLD.subject_id, OLD.raised_at, OLD.raised_by)
+       IS DISTINCT FROM
+       (NEW.id, NEW.kind, NEW.subject_kind, NEW.subject_id, NEW.raised_at, NEW.raised_by) THEN
+        RAISE EXCEPTION 'the identity of an incident does not change' USING ERRCODE = 'check_violation';
+    END IF;
+    IF OLD.state = 'closed' AND NEW.state <> 'closed' THEN
+        RAISE EXCEPTION 'a closed incident is terminal' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_ops_incidents_guard ON casework.ops_incidents;
+CREATE TRIGGER trg_ops_incidents_guard BEFORE UPDATE OR DELETE ON casework.ops_incidents
+    FOR EACH ROW EXECUTE FUNCTION casework.ops_incidents_guard();
+
+-- Grants. Every write path of this phase, with the UPDATE column lists its services use.
+GRANT SELECT, INSERT ON casework.ops_tasks TO akr_app;
+GRANT UPDATE (state, claimed_by, claimed_at, cbs_reference, completed_by, completed_at, verification_level,
+              second_person_only, verified_at, result, updated_at, version) ON casework.ops_tasks TO akr_app;
+GRANT SELECT, INSERT ON casework.ops_verifications TO akr_app;            -- append only (guard above)
+GRANT SELECT, INSERT ON casework.freezes TO akr_app;
+GRANT UPDATE (state, ops_task_id, verification_level, frozen_at, post_order_debit_count, committee_report_letter_id,
+              committee_report_at, second_report_due_at, second_report_letter_id, second_report_at, referral_letter_id,
+              referred_at, released_at, release_decision_id, release_reason_code, delisting_list_version_id,
+              updated_at, version) ON casework.freezes TO akr_app;
+GRANT SELECT, INSERT ON casework.refrain_instructions TO akr_app;
+GRANT UPDATE (ops_task_id, state, confirmed_at, referral_letter_id, referred_at, closed_at, closed_by,
+              closure_reason_code, updated_at, version) ON casework.refrain_instructions TO akr_app;
+GRANT SELECT, INSERT ON casework.ops_incidents TO akr_app;
+GRANT UPDATE (state, payload, closed_at, closed_by, closure_reason_code, version) ON casework.ops_incidents TO akr_app;
+GRANT USAGE ON SEQUENCE casework.ops_ref_seq TO akr_app;
+-- Phase 20 writes no alert row. akr_app keeps SELECT on canon.* (phase 10), on alert.screening_alerts, alert.screening_decisions and ref.* (phase 14), and
+-- on casework.alarms through AlarmService (phase 19). No grant to akr_readonly, akr_ingest, akr_audit_writer or akr_monitor:
+-- these tables are personal-adjacent and are read through the API. Audit events go through AuditSink.
+
+-- Settings. Copy of the phase 18 column list. governed = TRUE where a change must go through a change request; floor NULL
+-- throughout (the bounds of the freeze task are checked by the service, section 3.14).
+INSERT INTO admin.settings (key, value, value_type, floor, governed, label) VALUES
+ ('ops.freeze_task_hours', '8', 'integer', NULL, TRUE,
+  '{"ar": "مهلة مهمة التجميد بعد قرار الإدراج (ساعات، من 1 إلى 8)", "en": "Freeze task due time after the listing decision (hours; 1 to 8)"}')
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO admin.settings (key, value, value_type, floor, governed, label) VALUES
+ ('schedule.ops_check_sweep', '"0 */15 * * * *"', 'cron', NULL, FALSE,
+  '{"ar": "جدول فحص المهام التشغيلية مقابل النسخة المرجعية", "en": "Operations verification sweep against the canonical copy"}'),
+ ('schedule.ops_clock_scan', '"0 7 * * * *"', 'cron', NULL, FALSE,
+  '{"ar": "جدول احتياط مؤقتات التجميد والاستعادة", "en": "Backstop schedule for the freeze and refrain clocks"}')
+ON CONFLICT (key) DO NOTHING;
+
+-- Reason codes cited by this phase (ref.reason_codes, phase 04; families decision and closure, phase 09). Seeded, never deleted.
+INSERT INTO ref.reason_codes (code, family, label) VALUES
+ ('DEC_FREEZE_DELISTED', 'decision',
+  '{"ar": "رُفع الاسم من القائمة وسُجّل القرار", "en": "Delisted; release recorded"}'),
+ ('CLS_OPS_TASK_CANNOT_COMPLETE', 'closure',
+  '{"ar": "تعذّر تنفيذ الإجراء في النظام المصرفي", "en": "Action cannot be completed in the core system"}'),
+ ('CLS_OPS_INCIDENT_RESOLVED', 'closure',
+  '{"ar": "أُغلقت الحالة بعد المعالجة", "en": "Resolved after action"}'),
+ ('CLS_OPS_INCIDENT_WITHDRAWN', 'closure',
+  '{"ar": "سُحبت الحالة لعدم وجود أثر", "en": "Withdrawn: no effect found"}'),
+ ('CLS_OPS_REFRAIN_WITHDRAWN', 'closure',
+  '{"ar": "سحب المكتب التعليمات", "en": "The Office withdrew the instruction"}')
+ON CONFLICT (code) DO NOTHING;
+
+-- Classification (DATA-MODEL s.0 classes). No sealed column in this phase: the free text of an incident or a task is not
+-- stored (codes only), so no `encrypted` flag is set. Amounts are financial.
+INSERT INTO admin.column_classification (schema_name, table_name, column_name, classification)
+SELECT 'casework', v.t, c, v.cls::admin.data_classification
+FROM (VALUES
+  ('ops_tasks', 'internal', ARRAY['id', 'task_ref', 'case_id', 'source_kind', 'source_id', 'action', 'neutral_text_code',
+                                  'target_accounts', 'authority_ref', 'effective_at', 'due_at', 'state', 'claimed_by',
+                                  'claimed_at', 'cbs_reference', 'completed_by', 'completed_at', 'verification_level',
+                                  'second_person_only', 'verified_at', 'result', 'created_by', 'created_at', 'updated_at',
+                                  'version']),
+  ('ops_verifications', 'internal', ARRAY['id', 'ops_task_id', 'kind', 'level', 'checked_at', 'actor_id', 'canon_as_of',
+                                          'accounts_checked', 'holds_matched', 'evidence_id', 'workflow_instance_id']),
+  ('ops_verifications', 'financial', ARRAY['post_order_debits']),
+  ('freezes', 'internal', ARRAY['id', 'freeze_ref', 'screening_alert_id', 'case_id', 'subject_kind', 'subject_id', 'list_id',
+                                'list_code', 'entry_id', 'entry_key', 'listing_decision_at', 'listing_decided_by',
+                                'freeze_due_at', 'freeze_limit_at', 'committee_report_due_at', 'ops_task_id',
+                                'verification_level', 'frozen_at', 'post_order_debit_count', 'committee_report_letter_id',
+                                'committee_report_at', 'second_report_due_at', 'second_report_letter_id', 'second_report_at',
+                                'referral_letter_id', 'referred_at', 'state', 'released_at', 'release_decision_id',
+                                'release_reason_code', 'delisting_list_version_id', 'created_at', 'updated_at', 'version']),
+  ('refrain_instructions', 'internal', ARRAY['id', 'refrain_ref', 'office_reference', 'received_at', 'party_ids',
+                                             'target_accounts', 'case_id', 'ops_task_id', 'refrain_due_at', 'state',
+                                             'confirmed_at', 'referral_letter_id', 'referred_at', 'closed_at', 'closed_by',
+                                             'closure_reason_code', 'registered_by', 'created_at', 'updated_at', 'version']),
+  ('ops_incidents', 'internal', ARRAY['id', 'kind', 'subject_kind', 'subject_id', 'raised_at', 'raised_by', 'state',
+                                      'closed_at', 'closed_by', 'closure_reason_code', 'version']),
+  ('ops_incidents', 'financial', ARRAY['payload'])
+) AS v(t, cls, cols)
+CROSS JOIN LATERAL unnest(v.cols) AS c
+ON CONFLICT DO NOTHING;
+
+-- Retention (phase 00 clocks; R7 screening and sanctions records, ARCHITECTURE s.17, as phase 14). The clock starts when the
+-- record ends, so a freeze in force or an open refrain is never due (DR-166). DATA-MODEL s.13 R6 becomes R7.
+INSERT INTO admin.retention_assignment (schema_name, table_name, retention_class, clock, clock_column, note) VALUES
+ ('casework', 'ops_tasks',            'R7', 'owner',   NULL,          'Operations tasks: follow the freeze, refrain or exit record'),
+ ('casework', 'ops_verifications',    'R7', 'owner',   NULL,          'Verification history: follows its task'),
+ ('casework', 'freezes',              'R7', 'closure', 'released_at', 'Freeze records from the release; a freeze in force stays (ten-year question in Open doubts 12)'),
+ ('casework', 'refrain_instructions', 'R7', 'closure', 'closed_at',   'Refrain instructions of the Office, from the close'),
+ ('casework', 'ops_incidents',        'R7', 'closure', 'closed_at',   'Failure incidents, from the close')
+ON CONFLICT (schema_name, table_name) DO NOTHING;
+```
+
+---
+
+## 2. DDD Implementation (Rust)
+
+Crate placement follows phase 18 and phase 19: the domain in `domain::ops` (akr-core, no IO; the clock rules, the verification ladder and the release gate are pure functions of their inputs), the repositories in `infrastructure::ops`, the services in `services::ops`, the routers in `api::routes` (`ops_tasks`, `freezes`, `refrain_instructions`, `incidents`). No sealed field exists in this phase (section 1 note): every response DTO is an explicit view struct, and the account numbers of the views of section 2 are decrypted only inside `CanonOpsReader`.
+
+**Reused types (not redefined here):** phase 14 `ListCode` (values `IqNational`, `Un`, `OfacSdn`, `Eu`, `Uk`, `Bank`; the freeze service accepts the five freeze values only), phase 14 `SubjectKind` (`Party`, `Counterparty`, `PaymentParty`), phase 14 `FreezeCandidate`, `FreezeStart` and the `FreezeTrigger` port, phase 04 `TaskAction`, phase 09 `BusinessUnit` and `BusinessClock`, phase 17 `SourceKind` (alerts; phase 20 uses `OpsSourceKind` below to avoid the clash), phase 19 `AlarmService` and `NewAlarm`.
+
+**Domain entities** (derives `Debug, Serialize, Deserialize, FromRow, ToSchema`):
+- `OpsTask { id, task_ref, case_id: Option<Uuid>, source_kind: OpsSourceKind, source_id: Uuid, action: OpsAction, neutral_text_code: NeutralText, target_accounts: Vec<Uuid>, authority_ref, effective_at, due_at, state: OpsTaskState, claimed_by: Option<Uuid>, claimed_at, cbs_reference: Option<String>, completed_by: Option<Uuid>, completed_at, verification_level: Option<VerificationLevel>, second_person_only: bool, verified_at, result: serde_json::Map<String, Value>, created_by: Option<Uuid>, created_at, updated_at, version: i32 }`
+- `OpsVerification { id, ops_task_id, kind: VerificationKind, level: VerificationLevel, checked_at, actor_id: Option<Uuid>, canon_as_of: Option<NaiveDate>, accounts_checked: i32, holds_matched: i32, post_order_debits: Vec<DebitRef>, evidence_id: Option<Uuid>, workflow_instance_id: Option<Uuid> }`
+- `DebitRef { account_id, txn_id, booking_date: NaiveDate, amount: Decimal, currency: String }` (financial; the txn id and booking date are the key of `canon.txn`, phase 10)
+- `Freeze { id, freeze_ref, screening_alert_id, case_id: Option<Uuid>, subject_kind: SubjectKind, subject_id, list_id, list_code: ListCode, entry_id, entry_key, listing_decision_at, listing_decided_by, freeze_due_at, freeze_limit_at, committee_report_due_at, ops_task_id: Option<Uuid>, verification_level: Option<VerificationLevel>, frozen_at, post_order_debit_count: i32, committee_report_letter_id, committee_report_at, second_report_due_at, second_report_letter_id, second_report_at, referral_letter_id, referred_at, state: FreezeState, released_at, release_decision_id, release_reason_code: Option<String>, delisting_list_version_id, created_at, updated_at, version: i32 }`
+- `RefrainInstruction { id, refrain_ref, office_reference, received_at, party_ids: Vec<Uuid>, target_accounts: Vec<Uuid>, case_id, ops_task_id, refrain_due_at, state: RefrainState, confirmed_at, referral_letter_id, referred_at, closed_at, closed_by, closure_reason_code, registered_by, created_at, updated_at, version: i32 }`
+- `OpsIncident { id, kind: IncidentKind, subject_kind: IncidentSubject, subject_id, raised_at, raised_by, state: IncidentState, payload: serde_json::Map<String, Value>, closed_at, closed_by, closure_reason_code, version: i32 }`
+
+**Enums** (closed in code; the SQL CHECK lists are the same values):
+- `OpsAction { Freeze => "freeze", Hold => "hold", Restrict => "restrict", Exit => "exit", Release => "release" }`
+- `NeutralText { RestrictAccount => "ops.restrict.account", HoldAccount => "ops.hold.account", ReleaseAccount => "ops.release.account" }`
+- `OpsSourceKind { Freeze => "freeze", Refrain => "refrain", Exit => "exit" }`
+- `OpsTaskState { Open => "open", Claimed => "claimed", Completed => "completed" }`
+- `VerificationLevel { V0 => "v0", V1 => "v1", V2 => "v2", V3 => "v3" }`, derive `PartialOrd, Ord`; a level never falls (guard of section 1.2)
+- `VerificationKind { SecondPerson => "second_person", CanonicalCheck => "canonical_check", Attestation => "attestation" }`; the pairing of kind and level is a unit-tested function (`second_person` with V0, `canonical_check` with V1 or V2, `attestation` with V3), repeated by the CHECKs of section 1.1
+- `FreezeState { Listed => "listed", Frozen => "frozen", Released => "released" }`, derive `PartialOrd, Ord` (the guard refuses a move down)
+- `RefrainState { Open => "open", Confirmed => "confirmed", Referred => "referred", Closed => "closed" }`
+- `IncidentKind { PostOrderDebit => "post_order_debit", HoldAbsent => "hold_absent", LimitMissed => "limit_missed", ReportMissed => "report_missed", TaskFailed => "task_failed" }`
+- `IncidentSubject { OpsTask => "ops_task", Freeze => "freeze", Refrain => "refrain" }`
+- `IncidentState { Open => "open", Closed => "closed" }`
+- `ReleaseAction { Approve, Reject }` (the body of the release decision)
+- Phase 19's `AlarmKind` (the enum of `Alarm.kind`, phase 19 section 2) gains three variants: `PostOrderDebit => "post_order_debit"`, `FreezeOverdue => "freeze_overdue"`, `RefrainOverdue => "refrain_overdue"`; the SQL CHECK of section 1.1 repeats them. No second alarm enum exists.
+
+**Command DTOs** (`Deserialize, ToSchema`; every change is a named command, no generic update):
+- `ClaimOpsTask {}` (`If-Match` task version)
+- `CompleteOpsTask { cbs_reference: String (trimmed, 1 to 40 characters) }` (`If-Match`; `Idempotency-Key`)
+- `CannotCompleteOpsTask { reason_code: String }`: one code of family `closure` with the prefix `CLS_OPS_`, here only `CLS_OPS_TASK_CANNOT_COMPLETE`; no free text
+- `AttestOpsTask { evidence_id: Uuid }`: an evidence item already staged for the owner kind `ops_task` and this task through `POST /ops-tasks/{id}/evidence` (section 3.3; added here, because phase 02 has no generic upload route)
+- `ProposeFreezeRelease { reason_code: String }`: only `DEC_FREEZE_DELISTED`
+- `ActOnFreezeRelease { task_id: Uuid, action: ReleaseAction, comment: Option<String> (required for `Reject`, at most 500 characters) }` (`If-Match` instance version)
+- `RegisterRefrain { office_reference: String (1 to 60), received_at: DateTime<Utc>, party_ids: Vec<Uuid> (1 to 50), case_id: Option<Uuid> }` (`Idempotency-Key`; the accounts are read from the copy, section 3.7)
+- `CloseRefrain { reason_code: String }`: only `CLS_OPS_REFRAIN_WITHDRAWN`
+- `CloseIncident { reason_code: String }`: `CLS_OPS_INCIDENT_RESOLVED` or `CLS_OPS_INCIDENT_WITHDRAWN`
+- Query: `ListOpsTasks { state?, due_before?, cursor }`, `ListFreezes { state?, subject_kind?, cursor }`, `ListRefrains { state?, cursor }`, `ListIncidents { state?, kind?, cursor }`
+
+**Views** (`Serialize, ToSchema`; the view decides what the caller may learn, the views of section 2):
+- `OpsTaskNeutralView { id, task_ref, text: String (the neutral text rendered in the caller's language), accounts: Vec<AccountNumberView { account_id, number }>, authority_ref, due_at, state, claimed_by_me: bool, cbs_reference: Option<String>, completed_at: Option<DateTime<Utc>>, version }`
+- `OpsTaskTeamView` = `OpsTaskNeutralView` fields plus `action`, `source_kind`, `source_ref` (`FRZ-` or `REF-` or the exit instance reference), `case_id: Option<Uuid>`, `verification_level: Option<String>`, `second_person_only`, `completed_by: Option<PersonRef>`, `verified_at`
+- `FreezeView { id, freeze_ref, subject: SubjectRef { kind, id, display_name }, list_code, state, listing_decision_at, freeze_due_at, freeze_limit_at, committee_report_due_at, frozen_at, verification_level, post_order_debit_count, committee_report_at, second_report_due_at, second_report_at, referred_at, released_at, case_id: Option<Uuid>, version }`; `display_name` is the party's current name (Arabic first, `canon.party_name` with `superseded_at IS NULL`, phase 18); `FreezeDetailView` adds `task: Option<OpsTaskTeamView>`, `letters: Vec<LetterRef { role: LetterRole, letter_id }>` (`committee_report`, `second_report`, `referral`), `release: Option<ReleaseView { decision_id, reason_code, delisting_list_version_id, decided_by: PersonRef, decided_at }>`
+- `VerificationView { ops_task_id, level: Option<String>, second_person_only, checks: Vec<VerificationRow { kind, level, checked_at, actor: Option<PersonRef>, accounts_checked, holds_matched, canon_as_of, debit_count, debit_total: Vec<AmountView { currency, amount }> }>, attestation: Option<AttestationRef { evidence_id, workflow_instance_id, attested_by: PersonRef, attested_at }> }`
+- `RefrainView { id, refrain_ref, office_reference, received_at, refrain_due_at, state, confirmed_at, referred_at, closed_at, parties: Vec<PartyRef>, account_count: i32, task: Option<OpsTaskTeamView> }`
+- `IncidentView { id, kind, subject_kind, subject_id, raised_at, state, payload, closure_reason_code }`
+
+**Repository traits** (domain layer; methods take `&mut PgConnection` or `&mut Tx` as their name says):
+- `OpsTaskRepository`: `insert(tx, NewOpsTask) -> OpsTask`; `get(conn, id)`; `get_for_update(tx, id)`; `list(conn, filter, page) -> Page<OpsTask>`; `for_source(conn, source_kind, source_id) -> Vec<OpsTask>`; `set_claimed(tx, id, actor, at, expected_version)`; `set_completed(tx, id, actor, cbs_reference, at, expected_version)`; `set_verification(tx, id, level, second_person_only, at)`; `needing_check(conn, limit) -> Vec<Uuid>` (the sweep, section 3.3)
+- `OpsVerificationRepository`: `insert(tx, NewVerification)`; `list(conn, task_id) -> Vec<OpsVerification>`; `exists(conn, task_id, level) -> bool`
+- `FreezeRepository`: `insert_if_absent(tx, NewFreeze) -> Option<Freeze>` (`INSERT ... ON CONFLICT (screening_alert_id) DO NOTHING RETURNING`; `None` when the alert already has a freeze); `get(conn, id)`; `get_for_update(tx, id)`; `by_alert(conn, alert_id)`; `visible(conn, principal, filter, page) -> Page<Freeze>` (the predicate of section 3.12); `set_task(tx, id, task_id)`; `set_state(tx, id, state, at)`; `set_frozen(tx, id, level, at)`; `add_debits(tx, id, count)`; `set_committee_requested(tx, id, letter_id, at, second_due_at)`; `set_second_requested(tx, id, letter_id, at)`; `set_referred(tx, id, letter_id, at)`; `set_released(tx, id, decision_id, reason_code, list_version_id, at)`; `due_unhandled(conn, at, limit) -> Vec<(Uuid, Kind)>` (the backstop query of `ops_clock_scan`, section 4.1)
+- `RefrainRepository`: `insert(tx, NewRefrain)`; `get(conn, id)`; `get_for_update(tx, id)`; `list(conn, filter, page)`; `set_task(tx, id, task_id)`; `set_confirmed(tx, id, at)`; `set_referred(tx, id, letter_id, at)`; `set_closed(tx, id, actor, reason_code, at)`
+- `OpsIncidentRepository`: `raise(tx, NewIncident) -> Option<OpsIncident>` (`ON CONFLICT (kind, subject_kind, subject_id) WHERE state = 'open' DO UPDATE SET payload = ops_incidents.payload || EXCLUDED.payload, version = version + 1 RETURNING` only when the payload changed; `None` when nothing changed); `get_for_update(tx, id)`; `list(conn, filter, page)`; `close(tx, id, actor, reason_code, at, expected_version)`
+- `CanonOpsReader` (read only; `SELECT` on `canon.*` of phase 10; no write): `target_accounts(conn, party_ids) -> Vec<Uuid>` (`canon.account_party_role` with `recorded_to IS NULL AND (valid_to IS NULL OR valid_to >= current_date)`, joined to `canon.account` with `status = 'active'` or `'dormant'` or `'stopped'`); `account_numbers(conn, ids) -> Vec<(Uuid, String)>` (decrypts `canon.account.number_enc` through the phase 02 personal seal, AAD = row id; the only function that returns a number); `holds(conn, account_ids, as_of) -> Vec<HoldRow { id, account_id, hold_type, reference, start_at, end_at }>` (`canon.account_hold` with `end_at IS NULL OR end_at > as_of`); `debits_since(conn, account_ids, from_date) -> Vec<DebitRow>` (`canon.txn` with `dr_cr = 'D' AND status = 'posted' AND account_id = ANY($1) AND booking_date >= $2`; the key is `(id, booking_date)`); `canon_as_of(conn, account_ids) -> Option<NaiveDate>` (`MAX(business_date)` of `canon.balance_snapshot`)
+
+**Pg implementations**: `PgOpsTaskRepository`, `PgOpsVerificationRepository`, `PgFreezeRepository`, `PgRefrainRepository`, `PgOpsIncidentRepository`, `PgCanonOpsReader`. Every `UPDATE` names its column list (section 1.2 grants); a `version` mismatch is `0 rows affected` and maps to `VersionConflict`. Refs (`task_ref`, `freeze_ref`, `refrain_ref`) are `T-`, `FRZ-`, `REF-` plus `to_char(now(), 'YYYY')` and `LPAD(nextval('casework.ops_ref_seq')::text, 4, '0')`.
+
+**Route table** (scopes from API.md section 2; `(API.md 3.14)` marks a row this phase owns, `(phase 20, added)` a row this phase adds to API.md 3.14; markers SU, 4E, `If-Match` and `Idempotency-Key` as in API.md section 3):
+
+| Method | Path | Scope | Description |
+|-|-|-|-|
+| GET | `/api/v1/ops-tasks` | `ops.tasks`, `case.decide` | List, cursor. OPS receives the neutral view; A2 and M receive the team view (API.md 3.14; scope `case.decide` added by phase 20 so W9 can serve the team) |
+| GET | `/api/v1/ops-tasks/{id}` | `ops.tasks`, `case.decide` | Detail in the caller's view (API.md 3.14) |
+| POST | `/api/v1/ops-tasks/{id}/claim` | `ops.tasks` | Claim an open task; `If-Match`; `E_CLAIMED` 409 when claimed by another (API.md 3.14) |
+| POST | `/api/v1/ops-tasks/{id}/complete` | `ops.tasks` | Complete with the core-system reference; `If-Match`; `Idempotency-Key` (API.md 3.14) |
+| POST | `/api/v1/ops-tasks/{id}/cannot-complete` | `ops.tasks` | Record that the action cannot be done, with a closure code; raises incident `task_failed` (phase 20, added) |
+| POST | `/api/v1/ops-tasks/{id}/confirm` | `ops.tasks` | Second-person confirmation for V0 (phase 20, added); refused to the completer |
+| GET | `/api/v1/ops-tasks/{id}/verification` | `case.decide` | Verification history and the achieved level from the copy (API.md 3.14) |
+| POST | `/api/v1/ops-tasks/{id}/verification/check` | `case.decide` | Run the canonical check now; `Idempotency-Key` (phase 20, added) |
+| POST | `/api/v1/ops-tasks/{id}/evidence` | `case.decide` | Upload the attestation screenshot through `EvidenceStore::stage` (owner kind `ops_task`; Cedar `ops.verification.attest`); 422 `E_UPLOAD_REJECTED` on an antivirus or type refusal; `Idempotency-Key` (phase 20, added) |
+| POST | `/api/v1/ops-tasks/{id}/attest` | `case.decide` | Request the V3 attestation with a staged evidence item; starts `ops_attestation`; **SU** (`ops.attest`, class `signing`); `If-Match`; `Idempotency-Key` (API.md 3.14) |
+| GET | `/api/v1/freezes` | `case.decide` | Freeze board, cursor, rows the caller may see (API.md 3.14) |
+| GET | `/api/v1/freezes/{id}` | `case.decide` | Freeze detail with task, letters and release; masked 404 (API.md 3.14) |
+| POST | `/api/v1/freezes/{id}/release-proposals` | `case.decide` | Propose the release of a delisted freeze; starts `freeze_release`; `If-Match` (freeze version); `Idempotency-Key` (phase 20, added) |
+| POST | `/api/v1/freezes/{id}/release-decision` | `case.decide` | Approve or reject the release task; **SU** (`freeze.release`, class `decision`, consumed by the engine at the act); **4E**; `If-Match` (instance version) (API.md 3.14) |
+| POST | `/api/v1/freezes/{id}/referral` | `case.decide` | Refer an unresolved match to the Committee's technical committee (letter request); **SU** (`freeze.refer`, class `decision`); `Idempotency-Key` (phase 20, added) |
+| GET | `/api/v1/refrain-instructions` | `case.decide` | Refrain instructions with the 7-working-day clock (API.md 3.14) |
+| POST | `/api/v1/refrain-instructions` | `case.decide` | Register an instruction; creates the hold task; **SU** (`refrain.register`, class `decision`); `Idempotency-Key` (API.md 3.14) |
+| GET | `/api/v1/refrain-instructions/{id}` | `case.decide` | Detail with its task (phase 20, added) |
+| POST | `/api/v1/refrain-instructions/{id}/referral` | `case.decide` | Refer to the technical committee (letter request); **SU** (`refrain.refer`, class `decision`) (phase 20, added) |
+| POST | `/api/v1/refrain-instructions/{id}/close` | `case.decide` | Close on the Office's withdrawal; creates the release task; **SU** (`refrain.close`, class `decision`) (phase 20, added) |
+| GET | `/api/v1/incidents` | `case.decide` | Failure incidents; Cedar gives M alone (phase 20, added) |
+| POST | `/api/v1/incidents/{id}/close` | `case.decide` | Close with a closure code; M alone (phase 20, added) |
+
+The route table has 22 rows: 11 owned rows of API.md 3.14 (the `POST /exits` row is not built here, see below) and 11 added rows. `POST /exits` (API.md 3.14, last row) is the phase 15 exit (`POST /exit-register`, phase 15 section 1.4); the row is superseded and the lead removes it from API.md 3.14 in the same change.
+
+**Routers**: `pub fn router() -> Router<AppState>` in `api::routes::ops_tasks`, `api::routes::freezes`, `api::routes::refrain_instructions` and `api::routes::incidents`.
+
+**Views and the neutral contract** (the rule of section 3.2, in code; referred to as "the views of section 2")
+
+- `OpsTaskNeutralView` is built by `OpsTaskService::neutral_view` from the row and the `CanonOpsReader` only. It has no field for the action, the source, the case, the risk, the reason codes, the list, the party name or the verification level. The `text` is the template of section 3.2 with `{account}` and `{ref}` filled; no other value enters the template.
+- `OpsTaskTeamView` is built by `OpsTaskService::team_view` for holders of `case.decide` only.
+- The view is chosen from the scope of the caller, never from a query flag: a request with `ops.tasks` and without `case.decide` always gets the neutral view, a request with `case.decide` always gets the team view.
+
+---
+
+## 3. Business Logic
+
+Every mutation below runs in one transaction with its audit event (section 3.10), and every step that reads a clock reads `now()` once at its start. The order of locks is section 3.13. No path of this phase writes a case event: a freeze, a refrain and a task are not case records, so a closed or sealed case (phase 18) never blocks them, and a freeze never waits for a case lock (DR-158).
+
+### 3.1 The operations task contract (`OpsTaskService`; M-32, M-33)
+
+**What a task is.** A neutral instruction to bank operations to restrict, hold or release the usage of accounts in the core banking system, with its due time, a reference (`task_ref`, `T-YYYY-NNNN`), an authority reference, the list of target accounts and, on completion, the core-system reference that operations enter. No task creates a CBS write: the CBS stays read-only (phases 05 and 10), and the action is done by a person in the CBS (DSL E.3 `create_ops_task`, "never a CBS write").
+
+**Creation** (`OpsTaskService::create(tx, NewOpsTaskSpec { source_kind, source_id, action, case_id, target_accounts, authority_ref, effective_at, due_at, created_by: Option<Uuid> }) -> Result<OpsTask, OpsError>`; called by `FreezeService::start` (section 3.4), by `RefrainService::register` and `RefrainService::close` (section 3.7), by the release effect `release_freeze` (section 3.5) and by the phase 15 terminal effect `create_ops_task` (DSL E.3, registered here and called by the `exit_decision` definition of phase 15):
+1. Validate: `target_accounts` has 1 to 500 ids (else `E_VALIDATION`, sub-code `no_account`); `due_at >= effective_at`; `action` maps to exactly one neutral code by the table of step 2.
+2. Neutral code by action (closed): `freeze` to `ops.restrict.account`; `restrict` to `ops.restrict.account`; `exit` to `ops.restrict.account`; `hold` to `ops.hold.account`; `release` to `ops.release.account`.
+3. `task_ref` from `casework.ops_ref_seq` (`T-`, year of `now()`, four digits or more).
+4. Insert the row (`state = open`, `version = 1`, `created_by` NULL for the system).
+5. Audit `ops.task_created` (section 3.10). No chain event.
+
+**Claim** (`POST /ops-tasks/{id}/claim`, `ops.tasks`, `If-Match`): lock the task row. `If-Match` absent: 428; not equal to `version`: 409 `E_VERSION_CONFLICT` with the current version. State `open`: set `claimed` with `claimed_by = actor`; state `claimed` by the actor: no-op (200); claimed by another: 409 `E_CLAIMED`; `completed`: 409 `E_NOT_ALLOWED_IN_STATE`, sub `already_completed`. Audit `ops.task_claimed`.
+
+**Complete** (`POST /ops-tasks/{id}/complete`, `ops.tasks`, `If-Match`, `Idempotency-Key`; body `CompleteOpsTask`):
+1. Read the task without a lock to learn its source. Lock the owner row first (section 3.13): `freezes` for `source_kind = freeze`, `refrain_instructions` for `refrain`, nothing for `exit` (the exit instance is phase 15's). Then lock the task row and re-read it. The owner row is locked before the task in every path (section 3.13), so this path cannot deadlock with a verification.
+2. `If-Match` checked against `version`.
+3. State `completed`: 409 `already_completed`. State `claimed` by another user: 409 `E_CLAIMED`. Otherwise the completer is the actor, and an unclaimed task is claimed by the completer in the same step.
+4. `cbs_reference`: trimmed; 1 to 40 characters; only letters, digits, `-`, `/` and space (else 422 `E_VALIDATION`, sub-code `reference_format`). The reference is an identifier of the core system, not personal data.
+5. Set `state = completed`, `completed_by = actor`, `completed_at = now()`, `cbs_reference`, `version + 1`.
+6. Enqueue the job `ops_canon_check` with coalesce key `ops_check:<task id>` in the same transaction (section 3.3), so the copy is checked at once and not only at the next sweep.
+7. Call the owner's hook: `FreezeService::on_task_completed` or `RefrainService::on_task_completed` (both only record that the task is done; the level changes only through the check).
+8. Audit `ops.task_completed`. Response: `OpsTaskNeutralView` for the actor.
+
+**Cannot complete** (`POST /ops-tasks/{id}/cannot-complete`, `ops.tasks`, `If-Match`): lock as in complete (a task claimed by another user is refused 409 `E_CLAIMED`, complete step 3); state not `completed`; `reason_code` is `CLS_OPS_TASK_CANNOT_COMPLETE` (family `closure`, checked against `ref.reason_codes`, active). Calls `IncidentService::raise(task_failed, ops_task, task id, payload {reason_code, task_ref})` (section 3.8). The task keeps its state. Audit `ops.task_cannot_complete`. The owner is not changed: the freeze stays `listed` and its clocks run.
+
+**Reads.** `GET /ops-tasks` and `GET /ops-tasks/{id}` return the view of the caller's scope (section 2, views). For the team view, a task is visible to a holder of `case.decide` when `case_id` is visible to them under the case access list (section 3.12, rule T1), or to role `M` in every case, including tasks with no case.
+
+### 3.2 Neutral instruction texts and the scan (`PolicyPackService`, scope `task`; M-33, DESIGN-SYSTEM W9)
+
+The three instruction texts are template entries of the policy pack (phase 09 section 3.5, `templates`, scope `task`, bilingual), keyed by the neutral codes of section 1.1:
+
+| Key | Arabic | English |
+|-|-|-|
+| `ops.restrict.account` | تطبيق تقييد على الحساب {account} · المرجع {ref} | Apply restriction to account {account} · reference {ref} |
+| `ops.hold.account` | وضع حجز على الحساب {account} · المرجع {ref} | Place a hold on account {account} · reference {ref} |
+| `ops.release.account` | رفع التقييد عن الحساب {account} · المرجع {ref} | Lift restriction on account {account} · reference {ref} |
+
+- The placeholders are `{account}` (the account number of section 2 `AccountNumberView`) and `{ref}` (`task_ref`); nothing else is substituted, so a rendered text can carry no party name, reason or list.
+- Each template is passed through `PolicyPackService::scan(scope = task, text)` at pack save (phase 09, forbidden-word list). A pack that holds a hit is refused; the test of section 6 checks that the shipped texts pass in both languages.
+- Authorship: the texts ship in the seed of the pack; a change to them is a policy pack change (phase 09 change request), never a free edit by OPS.
+- `OpsTaskNeutralView.text` is the template in the caller's language (`Accept-Language`, default Arabic), with the two placeholders filled.
+
+### 3.3 Verification from the canonical copy (`VerificationService`; M-33, RP-55, C-60)
+
+**The levels** (stored on `ops_tasks.verification_level`; the level only rises, guard of section 1.2):
+
+| Level | Meaning | How it is reached | Written as |
+|-|-|-|-|
+| V0 | The completion is confirmed by a second person, flagged: the copy does not show it (yet) | `confirm` by another OPS user (the Confirm step below), refused when the copy already matches | `ops_verifications` kind `second_person`; `second_person_only = TRUE` |
+| V1 | The hold is in place in the copy: on every target account a hold row of type `block`, `restriction`, `aml_freeze`, `sanctions_freeze` or `cbi_order` (phase 10 `canon.account_hold.type`) carries the entered core-system reference and is open (`end_at IS NULL OR end_at > now()`) | the sweep or the completion check | `kind canonical_check`, `level v1` |
+| V2 | V1, and the copy is current (`canon_as_of` on or after the effective date) and no posted debit has booking date on or after the effective date on any target account | the check | `kind canonical_check`, `level v2` |
+| V3 | A person attests the block with a staged evidence item (screenshot of the CBS screen), and a second person approves (four-eyes) | `POST /ops-tasks/{id}/attest` then the approval task of `ops_attestation` | `kind attestation`, `level v3` |
+
+The copy does not have an order type or an authority on a hold row: a row proves that a block exists with the reference, not that a freeze order was issued (MODULES M14 edge case). That is why V1 needs the reference, and why V0 is the flagged level when the reference is not found.
+
+**Check** (`VerificationService::check(tx, task_id, actor: Option<Uuid>) -> VerificationView`; the job `ops_canon_check`, the route `POST /ops-tasks/{id}/verification/check` (actor = caller) and the completion enqueue):
+1. Read the task and its owner without a lock to learn them, then lock the owner and then the task (`FOR UPDATE`, section 3.13) and re-read the task; a task that is not `completed` is a no-op. A hold task (action `freeze`, `restrict`, `hold` or `exit`) whose owner is `released` (freeze) or `closed` (refrain) is a no-op (the phase 00 timer rule: the handler re-reads its owner). A `release` task follows the lift rule below instead of steps 2 to 10.
+2. `holds`: for each target, the holds that V1 requires (a type of the V1 row, the reference equal to `cbs_reference`, open at `now()`), counted per target account as `holds_matched` (an account counts once, however many matching holds it has); `n` is the number of target accounts, the `accounts_checked` of the row.
+3. `canon_as_of = CanonOpsReader::canon_as_of(targets)`; `effective_date` is the bank-zone date of `effective_at`.
+4. `debits = CanonOpsReader::debits_since(targets, effective_date)`: every posted debit (`dr_cr = 'D'`), fees included because a fee is a debit posting; the set is by `(txn id, booking_date)`.
+5. Candidate level: `L* = v2` when `holds_matched = n` and `canon_as_of >= effective_date` and `debits` is empty; `L* = v1` when `holds_matched = n` and not v2; otherwise none.
+6. `new_level = max(current, L*)`. `new_debits` = the debits whose txn id is not in the `post_order_debits` of an earlier row of this task.
+7. Rise (`new_level > current`): insert `ops_verifications` (kind `canonical_check`, level `new_level`, `post_order_debits = new_debits`, counts, `canon_as_of`); set `ops_tasks.verification_level = new_level`, `second_person_only = FALSE`, `verified_at = now()`; call the owner's `on_level` (section 3.4, `on_level`).
+8. No rise, but `new_debits` non-empty and `current` is V1 or V2: insert a `canonical_check` row at `current` with `post_order_debits = new_debits` (the history of the debit is kept; the level is not changed).
+9. `new_debits` non-empty (any level): `IncidentService::raise(post_order_debit, subject = owner, payload {count, totals by currency, task_ref})` (the payload carries the amounts; section 3.8); for a freeze also `FreezeService::add_debits(count)` and `AlarmService::raise` of kind `post_order_debit`, subject freeze, supervisor M (phase 19, section 3.10).
+10. `holds_matched < n` and `canon_as_of >= effective_date` and `current` is null or V0: `IncidentService::raise(hold_absent, ops_task, task id, payload {holds_matched, accounts, canon_as_of})`. A copy that is not yet current is not an incident: it is the reason the sweep runs again.
+11. Audit `ops.verification_checked` with counts and the levels before and after (no account, no amount).
+12. Response: `VerificationView` (section 2).
+
+**Lift rule** (`release` tasks; lead review): a lift task reaches V1 when the copy is current (`canon_as_of` on or after the effective date) and no target account has an open hold of the V1 types carrying the `cbs_reference` of the hold task it lifts (the owner's `ops_task_id`); a lift has no V2 and no debit watch, and it is checked whatever the owner's state, until V1. A lift still below V1 with a current copy after its due time raises incident `task_failed` with payload `{lift_pending: true}`. V0 by a second operator is allowed as for a hold task.
+
+**Confirm (V0)** (`POST /ops-tasks/{id}/confirm`, `ops.tasks`, `If-Match`):
+1. Lock the owner, then the task. State `completed`; level null (else 409 `E_NOT_ALLOWED_IN_STATE`, sub `already_verified`).
+2. The completer may not confirm (403 `E_SELF_APPROVAL`).
+3. The check of section 3.3 is run first; if it finds `holds_matched = n`, the refusal is 409 `E_NOT_ALLOWED_IN_STATE`, sub `copy_matches` (the level will be V1 on the sweep; a second person does not override a copy that shows the hold).
+4. Insert `ops_verifications` (kind `second_person`, level `v0`, actor = caller, counts from step 2 of the check); set `verification_level = v0`, `second_person_only = TRUE`, `verified_at = now()`.
+5. Owner: `on_level(v0)` (freeze: section 3.4; refrain: no change, a refrain is confirmed only at V1).
+6. Audit `ops.verification_confirmed` (level v0).
+
+**Attest (V3)** (`POST /ops-tasks/{id}/attest`, `case.decide`, **SU** `ops.attest` class `signing`, `If-Match`, `Idempotency-Key`; body `AttestOpsTask`):
+1. SU consumed by the route (`StepUpService::consume` with resource ref `ops_task:<id>`).
+2. Lock the owner, then the task. State `completed`; level `v1` or `v2` (else 409 `not_verified`); level `v3` already (409 `already_verified`).
+3. The evidence item: an `admin.evidence_objects` row with `owner_kind = 'ops_task'`, `owner_id = task id`, `kind = upload`, scan status clean (phase 02 `evidence_scan`); absent: 422 `evidence_missing`; not clean: 422 `evidence_not_clean` (phase 18 sub-code).
+4. `WorkflowEngine::start(tx, StartSpec { definition_key: "ops_attestation", resource: ("ops_task", task id), purpose: Decision, initiator: actor, maker: actor })` (phase 04; `StartSpec` carries no parameters). `OpsTaskWorkflowSubject::start_context` freezes the attribute `ops.evidence_id` (the clean upload of step 3, the latest when several exist) into `workflow_instances.context`, so the effect reads the evidence from the instance, not from a later upload. The instance is the proposal. No verification row is written yet.
+5. Audit `ops.attestation_requested` (task id, evidence id, instance id).
+
+**Approval of the attestation** (phase 04 generic route `POST /tasks/{id}/actions/approve` on the task of `ops_attestation`; holders by phase 04 `Holders` from the step's assignee `{kind: role, role: A2, scope: bank}`, excluding the maker; the completer is refused by `check_before_decision`):
+- `OpsTaskWorkflowSubject::check_before_decision` (phase 18 hook): lock the owner, then the task; the approver is not `completed_by` (403 `E_SELF_APPROVAL`); the level is still `v1` or `v2` (409 `not_verified`); the declared step-up action of the approval is `ops.attest.approve` (class `signing`), consumed once by the engine at step 5.
+- Terminal effect `record_verification` (new in phase 20, resource kinds `ops_task`): insert `ops_verifications` (kind `attestation`, level `v3`, `evidence_id` from `inst.context`, `workflow_instance_id`, `actor_id = approver`, counts copied from the last check); set `verification_level = v3`, `second_person_only = FALSE`, `verified_at = now()`; the owner's `on_level(v3)` raises the freeze's level only. Audit `ops.attested` (task id, instance id, evidence id).
+- A rejected attestation ends the instance; `on_ended` writes audit `ops.attestation_rejected`.
+
+**Sweep** (`ops_check_sweep`, worker, cron `schedule.ops_check_sweep`, every 15 minutes): `OpsTaskRepository::needing_check(limit 500)` returns, oldest last check first (so no task starves), the completed hold tasks whose owner is not released (freeze) or closed (refrain), regardless of level (the post-order watch lasts until the release, not until V3), and the completed `release` tasks below V1. For each id the job enqueues `ops_canon_check` with coalesce key `ops_check:<id>` (concurrency 2, attempts 3). The job re-reads the task and runs step 1 to 12 of the check.
+
+### 3.4 Freezes and their clocks (`FreezeService`, implements phase 14 `FreezeTrigger`; M-34, C-63, RP-55, RP-56)
+
+`FreezeService` replaces `RecordingFreezeTrigger` in `AppState` (section 4.3). The port is phase 14's: `start(tx, &FreezeCandidate) -> Result<FreezeStart, FreezeError>`, called by phase 14 decision step 8 in the decision transaction, after the alert row is `true`.
+
+**Clock values.** Computed once, at listing, from `c.decided_at` (the listing decision time):
+
+| Clock | Value | Source | Column |
+|-|-|-|-|
+| Freeze task due | `decided_at + ops.freeze_task_hours` hours (default 8; a value outside 1 to 8 never fails the screening decision: the service uses 8 and writes audit `ops.config_fallback {key, value}`, lead review) | setting (section 3.14) | `freeze_due_at` |
+| Freeze limit | `decided_at + 24` hours | ClockRegistry `freeze.limit`, `fixed: true` (section 3.14) | `freeze_limit_at` |
+| Committee report | `decided_at + 48` hours, a copy to the Office | ClockRegistry `freeze.committee_report`, `fixed: true` | `committee_report_due_at` |
+| Second report | `committee_report_at + 2` calendar months (bank zone, local time kept) | ClockRegistry `freeze.second_report`, `fixed: true`; `add_calendar_months` (new in phase 20, section 3.14) | `second_report_due_at` |
+
+Hours are plain hours (phase 09 `BusinessUnit::Hours`): the freeze clocks run through weekends and holidays, as the CBI texts require. The two-month clock is set from the moment the Committee letter is requested (the first report), not from the listing (Open doubts 4).
+
+**Start** (`FreezeService::start`; the only creator of a freeze):
+1. Read `alert.screening_alerts` by `c.alert_id` (`list_kind = 'freeze'` else `FreezeError::NotFreezeList`, sub-code `not_freeze_list`; the row gives `entry_id`, `list_id`, `subject_kind`, `subject_id`, `case_id` (phase 17)). Read the entry key from `ref.list_entries` by `entry_id`.
+2. `case_id` is the alert's `case_id` only when `subject_kind = 'party'` (DR-147); otherwise NULL.
+3. `freeze_ref` from `casework.ops_ref_seq` (`FRZ-` plus year and number).
+4. `INSERT ... ON CONFLICT (screening_alert_id) DO NOTHING RETURNING *` (`FreezeRepository::insert_if_absent`). `None`: the freeze exists; return `FreezeStart::Started { freeze_id }` of the existing row and write nothing (a replayed decision and the backfill of this section both rely on this).
+5. Target accounts: for `party`, `CanonOpsReader::target_accounts([c.subject_id])`. For `counterparty` and `payment_party` the service does not derive accounts (Open doubts 6): no task is created.
+6. With accounts: `OpsTaskService::create(tx, { source_kind: freeze, source_id: freeze id, action: freeze, case_id, target_accounts, authority_ref: the task's own `task_ref` (note below), effective_at: c.decided_at, due_at: freeze_due_at })`; `freezes.ops_task_id` is then set (`set_task`). The OPS view thus shows the bank's own instruction number and no list or freeze word.
+7. Without accounts (counterparty, payment party, or a party with no current account): `AlarmService::raise(freeze_overdue, subject freeze, supervisor M, payload {reason: no_target_accounts})` now, and the freeze stays `listed` until a person acts (Open doubts 6).
+8. Timers (`TimerService::schedule`, owner `freeze`, `fire_at` absolute, no calendar): `freeze_due` at `freeze_due_at`; `freeze_limit` at `freeze_limit_at`; `committee_report_due` at `committee_report_due_at`.
+9. Audit `freeze.created` (freeze id, `freeze_ref`, `list_code`, `subject_kind`, due and limit instants, task id or none). No party name, no reason.
+10. Return `FreezeStart::Started { freeze_id }`. Phase 14 writes its own `screening.freeze_trigger_recorded` only for the recording stub; the real port writes no phase 14 event.
+
+**Note on step 6.** The task's `authority_ref` is its own `task_ref`. `OpsTaskService::create` draws the `task_ref` from `casework.ops_ref_seq` before the insert and writes it as `authority_ref` in the same row, so no second write is needed.
+
+**Clock handlers** (worker; section 4.2 lists the handlers; each re-reads the owner and does nothing when the owner's state does not call for it):
+- `timer_freeze_due`: state `listed` (no level reached): `AlarmService::raise(freeze_overdue, subject freeze, supervisor M, payload {freeze_ref, due_at})`; audit `freeze.overdue`. A `frozen` or `released` freeze is a no-op.
+- `timer_freeze_limit`: state `listed` (no level reached): `IncidentService::raise(limit_missed, freeze, payload {freeze_ref, limit_at})` for the MLRO; audit `freeze.limit_missed`. Any level reached: no-op.
+- `timer_committee_report_due`: `committee_report_at` NULL: `IncidentService::raise(report_missed, freeze)` and then `request_committee_report(reason = deadline)`. Otherwise no-op.
+- `timer_second_report_due`: `second_report_at` NULL and state not `released`: `request_second_report`. Otherwise no-op.
+
+**`on_level(tx, freeze, level)`** (called by the verification of section 3.3):
+1. The freeze moves `listed` to `frozen` on the first level (V0 or better), with `frozen_at = now()`; `verification_level` is set to the level (only rises). Audit `freeze.frozen` (level).
+2. If `committee_report_at` is NULL: `request_committee_report(reason = verified)`. The Committee report is therefore requested at the first verified level, and at the deadline in any case.
+
+**`on_task_completed(tx, freeze)`** (called by section 3.1 step 7): records nothing and changes no state; the completion is audited by section 3.1, and the level changes only through the check.
+
+**`add_debits(tx, freeze, n)`**: `post_order_debit_count = post_order_debit_count + n`. The alarm of section 3.3 step 9 is raised once (the live-alarm index of phase 19 stops a second one).
+
+**`request_committee_report(tx, freeze, reason)`** (the first report to the Committee, copy to the Office; RP-56):
+1. `committee_report_at` NULL, else return.
+2. `LetterRequester::request(tx, LetterRequest { kind: CommitteeFreezeReport, subject_kind: freeze, subject_id, copy_to_office: TRUE, facts: { freeze_id, freeze_ref, reason, verification_level, post_order_debit_count } })` (section 3.6). The letter reads the rest of its content from the freeze row through phase 21; the request carries ids, codes and counts only.
+3. `set_committee_requested(letter id, now, second_due = add_calendar_months(now, 2))`; schedule `second_report_due` at `second_due`.
+4. Audit `freeze.committee_report_requested` (freeze id, letter id, reason).
+
+**`request_second_report(tx, freeze)`**: `LetterRequester::request(kind SecondFreezeReport, copy_to_office TRUE, facts as above plus the post-order count)`; `set_second_requested`; audit `freeze.second_report_requested`.
+
+**Board reads.** `GET /freezes` lists the rows of the visibility predicate of section 3.12 (rule F1), with `FreezeView`. `GET /freezes/{id}` returns `FreezeDetailView` for a visible row; a row the caller may not see is `E_NOT_FOUND` with the identical body (the masked answer of phase 17 section 3.10).
+
+**Backfill** (`freeze_backfill`, one-time job, worker; enqueued by `akr-ctl ops backfill-freezes` in the install step of this phase, idempotent). For every `alert.screening_alerts` row with `list_kind = 'freeze'` and `state = 'true'` and no freeze row, the job calls `FreezeService::start` in its own transaction with `listing_decision_at` = the alert's `decided_at` and `listing_decided_by` = the latest `alert.screening_decisions.decider_id` with outcome `true`. The phase 14 recording stub wrote `screening.freeze_trigger_recorded` for these alerts and nothing else happened to them, so the backfilled freezes are late by construction: their timers fire at once, and the alarms and incidents of this section show that. Audit `freeze.backfilled` per freeze; the job returns counts only. The decision of the bank on those freezes is Open doubts 15.
+
+### 3.5 Release after delisting (`FreezeService::propose_release`, `FreezeWorkflowSubject`, `release_freeze`; M-34, RP-59)
+
+**The gate: "delisted".** The freeze is delisted when the active version of its list (`ref.list_versions` with `list_id = freeze.list_id` and `status = 'active'`, id `v_active`) holds no row with `entry_key = freeze.entry_key`, or holds one with `delisted_on IS NOT NULL` (phase 14 `ref.list_entries.delisted_on`). The check is made at proposal, at the act (`check_before_decision`) and again in the effect, and `v_active` is stored as `delisting_list_version_id` at the effect.
+
+**Propose** (`POST /freezes/{id}/release-proposals`, `case.decide`, `If-Match` (freeze version), `Idempotency-Key`; body `ProposeFreezeRelease`):
+1. Lock the freeze. `If-Match` against `version`. State `released`: 409 `already_released`. State `listed` or `frozen`: continue.
+2. Delisting gate: not delisted: 409 `E_NOT_ALLOWED_IN_STATE`, sub `not_delisted`.
+3. A running `freeze_release` instance for this freeze (`admin.workflow_instances` with the definition and the resource id, state running): 409, sub `proposal_running`.
+4. `reason_code` must be `DEC_FREEZE_DELISTED` (the only release code, section 1.2).
+5. `WorkflowEngine::start(tx, StartSpec { definition_key: "freeze_release", resource: ("freeze", freeze id), purpose: Decision, initiator: actor, maker: actor })`; the reason code (the only release code) is not carried in the instance context: `release_freeze` step 3 writes it as a constant and the audit of step 6 names it. The maker is the proposer (four-eyes, phase 04).
+6. Audit `freeze.release_proposed` (freeze id, instance id, reason code). Response: the instance and its open task (phase 04 view).
+
+**Definition `freeze_release`** (new in phase 20; DSL E.4 gains the row, DR-168): one step `approve`, assignee `{ "kind": "role", "role": "M", "scope": "bank" }`, a timeout `remind` and `escalate` only (no automatic outcome, DSL E.2), terminal effect `release_freeze` on approve, `on_ended` on reject, withdraw and failure. `classification_default: "restricted"`. The authority matrix decision type `freeze.decision` (`case.decide`; A2, M, phase 09) is the delegation the matrix may grant; the step itself names M, so a delegated A2 can act only through the matrix pin of phase 09 (Open doubts 20).
+
+**`FreezeWorkflowSubject`** (phase 04 `WorkflowSubject`, `resource_kind = "freeze"`, `attribute_prefix = "freeze"`; attributes `state` (text), `subject_kind` (text), `tier` (text, always `suspicion` for a freeze), `has_case` (boolean)):
+- `start_context(conn, freeze_id)`: the attributes above; `classification = restricted`; `maker_id` = the proposer; title and step labels in neutral words (no party name, no list name).
+- `visible_to(principal, freeze_id)` and `visibility_sql()`: the predicate of section 3.12, rule F1.
+- `check_before_decision(tx, inst, actor, task)` (phase 18 hook; step 2 of the engine): lock the freeze (instance row first, then freeze, section 3.13). State `released`: 409 `already_released`. Not delisted: 409 `not_delisted`. `acting_for` set: 403 `E_FORBIDDEN`, sub `delegation_refused`. `AuthorityMatrix::permits(actor roles, freeze.decision, max_priority P0)`, false: 403 `E_FORBIDDEN`, sub `role_not_permitted`; a permit with `second_review`: 409 `E_NOT_ALLOWED_IN_STATE`, sub `second_review_not_shipped` (phase 18 behaviour, DR-143).
+- `on_ended(tx, inst, end)`: `rejected`: audit `freeze.release_rejected`; `withdrawn` and `failed`: audit `freeze.release_ended` (end kind). The freeze and its timers are unchanged.
+
+**`release_freeze`** (terminal effect, new in phase 20; resource kinds `freeze`; runs on approve in the same transaction, the engine's step 5 has consumed the step-up of action `freeze.release`, class `decision`):
+1. Lock the freeze (already locked by the check; same transaction).
+2. Re-run the delisting gate; failure rolls the approval back (the phase 04 rule for effects).
+3. Set `state = released`, `released_at = now()`, `release_decision_id = instance id`, `release_reason_code = DEC_FREEZE_DELISTED`, `delisting_list_version_id = v_active`.
+4. Cancel the four clocks: `TimerService::cancel_for_owner(tx, 'freeze', id, kind)` for `freeze_due`, `freeze_limit`, `committee_report_due` and `second_report_due` (the phase 00 rule and the requirement "timers cancelled on release").
+5. Create the lift task: `OpsTaskService::create` with action `release`, neutral `ops.release.account`, the freeze's target accounts (from the freeze task), `effective_at = now()`, `due_at = now() + ops.freeze_task_hours`. The lift is done by operations and confirmed by the check of section 3.3 (the copy must then show no open block). If the original freeze task is still open at release, it is not cancelled (there is no cancel state): the lift task covers the same accounts, and Open doubts 11 records it.
+6. Audit `freeze.released` (freeze id, `freeze_ref`, instance id, reason code, lift task id). No party name.
+7. No letter: the release is recorded as a decision with date, time and approver (RP-59); whether the Committee also receives a release letter is Open doubts 10.
+
+**Release decision route** (`POST /freezes/{id}/release-decision`, `case.decide`, **SU** `freeze.release` class `decision` consumed by the engine at the act, **4E**, `If-Match` (instance version)): the body is `ActOnFreezeRelease { task_id, action, comment }`; the route calls `WorkflowEngine::act(ctx, task_id, TaskAction::Approve | Reject, if_match, idem, assertion)` (phase 04 envelope; the same call as the generic `POST /tasks/{id}/actions/approve`, with the freeze path and the freeze gate). A reject needs `comment` (the engine's rule, phase 04).
+
+### 3.6 Letters requested, not generated (`LetterRequester`; RP-56, RP-58)
+
+The Committee report, the second report and the referral are letters. Their generation, signature and delivery are phase 21 (`POST /letters`, scope `report.file`). Phase 20 defines the port and the stub, and never writes a letter row.
+
+```rust
+/// Defined by phase 20; implemented by phase 21 (the letter engine) and replaces the recording stub in AppState.
+#[async_trait]
+pub trait LetterRequester: Send + Sync {
+    async fn request(&self, tx: &mut Tx, req: &LetterRequest) -> Result<Uuid, LetterError>;
+}
+pub struct LetterRequest { pub kind: LetterKind, pub subject_kind: OpsLetterSubject, pub subject_id: Uuid,
+                           pub copy_to_office: bool, pub facts: serde_json::Map<String, serde_json::Value> }
+pub enum LetterKind { CommitteeFreezeReport, SecondFreezeReport, CommitteeReferral }
+pub enum OpsLetterSubject { Freeze, Refrain }
+```
+
+- `facts` carries ids, codes, counts and dates only; the letter engine reads the content from the freeze or refrain row, so that a letter can be regenerated from the record.
+- `RecordingLetterRequester` (ships here; `AppState` until phase 21): returns `Uuid::now_v7()` and writes audit `ops.letter_recorded` (kind, subject kind, subject id). Phase 21 replaces it.
+- `LetterError` maps to `E_UNAVAILABLE` (503) when the letter engine is down; the caller's transaction is rolled back, so the freeze keeps `committee_report_at` NULL and the deadline timer retries (the handler re-reads the owner).
+- Referral (`POST /freezes/{id}/referral`, `POST /refrain-instructions/{id}/referral`): `LetterRequest { kind: CommitteeReferral, copy_to_office: TRUE }`, then `set_referred` (freeze: `referred_at`, `referral_letter_id`; refrain: state `referred`). Audit `freeze.referred` or `refrain.referred`. Referral is a person's act (RP-58); an automatic referral of unresolved matches is Open doubts 18.
+
+### 3.7 Refrain instructions (`RefrainService`; RP-45)
+
+**Register** (`POST /refrain-instructions`, `case.decide`, **SU** `refrain.register` class `decision`, `Idempotency-Key`; body `RegisterRefrain`):
+1. The parties: each `party_id` must be a current party (`canon.party`, else 422 `E_VALIDATION`, sub `unknown_party`).
+2. `target_accounts = CanonOpsReader::target_accounts(party_ids)`; empty: 422 `E_VALIDATION`, sub `no_account`.
+3. `refrain_due_at = BusinessClock::add(received_at, 7, WorkingDays)` (phase 09 `BankCalendarClock`; the value 7 is the ClockRegistry entry `refrain.clock`, `fixed: true`, section 3.14). A `received_at` in the future is refused (422 `E_VALIDATION`, sub `received_in_future`).
+4. Insert `refrain_instructions` (state `open`, `refrain_ref` from the sequence, `registered_by = actor`), then `OpsTaskService::create` with action `hold`, neutral `ops.hold.account`, `authority_ref = office_reference`, `effective_at = received_at`, `due_at = refrain_due_at`, `case_id` if given; `set_task`.
+5. Timer `refrain_due` (owner `refrain`) at `refrain_due_at`.
+6. Audit `refrain.registered` (refrain id, ref, party and account counts, due instant). The Office's reference is not written to the audit payload.
+
+**Confirmation and post-check.** The task is completed by operations (section 3.1). The check of section 3.3 reaching V1 sets the refrain `confirmed` (`confirmed_at = now()`, state `open` to `confirmed`); V2 is the post-check (no debit on the copy since the instruction). A V0 confirmation leaves the refrain `open`, flagged.
+
+**Overdue.** `timer_refrain_due`: state `open` (the hold is not confirmed by the deadline): `AlarmService::raise(refrain_overdue, subject refrain, supervisor M)`; audit `refrain.overdue`. The instruction is not closed by the system; the referral is a person's act.
+
+**Refer, close** (section 3.6 for the letter): `refer` requires state `open` or `confirmed` (else 409 `E_NOT_ALLOWED_IN_STATE`). `close` (`POST /refrain-instructions/{id}/close`, **SU** `refrain.close` class `decision`, body `CloseRefrain { reason_code }` with `CLS_OPS_REFRAIN_WITHDRAWN`): lock the refrain and its task; set `closed` (`closed_by`, `closed_at`, `closure_reason_code`); create the lift task (action `release`, neutral `ops.release.account`, same accounts, `authority_ref = office_reference`); audit `refrain.closed`.
+
+**Read.** `GET /refrain-instructions` and the detail: `RefrainView` (the Office's reference and the task are team data; OPS never sees a refrain row, only the task through the neutral view).
+
+### 3.8 Failure incidents (`IncidentService`; M-33)
+
+- `IncidentService::raise(tx, kind, subject_kind, subject_id, raised_by: Option<Uuid>, payload) -> Result<Option<OpsIncident>, OpsError>`: `OpsIncidentRepository::raise` (the open-unique index of section 1.1). A new row writes audit `incident.raised`; an existing open row takes the merged payload and writes no audit when nothing changed.
+- Kinds and their triggers: `post_order_debit` (section 3.3 step 9; payload: count and totals by currency; the debit list is in the `ops_verifications` row); `hold_absent` (section 3.3 step 10); `limit_missed` (section 3.4, `timer_freeze_limit`); `report_missed` (section 3.4, `timer_committee_report_due`); `task_failed` (section 3.1, cannot complete).
+- Recipient: the MLRO. Cedar gives `incident.read` and `incident.close` to role `M` alone (section 3.12). The scope of the routes is `case.decide` (A2 can reach the route and receives 403 `E_FORBIDDEN`, not a masked 404, because an incident is not a suspicion-tier row).
+- `POST /incidents/{id}/close` (M): `CloseIncident { reason_code }` with `CLS_OPS_INCIDENT_RESOLVED` or `CLS_OPS_INCIDENT_WITHDRAWN`; lock, `state = closed`, audit `incident.closed`. A closed incident is terminal (guard). A new incident of the same kind and subject may be raised after the close.
+- Incidents are not sent by phase 20 (no outbox topic; the MLRO's inbox is phase 22's notice).
+
+### 3.9 Errors (`OpsError`, `thiserror`; API section 6 codes only; `FreezeError` is phase 14's port error type and is this type (`pub type FreezeError = OpsError;`); the port returns the variants of the table below, and section 3.4 Start step 1 raises `NotFreezeList`)
+
+| Variant | Problem code | Status | Note |
+|-|-|-|-|
+| `NotFound` | `E_NOT_FOUND` | 404 | also the masked answer of a freeze the caller may not see (section 3.12, rule F1) |
+| `Forbidden { sub }` | `E_FORBIDDEN` | 403 | Cedar denial on a row the caller may know; `sub` in `errors[]` |
+| `SelfApproval` | `E_SELF_APPROVAL` | 403 | the completer confirms or attests; the maker of an attestation approves |
+| `StepUpRequired` | `E_STEPUP_REQUIRED` | 401 | missing, spent or wrong-class assertion (the route's action of section 2) |
+| `NotAllowed { sub }` | `E_NOT_ALLOWED_IN_STATE` | 409 | the state does not allow the command; `sub` in the body |
+| `Claimed` | `E_CLAIMED` | 409 | the task is claimed by someone else |
+| `VersionConflict { current }` | `E_VERSION_CONFLICT` | 409 | `If-Match` mismatch; the current version in the body |
+| `PreconditionRequired` | `E_PRECONDITION_REQUIRED` | 428 | versioned command without `If-Match` |
+| `Validation { errors }` | `E_VALIDATION` | 422 | one entry per field, sub-code in `code` |
+| `Unavailable` | `E_UNAVAILABLE` | 503 | the copy (`canon.*`), the evidence store or the letter engine is down; nothing is written |
+| `Config { key }` | `E_INTERNAL` | 500 | a setting outside its bounds on a request path; never returned by `FreezeService::start`, which falls back to 8 (`ops.freeze_task_hours`) |
+| `NotFreezeList` | `E_VALIDATION` | 422 | sub-code `not_freeze_list` (the port only; the decision of phase 14 never sends a non-freeze list) |
+
+The sub-codes of this phase are a closed list: `not_delisted`, `already_released`, `already_completed`, `already_verified`, `not_verified`, `copy_matches`, `proposal_running`, `no_account`, `reference_format`, `not_freeze_list`, `evidence_missing`, `received_in_future`. The phase 18 sub-codes reused here are `evidence_not_clean`, `unknown_party`, `role_not_permitted`, `delegation_refused`, `second_review_not_shipped`, `reason_code_inactive`, `reason_family_mismatch`. They ride in `errors[].code` or in `sub` of a 403 or 409 body; no top-level code is added (the phase 18 rule, Open doubts 16).
+
+### 3.10 Audit events (one per mutation; payloads carry ids, codes, counts and instants; never names, accounts, amounts in a free-text field, or reasons)
+
+| Event kind | On | Resource |
+|-|-|-|
+| `ops.task_created` | a task row (any owner) | ops_task |
+| `ops.task_claimed` | claim | ops_task |
+| `ops.task_completed` | completion (payload: `cbs_reference`, account count) | ops_task |
+| `ops.task_cannot_complete` | cannot-complete (payload: closure code) | ops_task |
+| `ops.verification_checked` | each canonical check that runs (payload: counts, levels before and after) | ops_task |
+| `ops.verification_confirmed` | V0 by a second person | ops_task |
+| `ops.attestation_requested`, `ops.attestation_rejected` | attest route; the rejected end of `ops_attestation` | ops_task |
+| `ops.attested` | `record_verification` effect (V3) | ops_task |
+| `ops.config_fallback` | `FreezeService::start` used 8 hours for an out-of-bounds setting (key, value) | freeze |
+| `ops.letter_recorded` | the recording stub of `LetterRequester` (phase 21 replaces it) | freeze or refrain |
+| `freeze.created` | `FreezeService::start` (new row) | freeze |
+| `freeze.backfilled` | backfill of phase 14 true decisions | freeze |
+| `freeze.frozen` | first level reached (V0 or better) | freeze |
+| `freeze.overdue` | `timer_freeze_due` on a listed freeze | freeze |
+| `freeze.limit_missed` | `timer_freeze_limit` on a listed freeze | freeze |
+| `freeze.committee_report_requested` | the first Committee letter requested | freeze |
+| `freeze.second_report_requested` | the second report requested | freeze |
+| `freeze.post_order_debit` | a debit found after the order (count and totals) | freeze |
+| `freeze.referred` | referral | freeze |
+| `freeze.release_proposed` | `propose_release` | freeze |
+| `freeze.release_rejected`, `freeze.release_ended` | the rejected or the ended end of `freeze_release` | freeze |
+| `freeze.released` | `release_freeze` effect | freeze |
+| `refrain.registered` | register | refrain |
+| `refrain.confirmed` | V1 on the refrain's task | refrain |
+| `refrain.overdue` | `timer_refrain_due` on an open refrain | refrain |
+| `refrain.referred` | referral | refrain |
+| `refrain.closed` | close | refrain |
+| `incident.raised`, `incident.closed` | the incident register | ops_incident |
+| `alarm.raised` (phase 19) | `AlarmService::raise` for `post_order_debit`, `freeze_overdue`, `refrain_overdue` | alarm |
+
+Events are written with the chain kinds of the audit writer (phase 02, `AuditSink`); no event is added to `casework.case_events`. The phase 19 alarm kinds and the phase 19 `alarm.raised` outbox event are reused; no outbox topic is added by this phase.
+
+### 3.11 Tipping-off review (what a person outside the access list can learn; the answer must be "nothing" except where stated)
+
+| Surface | Who | Learns |
+|-|-|-|
+| `GET /ops-tasks`, `GET /ops-tasks/{id}` (neutral view) | OPS | the instruction text (restrict, hold or lift an account, with its reference), the account numbers of the task, the authority reference, the due time, the state and their own completion. Not the action kind, the source, the case, the party name, the list, the reason, the verification level or any freeze or refrain word. The account numbers are needed to act in the core system; the account count is the task's own count (Open doubts 1). |
+| `GET /ops-tasks` for OPS, the empty list | OPS | the tasks of the bank's operations, not the reason for them. |
+| Team view of a task | a holder of `case.decide` who can see the case | the source, the case reference and the verification history. A task with no case is team-visible to M only. |
+| `GET /freezes`, `GET /freezes/{id}` | M; A2 on a case the caller is on | the freeze board. Any other caller: a 404 identical to a missing row. |
+| `GET /refrain-instructions` | M; A2 on the case | the Office's reference and the parties. Others: nothing (the list is filtered by rule R1 of section 3.12; a detail request is a 404). |
+| `GET /incidents` | M | incident kinds, subject ids and codes. Other `case.decide` holders: 403 `E_FORBIDDEN`. |
+| Audit viewer (phase 24) | IA, SEC | event kinds, ids and counts; no account, no name, no amount. |
+| Letters (phase 21) | the Committee, the Office (copy) | the freeze report, by design; the letter is the reporting channel, not an operations surface. |
+| Notifications (phase 22) | nobody in this phase | none; the outbox carries `alarm.raised` (ids and kinds only). |
+
+### 3.12 Visibility and Cedar (the file `93_ops.cedar`; phase 03 bundle, range 93)
+
+**Visibility predicates** (SQL, the same rules as the Cedar attributes, so the list, the count and the detail agree):
+- **F1 (freezes and freeze tasks of the team).** `TRUE` for role `M`; otherwise `f.case_id IS NOT NULL AND EXISTS (SELECT 1 FROM casework.case_acl a WHERE a.case_id = f.case_id AND a.principal_id = $principal AND a.revoked_at IS NULL)`. The Cedar attribute `Freeze.case_team` is the set of the active access-list principals of the case, and `has_case` is `case_id IS NOT NULL`.
+- **T1 (tasks of the team).** The same predicate over `ops_tasks.case_id`, with `TRUE` for role `M` (tasks with no case are M's alone).
+- **R1 (refrain instructions).** `TRUE` for role `M`; for `A2`, `case_id IS NOT NULL` and the case access list as in F1.
+
+**Cedar entities** (appended to `schema.cedarschema` in the phase 03 form):
+
+```cedar
+// appended to schema.cedarschema by phase 20. `User` and `Ctx` are phase 03's; `Case` is phase 17's.
+entity OpsTask = { state: String, tier: String, has_case: Bool, completer?: User, case_team: Set<User> };
+entity Freeze = { state: String, tier: String, has_case: Bool, case_team: Set<User> };
+entity Refrain = { state: String, has_case: Bool, case_team: Set<User> };
+entity OpsIncident = { kind: String, state: String };
+
+action "ops.task.read", "ops.task.claim", "ops.task.complete", "ops.task.cannot_complete", "ops.task.confirm"
+    appliesTo { principal: User, resource: OpsTask, context: Ctx };
+action "ops.verification.read", "ops.verification.check", "ops.verification.attest"
+    appliesTo { principal: User, resource: OpsTask, context: Ctx };
+action "freeze.read", "freeze.release.propose", "freeze.refer"
+    appliesTo { principal: User, resource: Freeze, context: Ctx };
+action "refrain.read", "refrain.refer", "refrain.close"
+    appliesTo { principal: User, resource: Refrain, context: Ctx };
+action "refrain.register" appliesTo { principal: User, resource: System, context: Ctx };
+action "incident.read", "incident.close" appliesTo { principal: User, resource: OpsIncident, context: Ctx };
+```
+
+**The file** (`93_ops.cedar`, copy-paste ready; one role per `@id`; the `@role` tag names the role):
+
+```cedar
+// 93_ops.cedar (phase 20). Scope gates are API.md section 2 (ops.tasks, case.decide); these policies are the fine gate.
+// Step-up is never a condition (the handler consumes it). The approvals of the freeze release and of the attestation are
+// phase 04 `task.approve` on the shared Task resource (56_workflow.cedar), with eligibility from `Holders`; the rules a shared
+// Task cannot carry (the completer, the proposer, the delegation) are service checks in `check_before_decision` (phase 18 section 3.8, item d).
+
+@id("ops.task.ops") @role("OPS")
+permit (principal, action in [Akr::Action::"ops.task.read", Akr::Action::"ops.task.claim", Akr::Action::"ops.task.complete",
+        Akr::Action::"ops.task.cannot_complete", Akr::Action::"ops.task.confirm"], resource)
+when { principal.roles.contains("OPS") };
+
+@id("ops.task.confirm_not_completer") @deny("self_approval")
+forbid (principal, action == Akr::Action::"ops.task.confirm", resource)
+when { resource has completer && resource.completer == principal };
+
+@id("ops.task.m") @role("M")
+permit (principal, action in [Akr::Action::"ops.task.read", Akr::Action::"ops.verification.read",
+        Akr::Action::"ops.verification.check", Akr::Action::"ops.verification.attest"], resource)
+when { principal.roles.contains("M") };
+
+@id("ops.task.a2_team") @role("A2")
+permit (principal, action in [Akr::Action::"ops.task.read", Akr::Action::"ops.verification.read",
+        Akr::Action::"ops.verification.check", Akr::Action::"ops.verification.attest"], resource)
+when { principal.roles.contains("A2") && resource.has_case && resource.case_team.contains(principal) };
+
+@id("ops.attest_not_completer") @deny("self_approval")
+forbid (principal, action == Akr::Action::"ops.verification.attest", resource)
+when { resource has completer && resource.completer == principal };
+
+@id("ops.freeze.m") @role("M")
+permit (principal, action in [Akr::Action::"freeze.read", Akr::Action::"freeze.release.propose", Akr::Action::"freeze.refer"], resource)
+when { principal.roles.contains("M") };
+
+@id("ops.freeze.a2_team") @role("A2")
+permit (principal, action in [Akr::Action::"freeze.read", Akr::Action::"freeze.release.propose", Akr::Action::"freeze.refer"], resource)
+when { principal.roles.contains("A2") && resource.has_case && resource.case_team.contains(principal) };
+
+@id("ops.refrain.m") @role("M")
+permit (principal, action in [Akr::Action::"refrain.read", Akr::Action::"refrain.refer", Akr::Action::"refrain.close",
+        Akr::Action::"refrain.register"], resource)
+when { principal.roles.contains("M") };
+
+@id("ops.refrain.a2_team") @role("A2")
+permit (principal, action == Akr::Action::"refrain.read", resource)
+when { principal.roles.contains("A2") && resource.has_case && resource.case_team.contains(principal) };
+
+@id("ops.incident.m") @role("M")
+permit (principal, action in [Akr::Action::"incident.read", Akr::Action::"incident.close"], resource)
+when { principal.roles.contains("M") };
+```
+
+The phase 19 `alarm.acknowledge` of the supervisor (M and A2) covers the three new alarm kinds without a change to phase 19's file, which this phase does not edit. `93_ops.cedar` is the only new file. Phase 17's `90_alerts.cedar`, phase 18's `91_cases.cedar` and phase 19's `92_followup.cedar` are not edited.
+
+### 3.13 Lock order (phase 18 section 3.16 extended; DR-158)
+
+1. The workflow instance and its tasks (phase 04 `WorkflowEngine::act`, `start`, `claim`, `release`, `withdraw`; invariant I1).
+2. The owner row: `freezes` (`FOR UPDATE`) for a freeze task, a freeze release, a freeze referral and a freeze's clock handler; `refrain_instructions` for a refrain. The owner is always locked before the task.
+3. `casework.ops_tasks` (`FOR UPDATE`).
+4. Below the owner and the task, in this order: `casework.ops_verifications` (insert), `casework.ops_incidents` (insert or update), `casework.alarms` through `AlarmService` (phase 19), `admin.timers` (`TimerService`), and the job queue (`enqueue`).
+
+No path takes a lower step and then a higher one. A task completion reads its owner's id without a lock (step 2 of section 3.1) and then takes the owner; the task is re-read after the owner lock. The sweep takes no lock to select; each job takes its locks in the order above. No phase 20 path takes `casework.cases` (the case row of phase 17 and 18): a freeze with a case and a sealed case do not wait on each other, which is what DR-158 decides.
+
+### 3.14 Settings, clock registry entries and the calendar month (DR-161)
+
+- **Settings** (section 1.2): `ops.freeze_task_hours` (integer 8, `governed = TRUE`, `floor` NULL, bounds 1 to 8: the phase 04 `setting` change target refuses a value outside them, and `FreezeService` falls back to 8 if one is found), `schedule.ops_check_sweep` (cron, every 15 minutes). The setting is read at listing (the due time of the freeze task) and at release (the due time of the lift task).
+- **ClockRegistry entries** (phase 09 section 3.5 registry, in code; the shipped values; `fixed: true`, so a policy pack that carries another value is refused with `E_INVARIANT_LOCKED`): `freeze.limit` (hours, 24), `freeze.committee_report` (hours, 48), `freeze.second_report` (calendar months, 2), `refrain.clock` (working days, 7). These four entries are new in phase 20 and are added to phase 09's registry code in the same change; phase 09's document shape is unchanged.
+- **`add_calendar_months(from: DateTime<Utc>, months: u32, zone: Tz) -> DateTime<Utc>`** (new in phase 20, `domain::ops::clock`, pure): converts `from` to the bank zone (`bank.timezone`, phase 00), adds `months` with `chrono::Months` to the local date, keeps the local time, and converts back (`earliest()` for a local gap). Phase 09's `BusinessUnit` has no month unit, so the calendar month is a function of this phase and is not added to `BusinessClock`.
+- **Clock units.** The working-day clock of the refrain is `BusinessClock::add(received_at, 7, WorkingDays)` with the bank calendar (phase 09 `BankCalendarClock`); the freeze clocks are plain hours, as in section 3.4.
+
+---
+
+## 4. Infrastructure Updates
+
+### 4.1 Job kinds (Postgres `jobs`; coalesce key in brackets)
+
+| Kind | Binary | Payload | Concurrency, attempts | Schedule or trigger |
+|-|-|-|-|-|
+| `ops_canon_check` | worker | `{ ops_task_id }` [`ops_check:<id>`] | 2, 3 | enqueued by the completion (section 3.1 step 6) and by the sweep; runs `VerificationService::check` (section 3.3) |
+| `ops_check_sweep` | worker | `{}` [`ops_check_sweep`] | 1, 3 | `schedule.ops_check_sweep` (every 15 minutes); enqueues `ops_canon_check` for each id of `needing_check` |
+| `ops_clock_scan` | worker | `{}` [`ops_clock_scan`] | 1, 3 | `schedule.ops_clock_scan` (hourly, minute 7); backstop for the four freeze timers and the refrain timer: enqueues the handler job of each due, unhandled clock (the handler re-reads and does nothing when the owner has moved on) |
+| `freeze_backfill` | worker | `{ "alert_ids": [..] }` or `{}` [`freeze_backfill`] | 1, 1 | one-time; enqueued by `akr-ctl ops backfill-freezes` in the install step of this phase; idempotent (section 3.4) |
+
+Every handler re-reads its owner first. Nothing in this phase is a `decision` job: the release and the attestation are workflow acts in the request transaction (akr-api), so a decision never waits in a queue. No new job prefix is used (`ingest_` is for akr-ingestd only).
+
+### 4.2 Timers (phase 00 `admin.timers`; the kind registry gains five kinds)
+
+| Timer kind | Owner kind | Fires at | Handler job | Action (after the re-read) |
+|-|-|-|-|-|
+| `freeze_due` | freeze | `freeze_due_at` | `timer_freeze_due` | overdue alarm to M while the freeze is `listed` (section 3.4) |
+| `freeze_limit` | freeze | `freeze_limit_at` | `timer_freeze_limit` | incident `limit_missed` while `listed` |
+| `committee_report_due` | freeze | `committee_report_due_at` | `timer_committee_report_due` | incident `report_missed` and the Committee letter request, if not yet requested |
+| `second_report_due` | freeze | `committee_report_at + 2 calendar months` | `timer_second_report_due` | the second report request, if the freeze is not released |
+| `refrain_due` | refrain | `refrain_due_at` | `timer_refrain_due` | overdue alarm to M while the refrain is `open` |
+
+All five are scheduled by the transaction that creates or changes their owner, with `calendar_id` NULL (absolute instants). `release_freeze` cancels the four freeze kinds for the freeze (section 3.5 step 4). The phase 00 timer sweep fires them; `ops_clock_scan` is the backstop.
+
+**Outbox.** No new topic. `alarm.raised` (phase 19) carries the three new alarm kinds (ids and kinds only).
+
+### 4.3 AppState additions
+
+- `akr-api`: `ops_tasks: Arc<OpsTaskService>`, `verification: Arc<VerificationService>`, `freezes: Arc<FreezeService>`, `refrains: Arc<RefrainService>`, `incidents: Arc<IncidentService>`, `ops_canon: Arc<CanonOpsReader>`, `letters: Arc<dyn LetterRequester>` (the recording stub until phase 21). `freeze` (phase 14, `Arc<dyn FreezeTrigger>`) is now `Arc<FreezeService>`; `RecordingFreezeTrigger` is removed from `AppState` and kept only as a test double, as phase 14 foresaw.
+- `akr-worker`: `ops_checks: Arc<VerificationService>` (the check and the sweep), `freeze_clock: Arc<FreezeClockHandlers>` (the four freeze timer handlers and the freeze half of `ops_clock_scan`), `refrain_clock: Arc<RefrainClockHandler>`, `freeze_backfill: Arc<FreezeBackfill>`, `letters: Arc<dyn LetterRequester>` (the timer handlers request letters).
+- Phase 04 registries: the `subjects` registry gains `FreezeWorkflowSubject` (resource kind `freeze`) and `OpsTaskWorkflowSubject` (resource kind `ops_task`, the attestation); the `effects` registry gains `release_freeze` and `record_verification` (resource kind `freeze` and `ops_task`) and `create_ops_task` (resource kind `exit_decision`, the instance resource kind of phase 15; freeze and refrain tasks are created by the services directly).
+
+### 4.4 Network zones, metrics, readiness, OpenAPI
+
+- **Zones**: no new edge. The API and the worker already read the canonical copy (phase 10) and the evidence store and the audit writer (phase 02). The letter engine's binary is phase 21's decision.
+- **Metrics**: `akr_ops_tasks_open{source_kind}` (gauge), `akr_ops_task_completions_total`, `akr_ops_verification_level{level}` (gauge of task counts), `akr_freezes_open{state}` (gauge), `akr_freeze_overdue_total`, `akr_post_order_debits_total`, `akr_refrain_overdue_total`, `akr_incidents_open{kind}` (gauge). No metric carries an account, a party, a task, a freeze or an amount.
+- **Readiness**: no new check. The freeze clocks depend on the phase 00 timer sweep, which the readiness of phase 00 already covers.
+- **OpenAPI**: tags `ops-tasks` (section 3.14 rows, extended), `freezes`, `refrain-instructions`, `incidents`. Schemas: the views and commands of section 2. `make generate-api` regenerates the client in this change.
+
+### 4.5 Existing entity, schema, route and code updates (extensions of earlier phases)
+
+1. **Phase 04 `WorkflowSubject` and definitions.** `FreezeWorkflowSubject` and `OpsTaskWorkflowSubject` implement `check_before_decision` (phase 18 item 1) and `on_ended`. Two shipped definitions are seeded by `akr-ctl workflow seed` (phase 04 section 3.8 pattern): `freeze_release` (one `approve` step, assignee `{ "kind": "role", "role": "M", "scope": "bank" }`, timeouts `remind` and `escalate` only, terminal effect `release_freeze`, `classification_default: "restricted"`) and `ops_attestation` (one `approve` step, assignee `{ "kind": "role", "role": "A2", "scope": "bank" }`, terminal effect `record_verification`). Both are added to DSL E.4 (DR-168).
+2. **Phase 14 freeze port**: `FreezeTrigger` is implemented by `FreezeService`; decision step 8 of phase 14 is unchanged; `screening.freeze_trigger_recorded` is no longer written by the port (only by the test double).
+3. **Phase 19 alarm register**: the `AlarmKind` enum gains `PostOrderDebit`, `FreezeOverdue`, `RefrainOverdue`; the CHECKs of `casework.alarms` are widened by `0066` (section 1.1). `AlarmService::raise` is called from this phase with subject kinds `freeze` and `refrain`; the supervisor of the three kinds is M (the table of phase 19 section 3.10 gains three rows, one per kind).
+4. **Phase 09 registries**: the `ClockRegistry` gains `freeze.limit`, `freeze.committee_report`, `freeze.second_report` and `refrain.clock` (`fixed: true`, section 3.14); the policy pack `templates` gains the three `task` texts of section 3.2 (scope `task`, in the shipped pack seed).
+5. **Phase 15**: `create_ops_task` is registered here and called by `exit_decision` (DSL E.4). The phase 15 `exit_register` route (`POST /exit-register`) is not changed. API.md 3.14 `POST /exits` is superseded by phase 15's exit register (M-36, section "Not carried here"); the lead removes that row in the same change.
+6. **Phase 02**: the evidence owner registry gains `ops_task` (attestation screenshots, staged through `EvidenceStore::stage`, read through `open`). `put_generated` is not used here.
+7. **Phase 01**: the closed step-up classes are used as they are. Phase 20 declares seven `StepUpAction` constants: `ops.attest` (`signing`), `ops.attest.approve` (`signing`), `freeze.release` (`decision`), `freeze.refer` (`decision`), `refrain.register` (`decision`), `refrain.refer` (`decision`), `refrain.close` (`decision`). The OpenAPI test of phase 01 checks that every SU route names one of them.
+8. **Phase 00**: the five timer kinds of section 4.2; the job kinds of section 4.1; the settings `ops.freeze_task_hours`, `schedule.ops_check_sweep` and `schedule.ops_clock_scan` (section 1.2).
+9. **Phase 10**: none. The reads use the existing `SELECT` grants on `canon.*`.
+10. **Phase 17**: none. `alert.screening_alerts.case_id` (phase 17) is read; `casework.effective_tier` is not used, because the freeze is suspicion tier by its kind.
+11. **DATA-MODEL section 13** is reconciled (section 1); **DSL E.3** gains `release_freeze`, `record_verification`, and the existing `create_ops_task` is now implemented; **DSL E.4** gains `freeze_release` and `ops_attestation`; **API.md 3.14** gains the eleven rows of section 2 and loses `POST /exits`; **roadmap** row 20 gains the five tables and the sequence; the research log gains DR-158 to DR-168 (Decisions).
+
+---
+
+## 5. Frontend Impact
+
+Screens follow DESIGN-SYSTEM section 8.1 (catalogue IDs W9 and S5) and the INBOX, LIST and FORM patterns of DESIGN-SYSTEM section 8.3. The neutral wording rule of DESIGN-SYSTEM section 11 applies to every string a neutral view shows.
+
+### 5.1 W9 Operations-task inbox (`/ops-tasks`; INBOX for OPS, LIST for A2 and M; UX-69)
+
+- **OPS (INBOX)**: each item shows the neutral text in the caller's language with the account numbers and the authority reference, the due time, the state, and two buttons: "Claim" (`If-Match`) and "Done" with a required **CBS reference** field (1 to 40 characters, the reference the core system shows after the action). No case, risk, reason, party name, list, or verification level is shown or fetched. A completed item stays visible for the day with its reference (a copy for the operator).
+- **OPS, second person**: an item completed by another operator shows "Confirm" (V0) after completion, with the note that the confirmation is flagged; the server's 409 `copy_matches` (section 3.3, Confirm step 3) decides whether the copy already shows the hold, and the screen shows that answer; the completer sees no such button for their own item.
+- **A2 and M (LIST)**: the team view with the source (freeze or refrain), the case reference when there is one, the verification level and the history of section 2 (`VerificationView`), the "Attest" action (**SU**, after the screenshot upload through `POST /ops-tasks/{id}/evidence`), and the incident link for M.
+- **Empty and error states**: an empty inbox says that there are no open tasks; a 403 says the screen needs the operations role; a 409 `E_CLAIMED` says the item was taken by a colleague.
+
+### 5.2 S5 Freeze board (`/freezes`; LIST; tabs "Freezes", "Refrain instructions", "Incidents")
+
+- **Freezes tab**: columns reference (`FRZ-`), subject name (Arabic first, the shared name component), list, state, the four clocks as chips (freeze task due, freeze limit, Committee report due, second report due; "Committee 48 h" as DESIGN-SYSTEM section 7.8 writes it), post-order debit count (shown in the error colour when above zero), verification level. A row whose clock has passed shows the clock in the error colour and the word "overdue". Counts come from the list response, never from a second request.
+- **Freeze detail** (the same route with the row open, `/freezes/:id`): the task (team view), the letters (committee report, second report, referral) with their state from phase 21, the verification history, and the release panel: "Propose release" is enabled only when the response says the freeze is delisted (the server gate, not a client check), and the decision form carries the approve or reject choice, the four-eyes notice and the step-up dialog of phase 01.
+- **Refrain instructions tab**: the list of section 3.7 with the 7-working-day clock; "Register" opens the FORM (Office reference, received date and time, party picker, step-up); "Refer" and "Close" are person acts with step-up.
+- **Incidents tab** (M only; the tab is absent for A2): the open incidents by kind, each with its subject link, the payload summary and "Close" with the closure code list.
+- **Forms**: the CBS reference field (required, the format rule of section 3.1 with the message "letters, digits, hyphen, slash, space"); the cannot-complete form (one closure code, no free text); the refrain form (the Office reference is required, at most 60 characters).
+
+### 5.3 Generated hooks (Orval names from the paths)
+
+`useGetOpsTasks`, `useGetOpsTasksId`, `usePostOpsTasksIdClaim`, `usePostOpsTasksIdComplete`, `usePostOpsTasksIdCannotComplete`, `usePostOpsTasksIdConfirm`, `useGetOpsTasksIdVerification`, `usePostOpsTasksIdVerificationCheck`, `usePostOpsTasksIdEvidence`, `usePostOpsTasksIdAttest`, `useGetFreezes`, `useGetFreezesId`, `usePostFreezesIdReleaseProposals`, `usePostFreezesIdReleaseDecision`, `usePostFreezesIdReferral`, `useGetRefrainInstructions`, `usePostRefrainInstructions`, `useGetRefrainInstructionsId`, `usePostRefrainInstructionsIdReferral`, `usePostRefrainInstructionsIdClose`, `useGetIncidents`, `usePostIncidentsIdClose`. The task act of the attestation approval is the phase 04 hook for `/tasks/{id}/actions/approve`.
+
+### 5.4 Browser and caching rules
+
+- Responses of the OPS scope are sent with `Cache-Control: no-store`; the neutral view is never written to `localStorage` or `sessionStorage`, and the account numbers are never put in a URL.
+- The client keeps the CBS reference only in the form until the request succeeds; a failed request keeps the form open, with the idempotency key of the attempt.
+- The step-up dialog of phase 01 is reused for each SU action; a 401 `E_STEPUP_REQUIRED` reopens it, once.
+
+---
+
+## 6. Verification
+
+1. `make migrate`: `0066_ops_records.sql` and `0067_ops_guards_grants.sql` apply cleanly, and a second run changes nothing (every table, index and trigger is `IF NOT EXISTS` or `DROP ... IF EXISTS` before `CREATE`; the two `ALTER TABLE casework.alarms` blocks drop `alarms_kind_check` and `alarms_subject_kind_check` before they add them, so a second run leaves the same constraints).
+2. `cargo check`: compile-time SQL passes for every query of sections 2 and 3, including `CanonOpsReader` (the `canon.account_party_role`, `canon.account_hold`, `canon.txn` and `canon.balance_snapshot` reads) and the `ref.list_versions` and `ref.list_entries` gate queries.
+3. `cargo clippy -- -D warnings`.
+4. `cargo test`, including these unit and property tests:
+   - `VerificationLevel` ladder: a proptest of at least 10,000 sequences of checks over random hold, debit and copy-date inputs; the level never falls; V2 implies no debit on or after the effective date and a copy at or after it; each check's new debits are recorded once (by txn id).
+   - Kind and level pairing: `second_person` only with V0, `canonical_check` only with V1 or V2, `attestation` only with V3.
+   - Clock arithmetic: listing at 10:00 with the default 8 hours gives 18:00 the same day; 24 hours and 48 hours are plain hours across a weekend and a holiday; a setting of 0 or 9 falls back to 8 with the audit `ops.config_fallback`; `add_calendar_months` of 31 January plus 2 months is 31 March, of 31 December plus 2 months is the last day of February; the refrain clock of 7 working days skips a Friday and a holiday in the bank calendar fixture.
+   - Release gate: an entry absent from the active version is delisted; an entry with `delisted_on` set is delisted; an entry with `delisted_on` NULL is not delisted; a list in `validated` state (not active) is never used as the gate.
+   - Neutral view: the serialized `OpsTaskNeutralView` has exactly the field names of section 2 (a test compares the set of keys with the allow-list); the three neutral texts render with `{account}` and `{ref}` only, and `PolicyPackService::scan(task, ...)` returns no hit for the six shipped texts (three keys, two languages).
+   - Errors: each `OpsError` variant maps to the problem code and status of section 3.9; each sub-code is in the closed list.
+5. Migration guard fixtures as `akr_app` (the test `DO` blocks of the migration test suite): `UPDATE casework.ops_tasks SET task_ref = ...` fails with `the identity of an operations task does not change`; a second `cbs_reference` fails with `the core-system reference is written once`; `verification_level` from `v2` to `v1` fails with `a verification level does not fall`; `UPDATE` or `DELETE` on `casework.ops_verifications` fails; a freeze from `frozen` back to `listed` fails with `a freeze state does not move back`; a second `committee_report_at` fails; a closed refrain or incident is terminal.
+6. Curl suite `tests/curl/phase20_ops.sh` (dev users, one per role: `ops@bank.test` and `ops2@bank.test` (role `OPS`; the second operator is new in phase 20), `a2@bank.test` (A2 on the case of the fixture), `a2b@bank.test` (A2 with no grant), `m@bank.test` (M), `ia@bank.test` (IA)). Each step prints the status and the problem code, and the script fails on a mismatch:
+   - a. `ops@` `GET /api/v1/ops-tasks`: 200; `jq` asserts that no item has the keys `case_id`, `source_kind`, `action`, `verification_level`, `completed_by`, `party` or `reason_codes`, and that every `text` begins with one of the three neutral texts.
+   - b. `ops@` `GET /api/v1/freezes`: 403 `E_SCOPE` (scope `case.decide`).
+   - c. `ops@` `POST /api/v1/ops-tasks/{id}/claim` without `If-Match`: 428 `E_PRECONDITION_REQUIRED`. With the current version: 200. `ops2@` claims the same task: 409 `E_CLAIMED`.
+   - d. `ops@` `POST /api/v1/ops-tasks/{id}/complete` with `cbs_reference` `"a;b"`: 422 `E_VALIDATION`, `code` `reference_format`. With `"CBS-2026-00412"` and `Idempotency-Key: k-complete-1`: 200 with the neutral view. The same request and key again: 200 with the identical body (replay). The same key with another body: 422 `E_IDEMPOTENCY_REUSE`.
+   - e. `ops@` `POST /ops-tasks/{id}/confirm` on its own completion: 403 `E_SELF_APPROVAL`. `ops2@` confirm when the copy does not show the hold: 200, the view's level `v0` is visible to `a2@` only. `ops2@` confirm when the copy shows the hold: 409 `E_NOT_ALLOWED_IN_STATE`, sub `copy_matches`.
+   - f. `a2b@` `GET /api/v1/freezes/{freeze_id}` of the party freeze: 404 `E_NOT_FOUND`, and the body is byte-identical to `GET /api/v1/freezes/00000000-0000-7000-8000-000000000000` (the masked and the missing answers are the same, `cmp` on the files).
+   - g. `a2@` `POST /api/v1/ops-tasks/{id}/attest` without the step-up header: 401 `E_STEPUP_REQUIRED`. With a fresh `signing` assertion and the staged evidence: 200 with the instance id.
+   - h. `a2@` (the requester of the attestation) `POST /api/v1/tasks/{task_id}/actions/approve` on the `ops_attestation` task: 403 `E_SELF_APPROVAL` (the maker exclusion of phase 04). `a2b@` (role A2 at bank scope, the step's assignee) approves with step-up: 200; `GET /api/v1/ops-tasks/{id}/verification` shows level `v3` and the attestation row.
+   - i. `a2@` `POST /api/v1/incidents/{id}/close`: 403 `E_FORBIDDEN` (Cedar: M alone). `m@` closes it with `CLS_OPS_INCIDENT_RESOLVED`: 200; a second close: 409 `E_NOT_ALLOWED_IN_STATE`.
+   - j. Freeze flow with a true freeze decision (phase 14 decision route, two decisions by two SS users, the second `true`): `GET /api/v1/freezes` shows one row, state `listed`, `freeze_due_at` equal to the decision time plus 8 hours, `freeze_limit_at` plus 24 hours, `committee_report_due_at` plus 48 hours. The task completes (step d); the sweep runs (`ops_check_sweep`), the detail shows state `frozen`, `verification_level` `v1` after the copy shows the hold reference, and `committee_report_at` set with a letter id from the recording stub.
+   - k. Release: `a2@` `POST /api/v1/freezes/{id}/release-proposals` before the delisting fixture: 409 `E_NOT_ALLOWED_IN_STATE`, sub `not_delisted`. After the delisting fixture (a new active list version without the entry, activated through phase 14): 200 with the instance. `m@` approves with the `freeze.release` step-up: 200; the freeze shows `released`, `release_reason_code` `DEC_FREEZE_DELISTED`; `admin.timers` shows the four freeze timers cancelled; a `release` task exists for the same accounts.
+   - l. Post-order debit: a debit fixture on a target account booked after the effective date, then the sweep: `GET /api/v1/alarms` (`m@`) lists kind `post_order_debit` for the freeze; `GET /api/v1/incidents` (`m@`) lists `post_order_debit` with the count and the amount; the freeze's `post_order_debit_count` is 1; a second sweep adds no second alarm and no second incident row (the live-alarm index and the open-unique index).
+   - m. Refrain: `m@` `POST /api/v1/refrain-instructions` with the step-up header and `received_at` on a Monday: 200 (the same request as `a2@` is 403 `E_FORBIDDEN`: Cedar gives `refrain.register` to M alone, section 3.12); `refrain_due_at` is seven working days later in the bank calendar (a holiday fixture in the window moves it by one day). Advancing the phase 00 timer fixture past `refrain_due_at` without a confirmation raises `refrain_overdue` (`GET /api/v1/alarms`).
+   - n. Backfill: a true freeze decision inserted before the phase 20 install; `akr-ctl ops backfill-freezes` creates one freeze (state `listed`, its `freeze_due_at` in the past), a second run creates none, and the overdue and limit timers fire at once (the alarm and incident of steps j and l appear for it).
+   - o. Tipping-off grep: the responses of step a and the audit payloads of the run contain no party name of the fixture (the names used are invented: "Ahmed Kareem Hassan", "Layla Nabil Sami"); `grep -c` returns 0 on the response files and on `audit_log` payloads.
+   - p. Audit: `audit_log` after the run holds `ops.task_created`, `ops.task_claimed`, `ops.task_completed`, `ops.verification_checked`, `ops.verification_confirmed`, `ops.attestation_requested`, `ops.attested`, `freeze.created`, `freeze.frozen`, `freeze.committee_report_requested`, `freeze.post_order_debit`, `freeze.release_proposed`, `freeze.released`, `refrain.registered`, `refrain.overdue`, `incident.raised`, `incident.closed`, and `alarm.raised` with the three new kinds.
+7. Swagger shows the 22 routes of section 2 under the four tags; `make generate-api` regenerates the client cleanly, and the hooks of section 5.3 exist in the generated module.
+8. Read-only conformance (phase 05): the freeze and verification paths issue no statement other than `SELECT` against the source; the verification reads `canon.*` only (the test asserts the statement list of the job against the allow-list).
+9. Existing tests still pass, including the phase 14 freeze port tests (the recording double still satisfies the trait) and the phase 19 alarm tests (the CHECK widening keeps the phase 19 kinds valid).
+
+## 7+. Gap Additions
+
+Gap pass 1 (2026-10-10), run 4a, from tools/agent/gap1-run4a.md; lead-verified (tools/agent/gap1-run4a-verdict.md).
+
+### 7.1 Account-class groups for freeze tasks (phase 26)
+From phase 26 on, and only while `pack.islamic` is on (with the flag off every account is `unrestricted`, which is the
+single task of this phase):
+- Section 3.4 step 6: target accounts are grouped by class (phase 26 section 3.8, setting `islamic.account_class_map`);
+  one `OpsTaskService::create` per non-empty group, action `freeze` (unrestricted), `restrict` (restricted) or `hold`
+  (pooled). `freezes.ops_task_id` holds the unrestricted task when there is one, else the first group's, in the order `freeze`, `restrict`, `hold`; the others are
+  found by `casework.ops_tasks.source_id = freeze.id`.
+- The audit `freeze.created` gains `groups: {unrestricted, restricted, pooled}` (counts only).
+- Section 3.5 step 5: `release_freeze` creates one release task per group, on approval and never at proposal; a proposal creates no ops task.
+- Section 3.4 `on_level`: a freeze with more than one group task moves to `frozen` only when every group task has a verification level, and `freezes.verification_level` is the lowest of them (phase 26 section 7+).
+Phase 26 owns these changes; the two-person rule for pooled holds stays its Open doubts 9.
+
+---
+
+Gap pass 1 (2026-10-10), run 4a: items carried from runs 3a and 3b and corrections found while checking phases 17 to 24 (tools/agent/gap1-run4a-verdict.md); lead-verified.
+
+### 7.2 Delisting by absence (DR-376)
+Open doubts 22 is closed: phase 14 delists by absence (versions are immutable), sets `delisted_on` only from a
+publisher date, and guards a silent drop with `screening.max_count_drop_pct` (phase 14 section 7+). The gate of section
+3.5 stays as written.
+
+Adversarial pass (2026-10-10), run 4 (clocks and timers on closed, merged or reopened items), from tools/agent/adv-run4.md; lead-verified (tools/agent/adv-run4-verdict.md).
+
+### 7.3 The Committee report deadline watches the letter (ADV-4-09 HIGH, ADV-4-05 LOW; DR-410)
+`committee_report_at` means the letter was requested; it starts the second-report clock. `timer_committee_report_due`
+(section 3.4) becomes: state `released`: no-op. `committee_report_at` NULL: as written (`report_missed`, then
+`request_committee_report(reason = deadline)`). `committee_report_at` set and, from phase 21 on, the letter
+`committee_report_letter_id` not in state `delivered`: `IncidentService::raise(report_missed, freeze)` and audit
+`freeze.report_undelivered {freeze_id, letter_id}`. A delivered letter: no-op. Phase 21 Open doubts 4 is answered by
+this rule. Test: a letter requested at the first level and not delivered by `committee_report_due_at` raises one
+`report_missed` incident.
+
+Verification pass (2026-10-10), from tools/agent/verify/; lead-verified (tools/agent/verify-verdict.md).
+
+### 7.4 Version 2 of exit_decision (V-15-06-b, MEDIUM; DR-413)
+This phase ships version 2 of the shipped definition `exit_decision` (phase 15 section 7.2 leaves it to this phase): the steps of version 1, with `create_ops_task` after `record_decision`. The phase 04 seed leaves an existing family alone, so `akr-ctl workflow seed --offer-updates` makes version 2 a draft of the family and the bank publishes it by a workflow change request (phase 04 section 3.8: a release never changes a published definition by itself). An install that has no `exit_decision` family yet gets the new file as its first version. The task it creates has `source_kind` `exit` and the instance as `source_id` (section 1.1, the column comment). Instances started on version 1 finish on version 1 and create no task. The shipped set of this phase is then three definitions: `freeze_release`, `ops_attestation` and `exit_decision` version 2.
+
+### 7.5 Input rows of the repository inserts (V-20-01-a, V-20-02-c, V-20-04-d, V-20-08-c, LOW; V-20-02-b, MEDIUM; DR-413)
+- `NewOpsTask` is `NewOpsTaskSpec` (section 3.1, Creation) plus the values creation derives: `task_ref` (step 3), `neutral_text_code` (step 2), `state = open` and `version = 1` (step 4), and on the freeze path `authority_ref` set to the task's own `task_ref` (the note on step 6 of section 3.4).
+- `NewFreeze` holds the `casework.freezes` columns that `FreezeService::start` sets before its insert (section 3.4 Start, steps 1 to 4 and the clock table): `freeze_ref`, `screening_alert_id`, `case_id`, `subject_kind`, `subject_id`, `list_id`, `list_code`, `entry_id`, `entry_key`, `listing_decision_at`, `listing_decided_by`, the clock instants and `state = listed`. `listing_decided_by` is `c.decided_by` of the phase 14 candidate, the `decider_id` of the true decision row (the column the backfill of section 3.4 reads). `ops_task_id` stays NULL until `set_task` (step 6).
+- `NewRefrain` holds the values of register step 4 (section 3.7): `refrain_ref`, `office_reference`, `received_at`, `party_ids`, `target_accounts`, `case_id`, `refrain_due_at`, `state = open` and `registered_by = actor`.
+- `NewVerification` holds the values of check step 7 (section 3.3): `ops_task_id` (the task checked), `kind = canonical_check`, `level`, `post_order_debits`, `accounts_checked`, `holds_matched`, `canon_as_of` and `actor_id` (NULL for the job).
+
+### 7.6 Completion hooks and method signatures (V-20-01-b, V-20-04-c, V-20-06-b, V-20-07-d, LOW; DR-413)
+- `FreezeService::on_task_completed(tx, freeze)` and `RefrainService::on_task_completed(tx, refrain)` write nothing and change no state: the completion sits on the task row and is audited by section 3.1 step 8, and the level changes only through the check of section 3.3. This replaces "both only record that the task is done" in section 3.1 step 7.
+- `RefrainService::register(tx, actor, cmd: RegisterRefrain) -> Result<RefrainInstruction, OpsError>` and `RefrainService::close(tx, actor, refrain_id, cmd: CloseRefrain) -> Result<RefrainInstruction, OpsError>` (section 3.7).
+- `FreezeService::refer(tx, actor, freeze_id) -> Result<Freeze, OpsError>` and `RefrainService::refer(tx, actor, refrain_id) -> Result<RefrainInstruction, OpsError>` serve the two referral routes of section 3.6 (the letter request, then `set_referred`).
+- `RefrainService::on_level(tx, refrain, level)`: a level of V1 or better on an `open` refrain sets `confirmed` and `confirmed_at = now()`; any other call changes nothing (section 3.7).
+- `FreezeService::propose_release(tx, actor, freeze_id, cmd: ProposeFreezeRelease)` returns the phase 04 instance and its open task (section 3.5 Propose, step 6).
+
+### 7.7 Due time of the exit task and of the refrain lift (V-20-01-d, MEDIUM; DR-413)
+`OpsTaskService::create` takes `due_at` from its caller. The callers that had no rule use the phase 09 pack clock `ops.task.due` (working days, bounds 1 to 10): the terminal effect `create_ops_task` (the exit task) and the lift task of `RefrainService::close` (section 3.7) set `effective_at = now()` and `due_at = BusinessClock::add(now, ops.task.due, WorkingDays)`. The other callers keep their own clocks: `freeze_due_at` (section 3.4 Start), `refrain_due_at` (register step 4) and `now() + ops.freeze_task_hours` for the lift of a released freeze (section 3.5 step 5). This is the use that phase 24 lists for `ops.task.due`.
+
+### 7.8 Registry bounds of the freeze task setting (V-20-03-a, MEDIUM; DR-413)
+Section 4.5 item 8: the settings registry (`common::settings_registry`, phase 00) declares the bounds 1 to 8 of `ops.freeze_task_hours`. The phase 04 setting target checks registry bounds, so a value outside them is refused at change time with 422 `E_VALIDATION`. Section 3.14 keeps the fallback to 8 for a value found outside the bounds.
+
+### 7.9 Close and referral: state rules (V-20-04-b, V-20-06-a, MEDIUM; DR-413)
+- Section 3.7 close: after the lock, a refrain already `closed` is refused before any write with 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `already_closed` (the phase 18 sub-code, reused; it joins the list of section 3.9). Close is allowed from `open`, `confirmed` and `referred`. The first `closed_by`, `closed_at` and lift task keep their values.
+- Section 3.6 freeze referral: lock the freeze; allowed in state `listed` or `frozen`. State `released`: 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `already_released`. `referred_at` already set: 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `already_referred`, which joins the list of section 3.9. Both refusals come before the letter request, so the first `referral_letter_id` and `referred_at` keep their values.
+
+### 7.10 Release of a freeze with no task, and the one release code (V-20-07-b, MEDIUM; V-20-07-c, LOW; DR-413)
+- Section 3.5 `release_freeze` step 5: a freeze with no freeze task (`ops_task_id` NULL; a non-party freeze, DR-158) gets no lift task. Nothing was asked of operations for it, so there is nothing to lift. Steps 1 to 4 and 6 run as written, and `freeze.released` carries a null lift task id.
+- Section 3.5 Propose step 4: a `reason_code` other than `DEC_FREEZE_DELISTED` is 422 `E_VALIDATION` at `/reason_code`. The sub-code is `reason_code_inactive` for an inactive or unknown code and `reason_family_mismatch` for any other code, including another active `decision` code: the release accepts one code only.
+
+### 7.11 Completed tasks in the operations list (V-20-09-b, LOW; DR-413)
+Section 3.1 Reads, the neutral view (`ops.tasks`): `GET /ops-tasks` returns the `open` and `claimed` tasks and the tasks completed since the start of the current bank day (phase 09 calendar). Older completed tasks are not listed in that view; the team view lists them all. This is the day window of the W9 screen (section 5.1), applied by the server, so no filter is added to `ListOpsTasks`.
+
+### 7.12 The deadline handler reads the letter state through the port (V-20-12-a, HIGH; DR-413)
+Section 3.6: `LetterRequester` gains `async fn delivered(&self, conn: &mut PgConnection, letter_id: Uuid) -> Result<bool, LetterError>;`. `RecordingLetterRequester` returns `true` (until phase 21 a requested letter counts as delivered, so 7.3 adds no incident before the letter engine exists). Phase 21 implements it over its letter row (state `delivered`). The handler of 7.3 calls it through the worker's `letters` port (section 4.3) for `committee_report_letter_id`; a `LetterError` leaves the timer to retry. No column is added to `casework.freezes` and phase 21 calls no phase 20 method on delivery.
+
+## Decisions
+
+Numbered from DR-158 (the last number in `research.md` is DR-157). Each decision is one paragraph with its rationale.
+
+**DR-158 (freeze and task records; no case event).** A freeze is a row of `casework.freezes`, one per screening alert, created by the port that phase 14 calls in its decision transaction; a task is a row of `casework.ops_tasks` written in the transaction of its owner. No path of this phase writes a case event or takes a case lock. The reason is that a freeze is a legal duty with clocks, and a case can be closed and sealed (phase 18) while the freeze is still running: a closed case must not block a freeze, and a freeze must not wait for an analyst's case lock. The records of the case link (`freezes.case_id`) are for navigation only, and counterparty and payment-party freezes create no task until the bank decides how their accounts are found (Open doubts 6), so the freeze of a non-party is visible and overdue, never silently dropped.
+
+**DR-159 (the neutral task contract).** Operations see a neutral instruction in one of three texts (restrict, hold or lift an account, with its reference), the account numbers of the task (needed to act in the core system), the authority reference, the due time and their own completion; they see no action kind, no source, no case, no party name, no list, no reason and no verification level. The view is chosen by the caller's scope, not by a flag, and the field set of the neutral view is a closed list tested in section 6. The reason is the tipping-off rule (M-68; the answer for an operator must be "nothing about the reason") together with the operational need to act on an account.
+
+**DR-160 (verification from the canonical copy; levels V0 to V3).** V1 is a hold row of the copy carrying the reference the operator entered; V2 adds a current copy and no posted debit from the effective date; V0 is a flagged confirmation by a second operator when the copy does not show the hold; V3 is an attested screenshot approved by a second person as a workflow act. The level only rises and is stored per task, with the achieved level read by the freeze and by the Committee letter. Debits are watched until the release, not until V3, because the research requires the absence of debits for as long as the block stands (RP-55). The reason for the reference rule is that a hold row does not say whether a freeze order was issued (MODULES M14 edge case), so the reference is the only link between the operator's act and the copy.
+
+**DR-161 (freeze clocks and their values).** The freeze task is due 8 hours after the listing decision by default, a setting the bank may tune between 1 and 8 hours (the strictest Office text is 8). The limit of 24 hours, the 48-hour Committee report and the 7-working-day refrain clock are CBI-set and are ClockRegistry entries with `fixed: true`, so a policy pack cannot move them. The Committee report is requested at the first verified level or at its deadline, whichever comes first, and the second report two calendar months after that request. The three-day clock of file 25 C-63 is superseded by the research (M-34), and the calendar month is a function of this phase because phase 09 has no month unit.
+
+**DR-162 (release after delisting).** A freeze is released only by a recorded decision of the workflow `freeze_release` (role M, four-eyes through the engine, step-up of the class `decision` consumed once at the act), and only when the active version of its list no longer carries the entry or carries it with `delisted_on` set (RP-59). The release cancels the four freeze timers, records the date, time, approver and the delisting list version, and creates a lift task for operations, so the core-system block is removed by a person and the copy must then show it gone. The reason is that the research requires a recorded decision for every lift and forbids a silent lift by delisting alone.
+
+**DR-163 (refrain instructions).** An Office refrain instruction runs a 7-working-day clock on the bank calendar. The hold task is confirmed by the copy (V1) and checked after (V2); a clock that passes with no confirmation raises an alarm to M and never releases the hold on its own. Referral to the Committee's technical committee is a person's act with a letter request (RP-45, RP-58). The reason is that an automatic release would be a decision made by a clock, which the bank's rules do not allow, and an automatic referral needs an MLRO rule that is not in the sources (Open doubts 5 and 18).
+
+**DR-164 (failure incidents and alarms).** Failures of the process are incidents in `casework.ops_incidents`, one open per kind and subject, for the MLRO (M-33). Clock breaches and post-order debits are alarms in the phase 19 register, with three new kinds added by widening its CHECK, because the phase 19 register already gives the supervisor, the live-alarm index and the acknowledgement (DR-156). A debit raises both: the alarm informs the supervisor and the incident records the failure for the MLRO, as RP-55 requires ("exceptions raise a P1 alert").
+
+**DR-165 (letters are requested, not generated).** The Committee report, the second report and the referral are letters of phase 21. Phase 20 defines `LetterRequester` and ships a recording stub; the request carries ids, codes and counts only, and the letter engine reads the content from the record, so a letter can be generated again and the audit payload stays free of content. The reason is that the letter is the reporting channel, which the research leaves to the Office's answer (RP-56), and that the channel is a bank setting, not a schema decision of this phase.
+
+**DR-166 (reconciliation with DATA-MODEL s.13 and retention class R7).** The DATA-MODEL table of section 13 is aligned in the same change: `timer_id` leaves the task and the refrain (a clock lives on its owner), `ops_verifications` keeps counts and the attestation evidence object (not a JSON copy of evidence), and `freezes` keeps its column names with the additions of section 1. The five tables are retained under R7 (screening and sanctions records, ARCHITECTURE section 17, as phase 14), with clocks that start at the release or the close of the record (tasks and verifications follow their owner), so a freeze in force is never due for deletion; the ten-year question stays open (Open doubts 12).
+
+**DR-167 (backfill of phase 14 true decisions).** Phase 14's recording stub wrote an event and no freeze. The backfill creates one freeze per such alert, as late freezes, so their alarms and incidents fire at once and show the bank what was not done in the core system. The backfill does not write a block or a release; it only records the obligation. The bank decides what the core system holds for each one (Open doubts 15).
+
+**DR-168 (shipped definitions and effects).** `freeze_release` and `ops_attestation` are shipped workflow definitions, and `release_freeze`, `record_verification` and `create_ops_task` are terminal effects registered in the phase 04 registries; DSL E.3 and E.4 gain the rows in the same change. The team view of the task list and the freeze board uses the scope `case.decide`, which API.md section 2 already gives to A2 and M, so no scope is added. The reason is that every release, attestation and refrain decision must be a workflow act with four-eyes and step-up (phase 04), which a direct status write could not provide.
+
+---
+
+**Lead corrections (review 2026-10-09).** Retention is R7 (ARCHITECTURE section 17 gives R7 to screening and sanctions records; the draft called R7 the alert class and used an age clock from the listing, which would have deleted a freeze still in force). The attestation screenshot needs its own upload route (`POST /ops-tasks/{id}/evidence`): phase 02 has no generic `POST /evidence`. `StartSpec` is `{definition_key, resource, purpose, initiator, maker}` with no parameters; the evidence id and the release reason are frozen into the instance context by `start_context`. An out-of-bounds `ops.freeze_task_hours` falls back to 8 instead of failing the phase 14 true-match decision. `second_review_not_shipped` is 409 `E_NOT_ALLOWED_IN_STATE` and the refusal sub-code is `role_not_permitted`, as phase 18 has them. A lift task is verified by its own rule (no open hold with the lifted reference), because the check skipped tasks of released owners. The V1 hold types include `restriction`; the sweep takes the oldest checks first. `create_ops_task` runs on the `exit_decision` resource kind. The curl attestation step uses `a2b@` as the approver.
+
+## Open doubts (for gap pass 1 and the bank)
+
+1. **Account numbers in the operator's view.** The operator needs the number to act in the core system, so the neutral view carries the full number of each target account. A last-digits view with a lookup in the core system is the alternative; the bank chooses (DR-159).
+2. **Bounds of the freeze task setting.** The setting is bounded to 1 to 8 hours (the strictest text of the Office). A bank that wants a longer task would need an Office position; confirm that the bound is the right direction.
+3. **Origin of the 24-hour and 48-hour clocks.** The research says "within 24 hours of the listing decision" for the freeze; it does not say what starts the 48-hour Committee report. This phase uses the listing decision for both. Confirm with the compliance owner.
+4. **Origin of the second report.** Two calendar months are counted from the first Committee letter request (section 3.4), not from the listing or the freeze. The calendar-month function is new in phase 20; confirm the origin and whether the bank wants a month unit in phase 09's `BusinessClock`.
+5. **Meaning of the 7 working days.** RP-45 reads "a 7-working-day clock with confirmation and a post-check". This design takes the clock to be the confirmation deadline (an overdue alarm, no automatic release). If the clock is a referral deadline, the overdue event becomes an incident, and the referral becomes the act that stops the clock.
+6. **Counterparty and payment-party freezes.** No account set is derivable from these subjects in the copy as the sources describe it, so these freezes create no task and raise `freeze_overdue` at once. A mapping from payment parties to accounts (phase 10 `payment_message_party`) and a rule for counterparties are needed; the bank and phases 10 and 14 decide.
+7. **Who may confirm V0.** This design allows any `OPS` user other than the completer, and refuses it when the copy shows the hold. Whether a V0 freeze counts as "frozen" for the Committee letter (this design says yes, flagged) is the bank's decision.
+8. **Post-order debits: the date rule and fees.** A debit is after the order when its booking date is on or after the effective date, which may catch a debit booked on the same day but before the block. Fees are debits (`dr_cr = 'D'`); the canonical copy has no fee code to separate them, so fees are counted and not labelled. Confirm the rule with the bank's operations.
+9. **The hold rows of the copy.** V1 depends on the hold reference the operator enters being the reference the core system stores in `canon.account_hold.reference`, and on the hold types of section 3.3. The bank's sample of hold rows (phase 05 profiling) must confirm both; until then the expected result is `hold_absent` incidents.
+10. **A release letter to the Committee.** The sources read do not require a letter after a release; this design writes none (section 3.5 step 7). Confirm.
+11. **A freeze task still open at release.** The task states are `open`, `claimed` and `completed`, with no cancel state, so an open freeze task stays open after the release and the lift task covers the same accounts. A `cancelled` state would be a migration change to phase 20's table; the bank decides whether the lift task needs its own clock (it has only a due time today).
+12. **Retention of sanctions-tied records.** ARCHITECTURE section 17 gives sanctions-tied records ten years; this phase uses R7 from the release or the close, as phase 14 does for its screening records. Phase 14 already holds the same question for freeze-list alerts. The bank and the retention owner decide one class for all of them.
+13. **Where the verification level is "reported per bank".** This phase stores the level per task and per freeze, and the Committee letter reports the level. A per-bank summary (counts per level for the board) is not built; if the bank means a single figure, phase 24 or the board report carries it.
+14. **The channel of the freeze report.** The letter goes through phase 21. The research leaves the channel (controlled report, the IQTFS forms, goAML) to the Office's answer and to a bank setting (RP-56). Phase 21 decides the channel; this phase does not.
+15. **Freezes recorded before this phase.** The backfill of section 3.4 records them as late obligations. The bank must confirm what the core system holds for each one, and whether any of them must be reported late; a person decides, and the backfill writes nothing in the core system.
+16. **Sub-codes and no new top-level code.** The sub-codes of section 3.9 ride in `errors[].code`. If the API owner wants them as top-level problem codes, API.md section 6 gains them in one change.
+17. **The `POST /exits` row of API.md 3.14.** The row is superseded by phase 15's `POST /exit-register`. The lead removes it; phase 20 builds no exit route.
+18. **Automatic referral of unresolved matches.** RP-58 says unresolved matches go to the technical committee. This design keeps the referral a person's act (section 3.6). An automatic referral after a number of days is an MLRO rule that the sources do not give.
+19. **The refrain screen.** DESIGN-SYSTEM has no catalogue ID for refrain instructions. This phase puts them in a tab of S5. The design owner adds a catalogue entry or confirms the tab.
+20. **Delegated decision on the release.** The release step names role M. The authority matrix (`freeze.decision`, roles A2 and M) would let a delegated A2 decide only through the matrix pin of phase 09, and the step's assignee kind does not name A2. The MLRO decides whether a deputy may release a freeze.
+21. **Who may approve an attestation.** `ops_attestation` names role A2 with four-eyes, so M may not approve an attestation unless the step names M too. The bank confirms the holders.
+22. **Absent from the list means delisted.** The gate of section 3.5 treats a missing entry in the active version as delisting. That is safe only if phase 14's validation refuses a version that drops entries without a reason (its harness count checks) and sets `delisted_on` when a version omits an entry. Both are phase 14 items for gap pass 1.
+23. **The four fixed clock values in code.** The ClockRegistry values (24 hours, 48 hours, two calendar months, 7 working days) are added to phase 09's code, not to a document. The compliance owner confirms the values against the texts before the change ships.
+24. **The attestation evidence.** The screenshot is a staged evidence object of owner kind `ops_task`; its retention class is the phase 02 class of that owner kind, which phase 02's registry must name. Confirm the class with the retention owner.
+25. **Team visibility of verification levels.** An A2 on a case sees the verification levels of its tasks, which tells the team whether a block is in place. The sources say the team handles the freeze; the bank confirms that A2 needs the level and not only M.
+
+---
+
+## What This Phase Does NOT Touch
+
+- No CBS write, no CBS action and no core-system connection: the operator performs the action; the copy is read only (phases 05 and 10). No statement other than `SELECT` reaches the source from this phase.
+- No case row, no case event and no case lock (DR-158): a freeze and a task never write `casework.case_events`, `casework.cases` or `casework.case_acl`, and a sealed case is not refused by any path of this phase.
+- No screening decision, screening state, list, list version, pair memory or good-guy rule (phase 14); the one change is that `FreezeService` implements the port phase 14 already calls, and the list gate reads phase 14's tables without writing them.
+- No letter row and no letter generation, signature or delivery (phase 21); `LetterRequester` is a port and a recording stub here.
+- No exit proposal, exit register or exit decision (phase 15); the `create_ops_task` effect is registered here and called by phase 15's definition. The API row `POST /exits` is not built here.
+- No UTR watch, no network case and no alarm kind other than the three added to phase 19's register (phase 19).
+- No change to phase 17's `90_alerts.cedar`, phase 18's `91_cases.cedar` or phase 19's `92_followup.cedar`; `93_ops.cedar` is the only new Cedar file. The phase 19 supervisor's `alarm.acknowledge` covers the new alarm kinds without a change to phase 19's file.
+- No new step-up class (the closed list of phase 01 is used as it is), no new role (`OPS` exists in phase 01), no new masked kind (freezes are suspicion-tier by their kind and are masked by the case rule of section 3.12), and no new problem code (API section 6 only; sub-codes of section 3.9).
+- No change to the workflow engine's invariants, states or routes (phase 04); the two definitions and three effects are registered extensions.
+- No outbox topic and no notification (phase 22 notifies the MLRO and the supervisor later); `alarm.raised` of phase 19 is the only event that reaches the outbox.
+- No retention sweep and no legal hold for these records (phase 23); the R7 class is assigned here, the sweep is phase 23's.
+- No AI assistance and no model score in verification or release (P2).
+- No change to the reason-code families, the policy pack document structure or the authority matrix document; this phase adds three neutral texts to the pack's `task` templates and four clock entries to the phase 09 registry, and uses the matrix decision type `freeze.decision` as it stands.
+- No canonical hold, balance or transaction is written or derived back into the copy; the verification reads them.

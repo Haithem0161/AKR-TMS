@@ -1,0 +1,39 @@
+Replacements made in docs/plan/phase-20.md by the first re-check (DR-413). 7 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-20-1]
+WHY: R-20-1 | CONFIRMED MEDIUM (raised HIGH) | 7.4 has the seed publish version 2 of `exit_decision`; the phase 04 seed leaves an existing family alone and never changes a published definition | version 2 arrives as a draft through `--offer-updates` and the bank publishes it; a first install gets it as its first version
+OLD: This phase seeds version 2 of the shipped definition `exit_decision` through `akr-ctl workflow seed` (phase 15 section 7.2 leaves it to this phase): the steps of version 1, with `create_ops_task` after `record_decision`.
+NEW: This phase ships version 2 of the shipped definition `exit_decision` (phase 15 section 7.2 leaves it to this phase): the steps of version 1, with `create_ops_task` after `record_decision`. The phase 04 seed leaves an existing family alone, so `akr-ctl workflow seed --offer-updates` makes version 2 a draft of the family and the bank publishes it by a workflow change request (phase 04 section 3.8: a release never changes a published definition by itself). An install that has no `exit_decision` family yet gets the new file as its first version.
+
+=== F2 [R-20-2]
+WHY: R-20-2 | CONFIRMED LOW | pointer "(section 3.2)" for `source_id` should be the column comment of section 1.1 | pointer
+OLD: and the instance as `source_id` (section 3.2).
+NEW: and the instance as `source_id` (section 1.1, the column comment).
+
+=== F3 [R-20-3]
+WHY: R-20-3 | CONFIRMED LOW (raised MEDIUM) | `NewVerification` omits `ops_task_id` (NOT NULL) | added to the list
+OLD: (section 3.3): `kind = canonical_check`, `level`,
+NEW: (section 3.3): `ops_task_id` (the task checked), `kind = canonical_check`, `level`,
+
+=== F4 [R-20-4]
+WHY: R-20-4 | CONFIRMED LOW (raised MEDIUM) | the derived values of `NewOpsTask` omit `authority_ref` on the freeze path | added
+OLD: `neutral_text_code` (step 2), `state = open` and `version = 1` (step 4).
+NEW: `neutral_text_code` (step 2), `state = open` and `version = 1` (step 4), and on the freeze path `authority_ref` set to the task's own `task_ref` (the note on step 6 of section 3.4).
+
+=== F5 [R-20-5]
+WHY: R-20-5 | CONFIRMED LOW | doubled words "the reference and reference equal to" | wording
+OLD: the reference and reference equal to `cbs_reference`
+NEW: the reference equal to `cbs_reference`
+
+=== F6 [R-20-6]
+WHY: R-20-6 | CONFIRMED LOW | a clause of the W9 line hangs after the inserted sentence | clause moved
+OLD: shows "Confirm" (V0) after completion; the server's 409 `copy_matches` (section 3.3, Confirm step 3) decides whether the copy already shows the hold, and the screen shows that answer; with the note that the confirmation is flagged; the completer
+NEW: shows "Confirm" (V0) after completion, with the note that the confirmation is flagged; the server's 409 `copy_matches` (section 3.3, Confirm step 3) decides whether the copy already shows the hold, and the screen shows that answer; the completer
+
+=== F7 [R-20-7]
+WHY: R-20-7 | CONFIRMED LOW | "W-OPS" is not a screen id; the screen is W9 | id corrected
+OLD: the day window of the W-OPS screen (section 5.1)
+NEW: the day window of the W9 screen (section 5.1)

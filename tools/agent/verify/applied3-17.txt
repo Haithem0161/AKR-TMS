@@ -1,0 +1,15 @@
+Replacements made in docs/plan/phase-17.md by the second re-check (DR-413). 2 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-17-1]
+WHY: S-17-1 | CONFIRMED MEDIUM (raised HIGH) | block 7.25 step 3 (the R-17-5 text) answers 422 `role_cannot_decide` to a second worker without `A2` or `M`; the check of section 6 expects 403 `E_SELF_APPROVAL` when `a1` (an A1) is named as L2 after being L1, and the order of the two refusals is not stated | the self-approval refusal of section 3.8 step 4 is checked first
+OLD: with the phase 18 sub-code `role_cannot_decide`; an assignee who holds `A2` or `M` gets `decide`,
+NEW: with the phase 18 sub-code `role_cannot_decide` (the `E_SELF_APPROVAL` refusal of section 3.8 step 4 is checked before this one, so a first worker named as second worker gets the 403 whatever role they hold); an assignee who holds `A2` or `M` gets `decide`,
+
+=== F2 [L2-17-1a]
+WHY: L2-17-1 | CONFIRMED LOW (lead) | phase 17 section 7.2 and phase 18 section 3.2 still say a reassignment revokes the previous assignee's grant without a condition; phase 17 section 7.25 (the R-17-6 text) revokes it only when its reason is `assignment` or `second_review` and keeps a wider grant | both sentences name the two reasons and point to 7.25
+OLD:   reason `second_review`; a reassignment revokes the previous assignee's grant (`revoked_by` is the actor).
+NEW:   reason `second_review`; a reassignment revokes the previous assignee's grant of these two reasons (`revoked_by` is
+  the actor; a grant of another reason stays, 7.25).

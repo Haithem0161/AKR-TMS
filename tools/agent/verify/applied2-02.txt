@@ -1,0 +1,51 @@
+Replacements made in docs/plan/phase-02.md by the first re-check (DR-413). 7 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-02-1b]
+WHY: R-02-1 | CONFIRMED HIGH (raised HIGH) | the verifier reads as `akr_readonly`, and step 2 for the `case_event` stream reads `casework.case_events`, on which that role has no grant | phase 17 grants SELECT on the four columns `(case_id, seq, at, hash)` to `akr_readonly`; 7.17 names the grant
+OLD:   rebuilds the heads from the rows of `[range_from, range_to]` and compares the count, the ids, the last hash and the
+  root (`anchor_root_mismatch`).
+NEW:   rebuilds the heads from the rows of `[range_from, range_to]` and compares the count, the ids, the last hash and the
+  root (`anchor_root_mismatch`). It reads the four columns `(case_id, seq, at, hash)` as `akr_readonly`, through the
+  column grant of phase 17 section 1; no payload and no actor column is granted.
+
+=== F2 [R-02-2]
+WHY: R-02-2 | CONFIRMED MEDIUM (raised HIGH) | `ShredOutcome` is a struct in 7.16 and an enum in phase 23 section 7.8 | 7.16 takes the enum `{ Shredded, AlreadyShredded }`
+OLD: `ShredOutcome` is what `shred` returns (7.3): `{ shredded_at: DateTime<Utc> }`, the instant the same transaction wrote
+to the row's `shredded_at` column.
+NEW: `ShredOutcome` is what `shred` returns (7.3): the enum `{ Shredded, AlreadyShredded }` of phase 23 section 7.8.
+`Shredded` is the call that erased `wrapped_dek` and wrote `shredded_at` in the same transaction. `AlreadyShredded` is
+a repeat: it keeps the first `shredded_at` and writes no second event.
+
+=== F3 [R-02-3a]
+WHY: R-02-3 | CONFIRMED LOW (raised HIGH) | the metric label `{template}` cannot be filled, since `RenderJob` has no template name | the label is dropped in step 4 and section 4; 7.14 says so
+OLD: 4. Return the bytes and their SHA-256; `akr_render_duration_seconds{template}`, `akr_render_failures_total{reason}`.
+NEW: 4. Return the bytes and their SHA-256; `akr_render_duration_seconds`, `akr_render_failures_total{reason}`.
+
+=== F4 [R-02-3b]
+WHY: R-02-3 | CONFIRMED LOW (raised HIGH) | the metric label `{template}` cannot be filled, since `RenderJob` has no template name | the label is dropped in step 4 and section 4; 7.14 says so
+OLD:   `akr_clamd_signature_age_hours`, `akr_render_duration_seconds{template}`, `akr_render_failures_total{reason}`. Alert
+NEW:   `akr_clamd_signature_age_hours`, `akr_render_duration_seconds`, `akr_render_failures_total{reason}`. Alert
+
+=== F5 [R-02-3c]
+WHY: R-02-3 | CONFIRMED LOW (raised HIGH) | the metric label `{template}` cannot be filled, since `RenderJob` has no template name | the label is dropped in step 4 and section 4; 7.14 says so
+OLD: version: the caller renders the template before the call.
+NEW: version: the caller renders the template before the call. For the same reason `akr_render_duration_seconds` has no
+`template` label (step 4 and section 4).
+
+=== F6 [R-02-4]
+WHY: R-02-4 | CONFIRMED LOW (raised MEDIUM) | the 7.1 row shows a dash for `validation_pack` and `register_export`, for which phase 24 states R11 and R6 or R9 | the row is split in three
+OLD: | `validation_pack`, `training_record`, `register_export` | 24 | - |
+NEW: | `validation_pack` | 24 | R11 |
+| `register_export` | 24 | R6 (register kind `decisions`), R9 (every other register) |
+| `training_record` | 24 | - |
+
+=== F7 [R-02-5]
+WHY: R-02-5 | CONFIRMED MEDIUM (raised MEDIUM) | "SIEM when infected" cannot be a boolean flag | 7.13 names the three phase 02 kinds with the flag; `evidence.rejected` is exported for both outcomes and `reason` tells them apart
+OLD:   `failover_drill.recorded`); and the phase 02 kinds whose row says SIEM. No other kind of these three phases is
+  exported.
+NEW:   `failover_drill.recorded`); and three phase 02 kinds: `audit.chain_break_detected`, `evidence.hash_mismatch` and
+  `evidence.rejected`. The flag is one boolean per kind, so `evidence.rejected` is exported for both outcomes, and its
+  `reason` tells an infected file from a rejected one. No other kind of these three phases is exported.

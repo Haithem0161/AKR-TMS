@@ -1,0 +1,59 @@
+Fixes applied to docs/plan/phase-28.md by the verification pass (DR-413). 12 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 BLOCK (from fixes/00.txt)
+### 7.N Publisher country in the model manifest (V-00-02-b, MEDIUM; DR-413)
+Section 3.9, import step 2: the manifest field `publisher` is an object `{name, country}`, and `country` is an ISO 3166-1
+alpha-2 code. A manifest without it is `manifest_invalid`. Reason: the supply-chain legal screen (VO-07, phase 00) needs
+the maintainer and country of every component, and a model is outside the release SBOM (DR-390).
+
+=== F2 REP (from fixes/28.txt)
+OLD: `visibility`, `model`, `output`, `grounding`)
+NEW: `visibility`, `model` (with `input_too_large`), `output`, `grounding`)
+
+=== F3 BLOCK (from fixes/28.txt)
+### 7.N The QA sample keeps its evaluation run (V-28-02-b, MEDIUM; DR-413)
+Migration `0089` (section 1.2), next to the two constraint changes on `casework.qa_samples`: `ALTER TABLE
+casework.qa_samples ADD COLUMN IF NOT EXISTS eval_run_id UUID;` with its classification row (`internal`). The table
+grant of phase 19 covers the column. The draw of section 3.6 step 4 passes the run as `eval_run_id` (phase 19 section
+7+).
+
+=== F4 REP (from fixes/28.txt)
+OLD: (requirement on phase 19, section 4.5)
+NEW: (phase 19 section 3.8 step 7 and its section 7+ block)
+
+=== F5 REP (from fixes/28.txt)
+OLD: `EngageKillRequest`, `ReleaseKillAccepted`
+NEW: `EngageAssistantKill`, `ReleaseAssistantKillRequest`, `ReleaseKillAccepted`
+
+=== F6 BLOCK (from fixes/28.txt)
+### 7.N Provenance on the draft view (V-28-04-a, MEDIUM; DR-413)
+`GET /assistant/drafts/{id}` and `DraftView` gain a `provenance` object, null unless the draft carries its text
+(section 3.4, the case team only): `requested_by`, `requested_at`, `model_version_id` and `template_version_id` (each
+with its `version_no` from `admin.assistant_versions`), and `source_ids`. These are the DR-277 fields the draft row
+already keeps; the case, the output and the edits are left out because the view shows them.
+
+=== F7 REP (from fixes/28.txt)
+OLD: Draft `FOR UPDATE` (lock 4): status must be `ready`;
+NEW: For `report_narrative`, first the report row `FOR UPDATE` (lock 3 of section 3.15; `report_id` is read from the draft without a lock). Then the draft `FOR UPDATE` (lock 4): status must be `ready`;
+
+=== F8 REP (from fixes/28.txt)
+OLD: The engine deletes a case's drafts in its own `record_purge` before a case row is removed;
+NEW: No handler deletes a case's drafts in this release (7.2, DR-386: they are `report_only` with their case);
+
+=== F9 REP (from fixes/28.txt)
+OLD: The engine must delete a case's drafts before its case row; the foreign key is `RESTRICT`. Phase 23 has no rule for a child of a case that holds a sealed text yet (requirement; phase 23 owner to confirm).
+NEW: Settled by 7.2 (DR-386): no handler deletes a case's drafts in this release. They are `report_only` with their case (phase 23: a child of a `report_only` owner is `report_only` too), and the foreign key stays `RESTRICT`.
+
+=== F10 REP (from fixes/28.txt)
+OLD: `llama` | `akr/llama-server` (pinned, signed) | `z2_model` | internal only, no egress.
+NEW: `llama` | `akr/llama-server` (pinned, signed) | `z2_model` | internal only, no egress; `llama-eval` | `akr/llama-server` (same image, profile `assistant-eval`) | `z2_model` | internal only, no egress.
+
+=== F11 REP (from fixes/28.txt)
+OLD: The manifest's canonical bytes hash to `manifest_sha256`
+NEW: The manifest's canonical bytes (the canonical form of phase 27 section 3.3 step 2) hash to `manifest_sha256`
+
+=== F12 REP (from fixes/28.txt)
+OLD: has every `<` replaced by `<` before serialisation
+NEW: is serialised with every `<` written as the JSON escape `<`, so the block text holds no `<`

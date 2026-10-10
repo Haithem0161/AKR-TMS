@@ -1,0 +1,14 @@
+Replacements made in docs/plan/phase-04.md by the second re-check (DR-413). 2 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-04-1]
+WHY: S-04-1 | CONFIRMED LOW (raised MEDIUM) | the OpenAPI bullet (the R-07-1b text) totals 32 operations but its tag counts sum to 31: the evidence route of section 7.2 is under no tag and in no router. The total is right | the bullet names the tag `change-control` and the router for it; the Routers bullet of section 2 says 9 with that route (two replacements)
+OLD: 32 operations (the 31 of section 2 and the evidence route of section 7.2), each with `x-akr-action`;
+NEW: 32 operations (the 31 of section 2 and the evidence route of section 7.2, a ninth operation of the tag `change-control`, mounted in `change_control::router()`), each with `x-akr-action`;
+
+=== F2 [S-04-1b]
+WHY: S-04-1 | CONFIRMED LOW (raised MEDIUM) | the OpenAPI bullet (the R-07-1b text) totals 32 operations but its tag counts sum to 31: the evidence route of section 7.2 is under no tag and in no router. The total is right | the bullet names the tag `change-control` and the router for it; the Routers bullet of section 2 says 9 with that route (two replacements)
+OLD: `api::routes::change_control::router()` (8 + the three phase 03 CR branches),
+NEW: `api::routes::change_control::router()` (8 + the three phase 03 CR branches; 9 with the evidence route of section 7.2),

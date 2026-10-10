@@ -1,0 +1,97 @@
+Phase 10 fixes (lead-reviewed from tools/agent/verify/draft/10.txt; verdicts in tools/agent/verify-verdict.md).
+
+@@ REP 10
+DSL.md B.7, DR-38)
+@@ WITH
+DSL.md B.7, DR-10, DR-88)
+@@ END
+@@ REP 10
+-- append-only in practice (section 3.6)
+@@ WITH
+-- append-only in practice (section 7+, status change of a payment message)
+@@ END
+@@ REP 10
+different hash on a **fact** (txn, txn_event, payment_message, card_txn, cash_event, fx_deal, locker_access,
+@@ WITH
+different hash on a **fact** (txn, txn_event, payment_message, payment_message_party, payment_link, account_hold, card_txn, cash_event, fx_deal, locker_access,
+@@ END
+
+@@ BLOCK 10
+### 7.N Validate stores the artefact only while the revision holds (V-10-01-a, MEDIUM; DR-413)
+Section 3.1 step 4: `validate` reads `revision` with the version at its start. The store of the compiled artefact and the move `draft` -> `testing` are one compare-and-set on that revision, as `replace_draft` is in step 3; when the revision has moved, nothing is stored and the answer is 409 `E_VERSION_CONFLICT`. `MappingVersionRepository::store_compiled` takes `expected_revision: i32` after `id` and returns `Result<Option<MappingVersion>, RepoError>` (None when the revision moved). In section 6 item 5 a validate of a version that is not `draft` is 409 `E_NOT_ALLOWED_IN_STATE` (`not_draft`) only; "422 or 409" reads "409".
+@@ END
+
+@@ BLOCK 10
+### 7.N MappingExecutor::map and its row types (V-10-05-a, V-10-07-a, MEDIUM; DR-413)
+`MappingExecutor::map(version: &MappingVersion, rows: &[SourceRow]) -> MappedBatch` is the batch entry point that phase 11 calls. It applies `MappingExecutor::apply` (section 3.6 step 4) to each row in order. `SourceRow { source_pk: String, extracted_at: DateTime<Utc>, row_hash: RowHash, payload: Value }` is one landed or sampled row.
+`MappedBatch { rows: Vec<MappedRow>, rejected: Vec<Rejected>, unmapped_codes: u64 }`. `MappedRow { entity: CanonicalEntity, source_pk: String, extracted_at: DateTime<Utc>, row_hash: RowHash, values: Vec<(String, Value)> }` carries the catalogue columns of the entity. `Rejected { source_pk: String, reason: RowFailure, field: Option<String> }` names a field, never a value.
+`RowFailure` is a closed enum whose codes phase 11 writes as quarantine reasons: `transform_failed` (a `TransformFailure` of section 3.3), `required_missing` (a required attribute with no value, section 3.8), `unmapped_currency` (a currency not in `ref.currencies`), `card_guard` (section 3.3) and `rule_rejected` (a validation rule with `on_fail = quarantine`).
+`MappingExecutor::map_payload(version: &MappingVersion, row: &SourceRow) -> MappedBatch` (section 7.6) runs the same code on one stored landing row.
+@@ END
+
+@@ BLOCK 10
+### 7.N Row types and three writer rules (V-10-10-a, V-10-11-a, V-10-12-a, MEDIUM; DR-413)
+`CurrentRow` (returned by `current_by_source_key`) holds `id`, `recorded_from`, `valid_from` and `row_hash`; for `canon.payment_message` also `status` and the hashes kept in `status_history`, and for `canon.account_hold` also `end_at`. `CanonRow` (taken by `insert_rows`) holds the catalogue columns of the entity, `id` from `admin.xref` and the lineage columns; a bi-temporal entity adds `valid_from` and `recorded_from`.
+`close_versions`: the third element of each tuple is `Option<NaiveDate>`. `Some(d)` sets `recorded_to` and `valid_to = d`; `None` sets only `recorded_to` and leaves `valid_to` null (the equal-date case of section 7.13).
+Section 3.7 step 1: a group `(entity, source_key)` with more than one row keeps its newest row (by `extracted_at`, then landing order). The older rows of the group are not written and are counted with `unchanged`; they stay in raw. So one batch writes one version per id, and the one clock per batch of step 4 stays unique per id.
+Section 3.7 step 8: `xref_linked` is the number of `admin.xref` rows that step 2 inserted.
+@@ END
+
+@@ BLOCK 10
+### 7.N Status change of a payment message (V-10-09-a, HIGH; DR-413)
+The fact rule of section 3.7 step 3 left no way to write a status change, though the table keeps `status_history` and `akr_ingest` may update the two columns. For `canon.payment_message` step 3 reads: a row whose hash equals the stored `row_hash`, or the `row_hash` of any `status_history` entry, is `unchanged`. Otherwise, when the mapped `status` differs from the stored one, the writer calls `CanonRepository::append_status(tx, id, received_at, status, entry)`, which sets `status` and appends `entry = {status, at: extracted_at, row_hash}` to `status_history`; no conflict is returned. Otherwise the fact rule applies (`RowConflict`). A change of another column that arrives in the same source version as a status change is not written to canon; the raw row keeps it (DR-37).
+`CanonRepository` gains `async fn append_status(&self, tx: &mut Tx, id: Uuid, received_at: DateTime<Utc>, status: &str, entry: &Value) -> Result<u64, RepoError>;`.
+@@ END
+
+@@ REP 10
+`status TEXT NOT NULL CHECK (status IN ('received', 'released', 'rejected', 'returned', 'cancelled'))`; the values
+@@ WITH
+`status TEXT NOT NULL CHECK (status IN ('received', 'released', 'rejected', 'returned', 'cancelled', 'unknown'))` (`unknown` is what the `dq_issue` gate of the `status` code map writes for an unmapped value, section 3.4 step 5 and DSL.md B.7; without it the CHECK would fail the batch; phase 29 keeps `unknown` under control); the values
+@@ END
+
+@@ BLOCK 10
+### 7.N The end of an account hold (V-10-02-b, MEDIUM; DR-413)
+A hold that the source releases comes back as a changed row with `end_at` set. For `canon.account_hold` the fact rule of section 3.7 step 3 has one exception: when the stored `end_at` is null and the mapped `end_at` is set, the writer calls `CanonRepository::end_hold(tx, id, end_at, row_hash)`, which sets `end_at` and `row_hash`; no conflict is returned. Any other difference is a `RowConflict`. Migration `0030` (section 1.2) gains `GRANT UPDATE (end_at, row_hash) ON canon.account_hold TO akr_ingest;`. Phase 20 reads the open and the ended hold from this table.
+@@ END
+
+@@ BLOCK 10
+### 7.N A payment link names its two ends (V-10-02-a, MEDIUM; DR-413)
+Section 3.7 step 2 for `canon.payment_link`: the mapped row carries the source key of its payment message and of its transaction. Each is resolved through `admin.xref` with one `get_many` call per entity, and the canonical ids found are written as `message_id` and `txn_id`. A link end with no `admin.xref` row gets no new id: the link is not written, a `RowConflict` of kind `parent_missing` is returned, which phase 11 records as a `row_conflict` quarantine row with reason `parent_missing`, and the trailing re-read window (DR-37) meets the link again when its end has landed. A link taken from a source that holds it (phase 12 section 7+) is written with `rule = 'declared'` and `confidence = 1.0000`; match rules are P2 (DR-394).
+@@ END
+
+@@ BLOCK 10
+### 7.N Code-map changes: class, refusals and the revert event (V-10-03-a, V-10-03-b, MEDIUM; DR-413)
+Section 3.4 step 4: a change whose operations are `Verify` or `Map` only is `minor` (a prefilled entry is unmapped under the gate until it is verified, so `Verify` maps a previously unmapped code, the DSL.md D.3 test); a change with any `Reclassify` is `material`. An operation that cannot apply (a `Map` of a code that has an effective entry; a `Reclassify` with no effective entry or an unmatched `supersedes_valid_from`; a `Verify` of an entry that does not exist) is refused at propose with 422 `E_VALIDATION` at `/ops/<i>`, reason `operation_invalid`.
+Section 3.9, `code_map` Revert: the revert closes the `Map` entries of the change (`valid_to`) and writes one audit event per closed entry, `code_map.entry_reverted {code_map, source_code, canonical_code, valid_to}`, in the transaction of the revert; the section 3.10 audit table gains that row. Phase 04's `change_request.reverted` is written as well.
+@@ END
+
+@@ BLOCK 10
+### 7.N cdd_level stays null (V-10-04-a, LOW; DR-413)
+`customer.cdd_level` has no mapping path in this plan: it is not a required attribute (section 3.8), none of the ten code-map kinds maps it, and DATA-MODEL keeps it out of every rating and scenario input. The column stays null, and the CHECK of section 1.2 is reached by no writer. The KYC level a customer holds in this product is phase 15's.
+@@ END
+
+@@ BLOCK 10
+### 7.N The name columns and their transforms (V-10-08-a, MEDIUM; DR-413)
+Section 3.3: `raw` is the source value as landed. `folded` is `FoldArabic` run through all of its steps (research file 22 section 6.4, N1 to N6). `light` is `FoldArabic` stopped after step N4, its argument `stage: Light` (the other value is `Full`). `key` is written by `SplitArabicName` (the consonant key of research file 22 section 7.4). `FoldArabic` joins the `Transform` list of section 2.
+@@ END
+
+@@ BLOCK 10
+### 7.N The party lock in the writer (V-10-06-a, MEDIUM; DR-413)
+Section 7.4 (from phase 23 on), extended: before the tombstone read of a `canon.customer` row the writer takes `pg_advisory_xact_lock(hashtext('party:' || party_id))` (phase 23 section 3.15 step 1) for that row's party; before the tombstone read of a `canon.account` row it takes the same lock for the party of the customer the account names, when that customer has a row in canon. Locks are taken in ascending party id and held to the commit of the batch transaction, so the tombstone read and the insert cannot interleave with a party purge. An account whose customer has no canon row takes no party lock: a purge of that party has either committed (its tombstone is visible) or never ran.
+@@ END
+
+@@ BLOCK 23
+### 7.N The canonical writer takes the party lock (V-10-06-a, MEDIUM; DR-413)
+Section 3.15 step 1 gains a third taker of the party lock, beside hold placement and the party purge: the canonical writer of phase 10 (phase 10 section 7+, the party lock in the writer), before its tombstone read of a `canon.customer` or `canon.account` row, in ascending party id, held to the commit of its batch transaction.
+@@ END
+
+@@ REP 10
+attempt and the table stopped. Step 4 therefore sets the new version's `valid_from = GREATEST(<the row's business date>,
+@@ WITH
+attempt and the table stopped. Step 4 therefore sets the new version's `valid_from = GREATEST(<the batch's business date of step 4, phase 11's `admin.batches.business_to`>,
+@@ END
+@@ REP 10
+row keeps its own business date, and `recorded_from` records when AKR learned the value.
+@@ WITH
+row is unchanged (its batch row holds the business date), and `recorded_from` records when AKR learned the value.
+@@ END

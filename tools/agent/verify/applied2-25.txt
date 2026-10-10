@@ -1,0 +1,84 @@
+Replacements made in docs/plan/phase-25.md by the first re-check (DR-413). 15 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-25-1a]
+WHY: R-25-1 | CONFIRMED MEDIUM (raised MEDIUM) | the SP-36 rule entries have `window` and `threshold` and no value, and "key operations" names no exported kind | proposed starting values the bank tunes in its SIEM; the privileged-burst kinds are named
+OLD:    as entries `{id, title, kinds, group_by: actor, window, threshold}`: repeated denied or conflicting attempts
+NEW:    as entries `{id, title, kinds, group_by: actor, window, threshold}`. The shipped `window` and `threshold` are
+   proposed starting values that the bank tunes in its SIEM, not product settings: 10 minutes and 5 events for the
+   denied, sign-in and step-up rules, 24 hours and 1 event for break-glass use, 1 hour and 3 events for privileged
+   bursts. The rules: repeated denied or conflicting attempts
+
+=== F2 [R-25-1b]
+WHY: R-25-1 | CONFIRMED MEDIUM (raised MEDIUM) | the SP-36 rule entries have `window` and `threshold` and no value, and "key operations" names no exported kind | proposed starting values the bank tunes in its SIEM; the privileged-burst kinds are named
+OLD:    and privileged bursts (role grants, policy activation, key operations). The CI check
+NEW:    and privileged bursts (role grants, policy activation, and service client and token changes: `role_grant.created`,
+   `policy_bundle.activated`, the `service_client.*` kinds, `token.created` and `token.revoked`). The CI check
+
+=== F3 [R-25-2]
+WHY: R-25-2 | CONFIRMED LOW (raised LOW) | `SweepCounts` has three field sets and the access review sweep is missing | one map type for the four sweeps, with the count names of each
+OLD: - `SweepCounts` of the break-glass sweep is `{ lapsed, expired, review_overdue }`, one count per step; of the support session sweep `{ ended, expired, refused_timeout }`; of the bundle purge `{ archive_deleted }`.
+NEW: - `SweepCounts` is one type for the four sweeps: a map from a count name to a number (`BTreeMap<&'static str, i64>`). The access review sweep returns `superseded` and `overdue_opened` (section 3.1 sweep step 3); the break-glass sweep `lapsed`, `expired` and `review_overdue`, one count per step; the support session sweep `ended`, `expired` and `refused_timeout`; the bundle purge `archive_deleted`.
+
+=== F4 [R-25-3]
+WHY: R-25-3 | CONFIRMED LOW (raised LOW) | the severity sentence of section 3.5 reads broken | reworded
+OLD: read in the forwarder from the phase 02 catalogue entry of the row's kind, as the catalogue name is: `audit.siem_page` returns no severity column.
+NEW: read in the forwarder from the phase 02 catalogue entry of the row's kind, like the catalogue name, because `audit.siem_page` returns no severity column.
+
+=== F5 [R-25-4]
+WHY: R-25-4 | CONFIRMED LOW (raised LOW) | "clears once the cause is fixed" is wrong for a seven-day count | "clears seven days after the last dead letter"
+OLD: so it clears once the cause is fixed.
+NEW: so it clears seven days after the last dead letter.
+
+=== F6 [R-25-5a]
+WHY: R-25-5 | CONFIRMED LOW (raised MEDIUM) | `SiemStatus.dead_letters_open` and the metric keep the name of the replaced rule | `dead_letters_7d` and `akr_siem_dead_letters_7d`
+OLD: `status() -> SiemStatus { lag_s, dead_letters_open, last_forwarded_at }`
+NEW: `status() -> SiemStatus { lag_s, dead_letters_7d, last_forwarded_at }` (`dead_letters_7d` is the count of dead letters created in the last 7 days, section 7.16)
+
+=== F7 [R-25-5b]
+WHY: R-25-5 | CONFIRMED LOW (raised MEDIUM) | `SiemStatus.dead_letters_open` and the metric keep the name of the replaced rule | `dead_letters_7d` and `akr_siem_dead_letters_7d`
+OLD: `akr_siem_dead_letters_open`, `akr_break_glass_active`
+NEW: `akr_siem_dead_letters_7d`, `akr_break_glass_active`
+
+=== F8 [R-25-6]
+WHY: R-25-6 | CONFIRMED LOW (raised LOW) | `invalidate_user` is phase 01's, not phase 03's | attribution fixed
+OLD: after the commit phase 03's `invalidate_user`
+NEW: after the commit phase 01's `invalidate_user`
+
+=== F9 [R-25-7a]
+WHY: R-25-7 | CONFIRMED MEDIUM (raised MEDIUM) | the warn cell and the Currency paragraph leave out `proposed`, and the 30 days have no clock | both name the three states; the wait is counted from `verified_at`
+OLD: a newer verified or approved release not applied | either condition | a newer verified, proposed or approved release has waited unapplied for more than 30 days |
+NEW: a newer verified, proposed or approved release not applied | either condition | a newer verified, proposed or approved release has waited unapplied for more than 30 days, counted from its `verified_at` |
+
+=== F10 [R-25-7b]
+WHY: R-25-7 | CONFIRMED MEDIUM (raised MEDIUM) | the warn cell and the Currency paragraph leave out `proposed`, and the 30 days have no clock | both name the three states; the wait is counted from `verified_at`
+OLD: the existence of a newer `verified` or `approved` release that is not yet applied.
+NEW: the existence of a newer `verified`, `proposed` or `approved` release that is not yet applied (its wait is counted from `verified_at`).
+
+=== F11 [R-25-8]
+WHY: R-25-8 | CONFIRMED LOW (raised MEDIUM) | section 3.9 still runs the article check inside step 5; 7.20 moved it before step 5 | section 3.9 follows 7.20
+OLD: runs inside the verification transaction of section 3.6 (step 5): it reads `help/*.json` from the verified bundle, checks each article against the schema (`code`, `kind`, `title` and `body` with `ar` and `en`), refuses bidirectional-control characters outside the Arabic and Latin ranges (UX-20), writes one row per article
+NEW: runs inside the verification transaction of section 3.6 (step 5), after the article check of section 7.20 has passed. That check runs before step 5: it reads `help/*.json` from the verified bundle, tests each article against the schema (`code`, `kind`, `title` and `body` with `ar` and `en`) and refuses bidirectional-control characters outside the Arabic and Latin ranges (UX-20); a failure refuses the release. `import` then writes one row per article
+
+=== F12 [R-25-9]
+WHY: R-25-9 | CONFIRMED MEDIUM (raised MEDIUM) | the rollout upload names no content type, and `application/json` is not an allowed evidence type | declared type `text/plain`
+OLD: Upload the `rollout.json` of the apply (multipart, `EvidenceStore::stage`): kind `package`,
+NEW: Upload the `rollout.json` of the apply (multipart, `EvidenceStore::stage`, declared content type `text/plain`: JSON is UTF-8 text, and `application/json` is not in `evidence.allowed_types`): kind `package`,
+
+=== F13 [R-25-10a]
+WHY: R-25-10 | CONFIRMED LOW (raised LOW) | the upload route is missing from the section 2 table and the counts say 21 and 9 | the row is added; counts 22 and 10 (phase 25 and status.md)
+OLD: | POST | `/api/v1/admin/releases/{id}/applied` | `admin.system` | Record that the bank operator applied the approved release; **SU** `approval`; IF; IDEM (added) |
+NEW: | POST | `/api/v1/admin/releases/{id}/applied` | `admin.system` | Record that the bank operator applied the approved release; **SU** `approval`; IF; IDEM (added) |
+| POST | `/api/v1/admin/releases/{id}/evidence` | `admin.system` | Upload the `rollout.json` of the apply as evidence of owner kind `release`; answers 201 with the evidence id; IDEM (added, section 7.22; Cedar `release.applied`) |
+
+=== F14 [R-25-10b]
+WHY: R-25-10 | CONFIRMED LOW (raised LOW) | the upload route is missing from the section 2 table and the counts say 21 and 9 | the row is added; counts 22 and 10 (phase 25 and status.md)
+OLD: M (21 routes: 12 rows of API.md 3.2, 3.3, 3.20 and the help row owned here, 9 rows added beyond API.md;
+NEW: M (22 routes: 12 rows of API.md 3.2, 3.3, 3.20 and the help row owned here, 10 rows added beyond API.md;
+
+=== F15 [R-25-10c]
+WHY: R-25-10 | CONFIRMED LOW (raised LOW) | the upload route is missing from the section 2 table and the counts say 21 and 9 | the row is added; counts 22 and 10 (phase 25 and status.md)
+OLD: - **Route count**: 21 rows, of which 12 are owned (API.md 3.2, 3.3, 3.20 and the help row) and 9 are added (the review detail, the review item decision, the break-glass list and review, the release propose and applied records, the support session list
+NEW: - **Route count**: 22 rows, of which 12 are owned (API.md 3.2, 3.3, 3.20 and the help row) and 10 are added (the review detail, the review item decision, the break-glass list and review, the release propose and applied records, the rollout record upload of section 7.22, the support session list

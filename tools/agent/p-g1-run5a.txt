@@ -1,0 +1,77 @@
+You are drafting part of GAP PASS 1 for the AKR-TMS implementation plan (an AML/KYC transaction-monitoring product
+for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Read first: .claude/rules/planning.md (section
+"Gap Analysis Methodology"), tools/agent/b3-conventions.md, tools/agent/gap1-plan.md.
+
+YOUR RUN: run 5a = COVERAGE of research requirement IDs that no phase names. Your IDs (59), prefixes C, E, RP, S, TS:
+
+C-05 C-11 C-12 C-14 C-17 C-18 C-19 C-31 C-32 C-33 C-34 C-37 C-39 C-40 C-41 C-42 C-43 C-44 C-45 C-49 C-53
+E-01 E-02 E-03 E-04 E-05 E-06 E-07
+RP-08 RP-10 RP-12 RP-13 RP-35
+S-11 S-14 S-15 S-16 S-17 S-18 S-19 S-20 S-21 S-25 S-27 S-28 S-29 S-30 S-33 S-34 S-35 S-36
+TS-05 TS-06 TS-08 TS-11 TS-18 TS-20 TS-21 TS-35
+
+Background. Every phase file names the research IDs it carries on its "**Requirements carried:**" header (lines
+"Implemented here", "Partly implemented", "Connected", and "Not carried"). tools/coverage.py found that these 59 IDs
+are named by no phase header. Some are built in substance by a phase that simply forgot to name the ID; some are out of
+scope or later (P2, P3, the bank's own work); some are true gaps. Your job is to classify each ID with evidence.
+
+Runs 1 to 4b (backward amendments) are applied: read DR-356 to DR-392 in docs/plan/research.md first. Already decided,
+do not reopen: S-48 is P2 (DR-380); SP-30 canary records are P2 (DR-391).
+
+For each ID, in the order above:
+1. Find its row: grep -n -E "^\|\s*\**ID\**\s*\|" research/*.md (for example grep -n -E "^\|\s*\**C-05\**\s*\|"
+   research/*.md). Read the row and, if needed, the research section it cites, so you know what is required.
+2. Pick two or three distinctive keywords from the requirement (a table, a job, a metric, a screen, a rule) and grep
+   docs/plan/phase-*.md and docs/MODULES.md for them. Read the matching lines in context.
+3. Classify the ID as exactly one of:
+   - CARRIED: a phase builds the requirement in substance (a table, route, job, rule or screen that does what the row
+     asks). Name the phase, its section and quote the line (at most 15 words). Proposed action: "add ID to phase NN
+     header, line <Implemented here | Partly implemented>" (Partly when the phase builds only part of it; say which
+     part is missing).
+   - NOT-CARRIED: no phase builds it and it belongs outside this release: P2 or P3 in docs/ROADMAP.md, the bank's own
+     process, a vendor programme item, or a research suggestion that a DR rejected. Give the reason with a source
+     (ROADMAP line, DR number, MODULES line). Proposed action: "add ID to phase NN header, line Not carried (<reason in
+     at most 10 words>)", choosing the phase whose subject is closest.
+   - GAP: the requirement is in scope for this release (MODULES or ROADMAP puts it in P0 or P1) and no phase builds
+     it. Write a full finding (format below) with the target phase and the exact Section 7 text.
+   Do not mark CARRIED on a keyword match alone: the quoted line must do what the requirement asks.
+
+Lessons from earlier runs (follow them):
+- Verify every name you write by grep. Do not invent tables, routes, jobs, settings, helpers or enum values; if no
+  phase names it, it does not exist. Run 4a invented `UserRoleQuery::holders` (the real one was phase 01
+  `GrantRepository::active_holders`).
+- Never propose a new value for a closed list (step-up class, access verb, role code, problem code) when an existing
+  value fits.
+- When the object a GAP needs is created by a later phase, the target gets a note "from phase NN on", never a call
+  that would not compile at the target's own phase.
+- Prefer no new column or channel when an existing record serves (the screens are the notice; an evidence object's
+  owner link is the record).
+- Do not put line numbers inside Proposed 7.x text; cite sections. Line numbers go only in Sources and Check.
+- Prefer a concrete proposal with a one-line reason over UNCLEAR; use UNCLEAR only when two sources truly disagree.
+
+Output file: tools/agent/gap1-run5a.md. Create it at the start with the header line
+"# Gap pass 1, run 5a (coverage: C, E, RP, S, TS; Haiku draft for lead review)" and then:
+
+Part 1, a table, one row per ID, appended as soon as each ID is classified (the machine may crash):
+| ID | Research row (file:line) | Requirement (at most 15 words) | Class | Evidence (phase-NN.md:LINE "quote" or source) | Proposed action |
+
+Part 2, after the table: one finding per GAP, in this format:
+
+### G1-PP-NN Short title   (PP = the target phase number)
+- Severity: HIGH | MEDIUM | LOW   (HIGH: core P0/P1 function missing; MEDIUM: a rule or field missing from a built
+  function; LOW: wording or an informative list)
+- Category: one of Missing Table, Missing Fields, Missing Endpoint, Missing Logic, Missing Report, Missing Integration,
+  Missing Event, Missing Audit Event, Missing Policy, Missing Requirement, Incomplete Coverage
+- Requirement: ID and research file:line
+- Target: phase-PP.md section X.Y
+- Check: the greps you ran and their results
+- Proposed 7.x text: "### 7.N <title>" with the change stated concretely (SQL using the target's own DDL column names,
+  route rows in the format | Method | Path | Scope | Description |, numbered steps, audit event names). Name the ID.
+
+Rules:
+- Write ONLY tools/agent/gap1-run5a.md. Do not edit any other file.
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Do not read cbs-discovery/ or test-poc/ (not needed).
+- At the end append "## Summary": counts by class (CARRIED, Partly, NOT-CARRIED, GAP), GAP findings by severity, and
+  a list of anything UNCLEAR.
+- Your final reply: the counts and the file path, nothing else.

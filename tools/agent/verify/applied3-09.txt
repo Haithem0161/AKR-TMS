@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-09.md by the second re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-09-1]
+WHY: S-09-1 | CONFIRMED LOW (raised MEDIUM) | the Keys paragraph of 7+ says each file of `backend/packs/reference/` carries the rows of one table; the calendar file (the R-09-4 text, same paragraph) carries the rows of two | the first sentence names the exception
+OLD: Keys: each file of `backend/packs/reference/` carries its `release_id` (1 to 64 characters) and the rows of one table. A `countries` row
+NEW: Keys: each file of `backend/packs/reference/` carries its `release_id` (1 to 64 characters) and the rows of one table (the calendar file, below, of two). A `countries` row

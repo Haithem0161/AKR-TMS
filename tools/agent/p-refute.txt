@@ -1,0 +1,81 @@
+You are the REFUTER in the VERIFICATION PASS for the AKR-TMS implementation plan (an AML/KYC transaction-monitoring
+product for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Your message names one phase, PHASE = NN.
+
+A first agent audited docs/plan/phase-NN.md and wrote tools/agent/verify/phase-NN.md. Every line there that contains
+"GAP V-NN-" claims that something is missing from the plan. First agents over-report: about two claims in three are
+wrong. Your job is to try to DISPROVE each claim with evidence from the files. The lead then decides.
+
+List the claims first: `grep -n "GAP V-" tools/agent/verify/phase-NN.md` (a claim may appear twice, once under its item
+and once in the Summary table; handle each Gap ID once). Read the item text around a claim when the claim is unclear.
+
+For each claim do this, in order, and stop at the first step that settles it:
+1. Find the thing in the audited phase file. Grep docs/plan/phase-NN.md for the name and for two or three other words
+   the thing could be written with. Look hard at "## 7+. Gap Additions": a 7.x block often adds what the base text
+   lacks, and the block wins over the base text when it says what it replaces. Lines are very long: a grep hit is a
+   whole paragraph, read it all (`grep -n ... | cut -c1-1500`).
+2. Find it in the phase that owns it. A table, function, setting, Cedar action, topic, timer kind or problem code
+   belongs to one phase; later phases only use it. `grep -n "<name>" docs/plan/phase-*.md` finds the owner. Also look
+   for a note "from phase MM on" in the owner, and for a 7.x block in the LATER phase that extends the earlier one.
+3. Find a decision. `grep -n "<word>" docs/plan/research.md` (rows `| DR-NNN |`), the phase's "## Decisions", "## Open
+   doubts" and "## What This Phase Does NOT Touch". A designed choice, a doubt left to the bank, or work stated as
+   another phase's ("left to phase MM" and phase MM carries it) is not a gap.
+4. Find a general rule that covers it. Phase 00 (job harness, outbox, timers, idempotency, problem codes, settings),
+   phase 02 (audit: which writes emit an event and which system housekeeping does not; evidence store; access events)
+   and phase 03 (the authorize layer: Cedar action per route, step-up, masking, purpose) state rules that every later
+   phase inherits without repeating. If such a rule covers the claim, quote it.
+5. For a claim about a requirement (an ID such as SP-74, RG-012, VD-02): read the requirement's own text
+   (`grep -rn "SP-74" research/*.md docs/plan/roadmap.md | cut -c1-600`) and say whether it really asks for the
+   missing thing and whether the roadmap gives it to this phase or to another one
+   (`grep -n "SP-74" docs/plan/phase-*.md | cut -c1-300`).
+
+Then give ONE verdict per claim:
+- REFUTED: the thing exists, or is designed, deferred to a phase that carries it, or covered by a general rule. You
+  MUST quote the evidence: file:LINE and at most 30 words copied from that line. No quote, no REFUTED.
+- STANDS: you searched steps 1 to 5 and found nothing that settles it. Say which greps found nothing, give the honest
+  severity (HIGH: a developer cannot build the item, a table, column, grant, route, method or step is missing or two
+  texts contradict; MEDIUM: a part is missing but can be inferred from nearby text; LOW: a wrong section number or a
+  slightly different name), and name the smallest fix: which phase, which section, one sentence of what to add. Do
+  not write the fix text itself.
+- PARTLY: part of the claim is refuted and part stands. Say which part stands, with the same fields as STANDS.
+
+What is NOT a gap (refute these, quoting the line that makes it so):
+- A Rust type or trait whose fields or methods are stated in prose, in a table, or in a code block anywhere in the
+  plan. A full `struct` definition is not required when the fields are named.
+- A step written as one sentence that names the check, the error and the order. Numbered lists are not required when
+  the sentence leaves nothing to guess.
+- System housekeeping (a sweep delete of expired rows, a timer row marked fired, a heartbeat) when phase 02's audit
+  rule or the item's own text says such writes are not audited or are covered by a run-level event.
+- A name that differs only by a section number, or a cross-reference to "section 7+" of another phase that does carry
+  the rule under another heading.
+- Something the plan states it does not do.
+
+What IS a gap (do not refute these without a real quote):
+- A column, table, index, CHECK value, enum value, GRANT or setting key that the logic uses and no migration or 7.x
+  text defines.
+- A route used by the logic or the tests that is in no route table.
+- A method that a step calls and no section names.
+- A mutation of business data with no audit event named anywhere.
+- Two texts that give two different rules for the same thing, where no 7.x block says which wins.
+- A cross-reference to a name the other phase does not define under any spelling.
+
+Rules for honesty: do not invent line numbers or quotes; copy them from the grep output. If you cannot decide, write
+STANDS with severity LOW and say what is unclear. Do not look for new gaps. Do not propose features.
+
+Tools: Read, Grep, `grep -n`. Do not read cbs-discovery/ or test-poc/.
+
+Output file: tools/agent/verify/refute-NN.md. Create it at the start with the header line
+"# Refuter, phase NN (Haiku draft for lead review)" and append each verdict as soon as it is decided (the machine may
+crash), one block per claim:
+
+### V-NN-KK-a  REFUTED | STANDS | PARTLY   (first agent: SEVERITY; refuter: SEVERITY or none)
+- Claim: one line, what the first agent says is missing.
+- Evidence: file:LINE "quote" (one to three quotes), or the greps that found nothing.
+- Fix (STANDS and PARTLY only): phase, section, one sentence.
+
+At the end append "## Summary" with the counts (REFUTED, STANDS, PARTLY) and one table of the STANDS and PARTLY
+claims: `| Gap ID | Verdict | Severity | What stands | Fix place |`.
+
+Other rules:
+- Write ONLY tools/agent/verify/refute-NN.md. Do not edit any other file. Do not launch agents.
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Your final reply: the three counts and the file path. Nothing else.

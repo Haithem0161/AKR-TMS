@@ -123,7 +123,7 @@ Trust zones Z0-Z7, default-deny, mTLS between zones (SP-04, SP-08):
 |---|---|---|---|
 | Z0 CBS network | CBS database, replica, payment gateway database (bank-owned) | `akr-ingestd` only, to listener ports of bank-owned views | n/a |
 | Z1 CBS-facing | `akr-ingestd`, optional Debezium sidecar | Z2 (job and health calls) | Z0 listener ports; Z2 PostgreSQL; Z2 OpenBao for reads of its own source credentials (docs/plan/research.md DR-25); nothing else |
-| Z2 Application | `akr-worker`, PostgreSQL, MinIO, OpenBao, Valkey, Gotenberg, clamd | Z1, Z3 (through `akr-api` only), Z4, Z5 | Bank proxy (allow-listed list providers if approved), SMTP relay, SIEM collector |
+| Z2 Application | `akr-worker`, PostgreSQL, MinIO, OpenBao, Valkey, Gotenberg, clamd | Z1, Z3 (through `akr-api` only), Z4, Z5 | Bank proxy (allow-listed list providers if approved; the Office's schema page for the goAML watcher, `akr-worker` only on `z2_egress`, off by default, DR-71), SMTP relay, SIEM collector |
 | Z3 Analyst | Edge proxy, `akr-api`, Kratos, Hydra | Bank LAN on 443 | Z2 |
 | Z4 Gateway | `akr-assess` | Payment hub or Swift interface by mTLS | Z2 PostgreSQL and cache |
 | Z5 Management | Bank PAM or jump host, Harbor, bundle import, backup target, SIEM collector | Bank admin network | Zones, for administration only |
@@ -150,10 +150,19 @@ hold bank data. Profiles S, M and L are in tech-stack.md.
 Each deployment declares and proves its read-only level: **level 1 data plane** (no write reaches the CBS; always
 delivered and proved), **level 2 footprint-free** (nothing created in the CBS; holds for CT1, CT2, CT4, not for CT3),
 **level 3 load-free** (no load on the primary; holds on CT1, budgeted elsewhere) (C-03, C-04). Ingestion polls first,
-behind a change-source interface, so a bank moves between tiers by configuration (C-01, C-06, C-39).
+behind a change-source interface, so a bank moves between tiers by configuration (C-01, C-06, C-39). CT1, CT2 and CT4 as
+a bank landing database are available from the first release (phase 05); CT3 and CT4 file delivery arrive with
+ingestion in phase 11 (DR-63).
 
-Controls: grants are read on every connect and the source refuses to start if any write privilege exists; every
-statement is generated from the mapping and parsed to prove a single `SELECT` over approved objects; a signed per-bank
+Controls: grants are read on every connect from the session's effective privileges and every active role (not only
+direct grants) and judged against an allow-list per engine, and the source refuses to start if any write, create or
+ownership privilege or DBA-class role or privilege exists or a database link is usable without a bank-signed
+exception (DR-40, DR-60); the credential reaches only `akr-ingestd`, from OpenBao (DR-59); discovery reads the
+dictionary first and data only from objects the bank approved (DR-62); every statement is generated (from the
+discovery generator, later the mapping) and parsed to prove a single bounded `SELECT` over approved objects, with no
+predicate but its bound, no database link and no synonym to a remote object (DR-61), and
+runs inside the engine's read-only transaction mode (on Oracle `SET TRANSACTION READ ONLY`), so the database itself
+rejects a write a missed grant would allow; a signed per-bank
 load budget (sessions, statement time, rows per minute, end-of-day blackout, lag ceiling) and a kill switch; a DBA who
 locks the account puts the source in a normal "paused by bank" state with back-off, an open coverage gap shown to the
 MLRO and automatic backfill on resume (C-13, C-15, C-16). A CBS restored to an earlier point, or a failover with lost
@@ -161,17 +170,25 @@ commits, halts the watermarks and raises an alarm (C-64).
 
 ### 5.2 Pipeline
 
-1. `akr-ingestd` reads a batch per source table by keyset on the watermark, inside the load budget.
-2. Rows land verbatim in `raw` with lineage hashes; a batch receipt records counts and control totals; the same
+1. `akr-ingestd` reads a batch per source table by the table's change strategy (DR-37) inside the load budget: a
+   business-date range with a trailing re-read window, a key range, or a full snapshot hashed per row and diffed
+   against the previous one for tables with no indexed change date. Each read is one table over a key range; joins
+   are made in the AKR-TMS store (a source may have no optimizer statistics, DR-40).
+2. Rows land verbatim in `raw` with lineage hashes (the one exception: columns holding card or authentication data,
+   which each adapter pack's deny list drops before landing); a batch receipt records counts and control totals; the same
    transaction enqueues the mapping job (same-transaction enqueue, `jobs.md`).
-3. `akr-worker` maps raw rows to canonical entities through the published mapping version; rows that cannot map go
-   to the quarantine queue with a reason and a retry button (bulkhead: other tables continue).
+3. `akr-ingestd` maps raw rows to canonical entities through the published mapping version and writes them with the
+   canonical writer under `akr_ingest`, the only role with INSERT on `canon` (DR-85); `akr-worker` compiles and
+   recompiles mappings but never writes canonical rows. Rows that cannot map go to the quarantine queue with a reason
+   and a retry button (bulkhead: other tables continue).
 4. Canonical writes enqueue feature, screening, rating and scenario work for the accounts and parties touched,
    coalesced per account within a short window.
 5. The reconciliation ladder runs per batch and per day; the end-of-day gate releases end-of-day scenarios.
 
-Loads are idempotent; monitored data are never deleted because the source deleted them; the raw layer is the replay
-log (C-23, C-24). Payments come as native ISO 20022 and MT messages with the raw message kept, preferably from the
+Loads are idempotent; monitored data are never deleted because the source deleted them, and a row that disappears
+between reads becomes a delete event (DR-37). Back-dated postings are caught by the trailing re-read window (default
+31 days of business date, per source) and removals outside any window by a scheduled full snapshot diff. The raw
+layer is the replay log (C-23, C-24). Payments come as native ISO 20022 and MT messages with the raw message kept, preferably from the
 payment-gateway database, linked to ledger postings (C-41..C-44).
 
 ### 5.3 Mapping and the canonical model
@@ -180,10 +197,15 @@ One canonical model with lineage on every row, bi-temporal entities and UUIDv7 i
 are admin-managed, schema-validated documents built from a closed transform library, published by maker-checker,
 with drift detection that pauses only the affected tables (C-50..C-52). A gate stops new transaction codes and
 products from flowing unclassified; reference-value drift is detected (L-01..L-06). An Arabic and Kurdish
-character-set round trip runs at install, and a name data-quality profile is produced per bank (C-10, N-12). Data are
+character-set round trip runs at install, and a name data-quality profile is produced per bank (C-10, N-12). A CBS
+name is read from its full name fields, not a short-name field; a value that reaches the source's byte cap is flagged
+as possibly truncated and kept, never rejected; Arabic letter variants (yeh and alef maksura, teh marbuta and heh,
+the alef forms, Persian and Arabic kaf) are folded before matching. Data are
 minimised at the source: no full card numbers, no PIN or authentication data, a card guard before landing, no PCI DSS
 scope (C-36, SP-48, SP-51). Adapter packs follow market evidence: ICS BANKS on Oracle first, then iMAL, BML ICBS,
-FLEXCUBE and Temenos; Finacle on demand (C-38, C-62).
+FLEXCUBE and Temenos; Finacle on demand (C-38, C-62). Column meanings are set per installation (DR-36): the same
+column can hold a different identifier at another bank on the same product, so each mapping is confirmed with the
+bank before it is published.
 
 ### 5.4 Completeness
 
@@ -204,6 +226,14 @@ MLRO coverage statement (C-25..C-27, S-03, S-54, L-01, L-04, L-05).
 
 Scenarios evaluate at a settled time; late data recompute the affected windows and amend alerts with an explanation
 (C-22, S-09). `data_as_of` appears on every screen, export and API response (C-29).
+
+Source time (DR-39): for CBS-derived data, `data_as_of`, freshness, dormancy and look-backs use the CBS business
+date (per branch where the CBS keeps one), never the AKR server clock; F1 ingest latency and F5 refresh timers stay
+on wall-clock time. A source whose business date or newest posting stops moving raises a "stale source" state with
+its age shown, and a branch or feed with no postings is shown as such. Where the CBS has no dated timestamp (DR-37),
+late-data and window logic rest on business dates, `posted_at` stays null, and no alert claims an intra-day order
+the source does not record. CBS dates without a time zone are read as Baghdad local dates. The end of day behind F3
+is detected from the CBS's own processing state (the business date advances) and confirmed per bank.
 
 ## 6. Core Data Model (sketch)
 
@@ -261,7 +291,9 @@ families, compounds and titles (N-01..N-03). One Rust normalisation library serv
 assessment API, with a golden test file and a parity test against the browser (N-06, N-07, TS-19, TS-36). Scoring
 aligns tokens one to one, needs an evidence floor, never alerts on a family or tribe name alone, and returns "needs
 more data" when a query is too thin (N-25, N-26, N-29). The mother's chain, a year-only birth date with tolerance and
-exact document numbers decide (N-18..N-21). Matching runs on immutable in-memory snapshots; `pg_trgm` serves analyst
+exact document numbers decide (N-18..N-21), except that a placeholder number
+is treated as missing and a number shared by more than one customer record never decides a match alone; the match
+then degrades with a flag (D21, DR-41). Matching runs on immutable in-memory snapshots; `pg_trgm` serves analyst
 search only (N-49, N-53). Thresholds per list are set against an alert budget agreed with the MLRO and a recall floor,
 tested on an evaluation harness and a synthetic Iraqi name corpus (N-31, N-32, N-37, N-38).
 
@@ -280,10 +312,13 @@ High, Medium and Low (K-01, K-02); 27 starting factors in six blocks; an unknown
 mandatory unknown caps the best level (K-03, K-04). Floors FL-01..FL-15 cannot be overridden per customer; triggers
 TR-01..TR-26 re-rate on events (K-07, K-11). Two clocks per customer (classification review, KYC refresh) and a
 light automated yearly check for everyone (K-09, K-10). Overrides: upward easily, downward only by compliance, one
-level per decision, expiring within 12 months (K-24, K-25). A PEP register with tiers and kinship degrees (K-21..K-23);
+level per decision, expiring within 12 months (K-24, K-25). A PEP register with tiers and kinship degrees (K-21..K-23); a
+CBS PEP field is not a PEP source unless the bank declares it maintained (DR-38);
 beneficial ownership by chain calculation (K-18, K-20). Ratings live in AKR-TMS; the bank applies a one-way
-rating-change feed and sees a divergence view against the CBS risk field (K-35). No protected attributes or
-name-derived proxies as factors (K-33, GV-37).
+rating-change feed and sees a divergence view against the CBS risk field (K-35), which reports an unpopulated CBS field as not maintained instead
+of listing every customer as diverging. No protected attributes or name-derived proxies as factors (K-33, GV-37).
+CBS PEP, sanctions and risk-level fields that hold one default value on every customer are read as not assessed,
+never as not PEP or low (D21, DR-38).
 
 ### 7.5 Models
 
@@ -394,7 +429,8 @@ RP-62, M-65, M-69, F-16).
   exported to the bank's SIEM; kept without limit (SP-39, SP-42..SP-44).
 - **Evidence vault**: MinIO (Silo build) behind an S3 guard; evidence snapshots, attachments, report packages, coverage
   certificates and board packs; SHA-256 on write and on serve; antivirus on upload; encrypted before upload with
-  OpenBao-wrapped data keys; COMPLIANCE object lock for finals (file 32 s.12).
+  OpenBao-wrapped data keys, one per object, so a locked object can be shredded by erasing its key; served by
+  akr-api, never by a presigned link; COMPLIANCE object lock at the class floor (file 32 s.12; DR-44).
 - **Evidence packs** per report, per case and for the assessor (mapped to the D2 tests), the CBI coverage report and a
   board pack, all generated from system facts (S-02, S-56, S-57, M-62, M-63, RP-63, RP-64, GV-35).
 
@@ -516,7 +552,9 @@ implementation phases in [plan/roadmap.md](plan/roadmap.md).
   the list of rejection messages and how long the portal keeps filed reports, whether a TFR follows a true match;
   the national list feed (bulk or API key). For the pilot letter (research file 23 s.9).
 - Counsel: the AGPL reading for the MinIO code line and the optional Grafana family; the vendor legal screen.
-- First CBS adapter: confirm ICS BANKS on Oracle with the first bank; the bank's read-only tier and level.
+- First CBS adapter: confirm ICS BANKS on Oracle with the first bank and its release; the bank's read-only tier and
+  level; whether AKR-TMS reads the live database, a replica or a test copy (the discovery snapshot was 22 months
+  behind its clock); who maintains PEP, risk and expected-activity data, since the CBS fields were empty (DR-38).
 - Hardware sizing from discovery data; a load test on the target hardware.
 - Patroni + pgBackRest versus CloudNativePG (profile M/L).
 - Chart and graph libraries in RTL (spike).

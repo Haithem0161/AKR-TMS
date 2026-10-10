@@ -1,0 +1,65 @@
+Replacements made in docs/plan/phase-15.md by the first re-check (DR-413). 11 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-15-1]
+WHY: R-15-1 | CONFIRMED MEDIUM | 7.13 freezes `party_id` in the exit instance but lets the register body carry its own `party_id` unchecked | a body party that differs from the frozen one is 422
+OLD: is read from the instance context, never from the body; `NewExitEntry` keeps its fields.
+NEW: is read from the instance context, never from the body; `NewExitEntry` keeps its fields. Its `party_id` must equal the party frozen in the context: a different one is refused with 422 `E_VALIDATION` at `/party_id`, so an exit is never recorded against a party other than the one decided.
+
+=== F2 [R-15-2]
+WHY: R-15-2 | CONFIRMED LOW | the resource id the `exit_decision` instance is started with is not given | `("exit_decision", review_id)`
+OLD: - `ExitDecisionWorkflowSubject`: `resource_kind` `exit_decision`, `attribute_prefix` `exit`, no attributes. `start_context` freezes
+NEW: - `ExitDecisionWorkflowSubject`: `resource_kind` `exit_decision`, `attribute_prefix` `exit`, no attributes. The instance is started with the resource `("exit_decision", review_id)`, and its title is `{ar: "قرار إنهاء العلاقة", en: "Exit decision"}`. `start_context` reads the review and its party from that id and freezes
+
+=== F3 [R-15-3]
+WHY: R-15-3 | CONFIRMED LOW | neither new subject has the `title` that `SubjectContext` requires | two titles given
+OLD: attributes `kind` (text) and `level_at_open` (integer). `start_context` freezes both,
+NEW: attributes `kind` (text) and `level_at_open` (integer); the resource is `("kyc_review", review_id)` and the title `{ar: "مراجعة اعرف عميلك", en: "KYC review"}`. `start_context` freezes both,
+
+=== F4 [R-15-4]
+WHY: R-15-4 | CONFIRMED LOW (raised MEDIUM) | row C3 still lists the registration country as wired; C2 and Open doubts 10 say it is pending | row corrected
+OLD: over nationality, residence, registration, beneficial-owner residence | wired |
+NEW: over nationality, residence and beneficial-owner residence (registration joins when it is mapped, Open doubts 10) | wired |
+
+=== F5 [R-15-5]
+WHY: R-15-5 | CONFIRMED LOW | "the entry's `primary` row" does not name the column `alias_class` | column named
+OLD: `ar` is the `raw` of the entry's `primary` row with `script = 'ar'` and `en` that of its `primary` row with `script = 'lat'`
+NEW: `ar` is the `raw` of the entry's row with `alias_class = 'primary'` and `script = 'ar'`, and `en` that of its row with `alias_class = 'primary'` and `script = 'lat'`
+
+=== F6 [R-15-6]
+WHY: R-15-6 | CONFIRMED LOW | 7.7 step 3 keeps the two-argument clock call that 7.17 replaces | call corrected in 7.7
+OLD: `due_at = BusinessClock::add(now,
+     review_within)` on the bank calendar.
+NEW: `due_at` from `BusinessClock::add(now,
+     review_within.value, BusinessUnit::WorkingDays)` on the bank calendar (7.17).
+
+=== F7 [R-15-7a]
+WHY: R-15-7 | CONFIRMED MEDIUM | 7.18 says `open_or_join` returns the old and the new `due_at`; the trait returns `(KycReview, bool)` and RETURNING cannot show the old value in PostgreSQL 17 | return type and the CTE that reads the old value are given
+OLD: The method returns the old and the new `due_at`, and the caller
+NEW: The method returns `(KycReview, bool, Option<DateTime<Utc>>)`: the third value is the `due_at` the open row had before the statement, and the new `due_at` is in the returned review. RETURNING shows only the updated row in PostgreSQL 17, so the old value is read by a leading CTE of the same statement (`WITH prev AS (SELECT due_at FROM kyc.kyc_reviews WHERE party_id = $1 AND kind = $2 AND status IN ('open', 'in_progress', 'awaiting_answer'))`) and returned as `(SELECT due_at FROM prev)`. The caller
+
+=== F8 [R-15-7b]
+WHY: R-15-7 | CONFIRMED MEDIUM | 7.18 says `open_or_join` returns the old and the new `due_at`; the trait returns `(KycReview, bool)` and RETURNING cannot show the old value in PostgreSQL 17 | return type and the CTE that reads the old value are given
+OLD:     async fn open_or_join(&self, tx: &mut Tx, r: &NewReview) -> Result<(KycReview, bool), RepoError>;
+NEW:     /// The review, whether it was created, and the due_at the open row had before the statement (7.18).
+    async fn open_or_join(&self, tx: &mut Tx, r: &NewReview) -> Result<(KycReview, bool, Option<DateTime<Utc>>), RepoError>;
+
+=== F9 [L-15-1a]
+WHY: L-15-1 | CONFIRMED MEDIUM (lead, second look) | check 9 says Swagger lists 32 new operations and the header, the OpenAPI line and status.md say 32; sections 7.4 and 7.5 add two routes, so the stated check would fail at 34 | the four places say 34 and name the two sections
+OLD: **Complexity:** XL (32 routes, 16 tables and four ports;
+NEW: **Complexity:** XL (34 routes: the 32 of section 2 and the two count views of sections 7.4 and 7.5; 16 tables and four ports;
+
+=== F10 [L-15-1b]
+WHY: L-15-1 | CONFIRMED MEDIUM (lead, second look) | check 9 says Swagger lists 32 new operations and the header, the OpenAPI line and status.md say 32; sections 7.4 and 7.5 add two routes, so the stated check would fail at 34 | the four places say 34 and name the two sections
+OLD: `rating-models` (6): 32 in
+  all, each with `x-akr-action` (section 2).
+NEW: `rating-models` (6): 32 in
+  all, each with `x-akr-action` (section 2). The two routes of sections 7.4 and 7.5 join the tags `ownership` and
+  `rating`, which makes 34.
+
+=== F11 [L-15-1c]
+WHY: L-15-1 | CONFIRMED MEDIUM (lead, second look) | check 9 says Swagger lists 32 new operations and the header, the OpenAPI line and status.md say 32; sections 7.4 and 7.5 add two routes, so the stated check would fail at 34 | the four places say 34 and name the two sections
+OLD: 9. Swagger UI lists 32 new operations, each with `x-akr-action`;
+NEW: 9. Swagger UI lists 34 new operations (the 32 of section 2 and the two of sections 7.4 and 7.5), each with `x-akr-action`;

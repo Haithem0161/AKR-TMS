@@ -1,0 +1,1403 @@
+# Fixes of the re-check. Format: '@@ FIX id path' / old text / '@@ WITH' / new text / '@@ END'.
+# The old text must occur exactly once in the file. Applied by tools/agent/recheck-fix.py.
+@@ FIX R-04-1 docs/plan/phase-04.md
+the announced change-request pair is not added (section 3.1, DR-54)
+@@ WITH
+the announced change-request pair is not added (phase 03 section 3.1 and section 3.5 of this phase, DR-54)
+@@ END
+@@ FIX R-04-2a docs/plan/phase-04.md
+-- lifecycle columns are the only updates.
+@@ WITH
+-- lifecycle columns are the only updates, with one exception: evidence, which the maker's evidence route
+-- appends to (sections 7.2 and 7.18).
+@@ END
+@@ FIX R-04-2b docs/plan/phase-04.md
+   lifecycle columns only; `UPDATE admin.change_requests SET proposed = '{}'` as `akr_app` fails (permission);
+@@ WITH
+   lifecycle columns and `evidence` only (section 7.18); `UPDATE admin.change_requests SET proposed = '{}'` as `akr_app` fails (permission);
+@@ END
+@@ FIX R-04-3 docs/plan/phase-04.md
+with no task of the request's instance whose `outcome` is `approved` or `rejected` in
+@@ WITH
+with no deciding task of the request's instance in state `done` (a recorded decision: outcome `approved`, `rejected` or `signed`) in
+@@ END
+@@ FIX R-13-1a docs/plan/phase-13.md
+is the phase 16 static exclusion `EXCL_POOL_ACCOUNT`, and
+@@ WITH
+is a static exclusion of the scenario document (docs/DSL.md A.7; phase 16 section 3.1 rule 13) with an active reason code of family `exclusion`, `EXC_POOL_ACCOUNT` in the DSL example, and
+@@ END
+@@ FIX R-13-1b docs/DSL.md
+"reason_code": "EXCL_POOL_ACCOUNT"
+@@ WITH
+"reason_code": "EXC_POOL_ACCOUNT"
+@@ END
+@@ FIX L-21-1a docs/plan/phase-21.md
+ ('CLS_CTR_EXCLUDED_CANCELLED', 'exclusion',
+@@ WITH
+ ('CLS_CTR_EXCLUDED_CANCELLED', 'closure',
+@@ END
+@@ FIX L-21-1b docs/plan/phase-21.md
+ ('CLS_CTR_EXCLUDED_REVERSED', 'exclusion',
+@@ WITH
+ ('CLS_CTR_EXCLUDED_REVERSED', 'closure',
+@@ END
+@@ FIX R-30-1a docs/plan/phase-30.md
+CloudNativePG becomes the default only when it meets criteria 1 to 4 and 6 to 10 and the bank accepts a backup tool other than pgBackRest;
+@@ WITH
+CloudNativePG becomes the default only when Patroni does not qualify, CloudNativePG meets criteria 1 to 4 and 6 to 10, and the bank accepts a backup tool other than pgBackRest;
+@@ END
+@@ FIX R-30-1b docs/plan/phase-30.md
+When both candidates qualify, the bank's acceptance of another backup tool decides: without it Patroni stays the default.
+@@ WITH
+When both candidates qualify, Patroni stays the default, because it keeps the pgBackRest backups of phase 00 unchanged (research 32 section 16.5: backup consistency decides).
+@@ END
+@@ FIX R-28-1 docs/plan/phase-28.md
+written as the JSON escape `<`, so the block text holds no `<`
+@@ WITH
+written as the JSON escape `\u003c` (the six characters backslash, u, 0, 0, 3, c), so the block text holds no `<`
+@@ END
+@@ FIX R-18-1 docs/plan/phase-18.md
+(each opening posts `opened-views`)
+@@ WITH
+(a panel opening posts `opened-views`; opening an evidence item writes its own row through the content read, section 3.4 step 6)
+@@ END
+@@ FIX R-18-2 docs/plan/phase-18.md
+`GenericTextGuard::check(text, casework.decision_text_min_chars)` (section 3.3).
+@@ WITH
+`GenericTextGuard::check(conn, text, casework.decision_text_min_chars)` (section 3.3).
+@@ END
+@@ FIX R-18-3 docs/plan/phase-18.md
+for the note of a manual grant (section 3.2 `grant` step 5).
+@@ WITH
+for the note of a manual grant (section 3.2 `grant` step 5). The minimum is an internal argument of `post`, not a field of `CreateNote`: the note route passes 1, and `grant` step 5 passes the setting.
+@@ END
+@@ FIX R-18-4 docs/plan/phase-18.md
+13. **Phase 00**: the timer kind `work_item_due`, the job kinds of section 4.1 and the setting `schedule.work_item_due_scan`.
+@@ WITH
+13. **Phase 00**: the timer kinds `work_item_due` and `case_acl_expiry`, the job kinds of section 4.1 (with the two rows of 7.25) and the settings `schedule.work_item_due_scan` and `schedule.case_acl_expiry_scan`.
+@@ END
+@@ FIX R-04-4 docs/plan/phase-04.md
+and the definition validator refuses `mode: rework` without it.
+@@ WITH
+and the definition validator refuses `mode: rework` without it (`E_SCHEMA`); a `to` that is not a step of the definition from which the rejecting step can be reached is `E_DANGLING_REF`.
+@@ END
+@@ FIX R-30-2a docs/plan/phase-30.md
+statement) -> Result<Option<BlindPeriod>, AppError>`. Its two callers
+@@ WITH
+statement) -> Result<(BlindPeriod, bool), AppError>` (the row, and whether this call wrote it). Its two callers
+@@ END
+@@ FIX R-30-2b docs/plan/phase-30.md
+When one exists it writes nothing and returns `None`:
+@@ WITH
+When one exists it writes nothing and returns that row with `false`:
+@@ END
+@@ FIX R-30-3 docs/plan/phase-30.md
+through the `akr-ctl` database role of phase 00; no new repository
+@@ WITH
+connecting as `akr_app`, section 7.6; no new repository
+@@ END
+@@ FIX R-30-4 docs/plan/phase-30.md
+phase 11 section 3.6 owns the table and the anchor rule
+@@ WITH
+phase 11 section 1.1 defines the table and its section 3.6 owns the anchor rule
+@@ END
+@@ FIX R-03-1 docs/plan/phase-03.md
+file of 7.12 is built without the feature.
+@@ WITH
+file of 7.12 is built without the feature. With the feature on, the three actions are members of `Action::ALL`
+(`#[cfg(feature = "dev-routes")]`) and are declared in `policies/dev.cedarschema`, a schema fragment that
+`loader::load` appends together with `dev.cedar`; the fragment also declares the entity type of `_dev_masked` with
+its `tier` and `access_list` attributes. So the inventory of section 3.1 step 3 holds in both builds.
+@@ END
+@@ FIX R-03-2 docs/plan/phase-03.md
+printing `{bundle_hash, roles: {<role>: [<action>,
+...]}}` from the permits' `@role` annotations (phase 08 section 2).
+@@ WITH
+printing `{bundle_hash, roles: [{role, actions}]}`
+(the `RoleActions` list of 7.16) from the permits' `@role` annotations (phase 08 section 2).
+@@ END
+@@ FIX R-03-3 docs/plan/phase-03.md
+3. `{generated_at, bundle_version, bundle_sha256, roles, principals}`;
+@@ WITH
+3. `{generated_at, bundle_version, bundle_sha256, roles, sod, principals}` (`sod` is the `sod.json` rules of the
+   loaded bundle, `LoadedBundle.sod`; `build` adds it, `roles` of 7.16 does not);
+@@ END
+@@ FIX R-03-4 docs/plan/phase-03.md
+The kind need not be in `MASKED_KINDS`.
+@@ WITH
+The kind need not be in `MASKED_KINDS`: `loader::load` collects the resource kinds that such forbids name, and for section 3.2 step 8 and section 3.6 steps 2 and 3 (the access event, the same work and the latency floor) those kinds count as masked kinds, so a miss and a refusal on them cannot be told apart by an event or by timing.
+@@ END
+@@ FIX R-03-5 docs/plan/phase-03.md
+and the access event is the `deny` of section 3.6.
+@@ WITH
+and the access event is the `deny` of section 3.2 step 8.
+@@ END
+@@ FIX R-05-1 docs/plan/phase-05.md
+`evidence.staged`, `evidence.sealed` (phase 02).
+@@ WITH
+`evidence.staged` (source documents) and `evidence.stored` (the run report, through `put_generated`) (phase 02).
+@@ END
+@@ FIX R-05-2a docs/plan/phase-05.md
+; VD-02 (partly: this phase reads the inputs to each mapping, the bank's dictionary, column comments, value lists and candidate columns; the mapping itself is written by its author in the phase 10 workbench and published under `cr_mapping`), VD-05 (Db2
+@@ WITH
+; VD-05 (Db2
+@@ END
+@@ FIX R-05-2b docs/plan/phase-05.md
+VD-01 (ICS BANKS on Oracle as the first adapter pack), VD-06
+@@ WITH
+VD-01 (ICS BANKS on Oracle as the first adapter pack), VD-02 (this phase reads the inputs to each mapping, the bank's dictionary, column comments, value lists and candidate columns; the mapping itself is written by its author in the phase 10 workbench and published under `cr_mapping`), VD-06
+@@ END
+@@ FIX R-05-3 docs/plan/phase-05.md
+'Coverage-gap evidence (C-15); as its source'
+@@ WITH
+'Record of who paused a source, when and why (C-15); as its source'
+@@ END
+@@ FIX R-05-4 docs/plan/phase-05.md
+no mapping, no backfill planner (phase 11, DR-63):
+@@ WITH
+no mapping, no backfill planner (landing is phase 11, DR-63; no phase builds a backfill planner, DR-380):
+@@ END
+@@ FIX R-23-1 docs/plan/phase-23.md
+`account_hold`, `card` (through `account_id`), `facility`, `trade_instrument` (through `customer_id` and `canon.customer.party_id`)
+@@ WITH
+`account_hold` and `card` (each through `account_id`), `facility` and `trade_instrument` (each through `customer_id` and `canon.customer.party_id`)
+@@ END
+@@ FIX R-23-2a docs/plan/phase-23.md
+`canon.payment_message_party`, `feat.feature_runs` and `feat.segment_stats` have no party path
+@@ WITH
+`canon.payment_message_party` and `feat.segment_stats` have no party path
+@@ END
+@@ FIX R-23-2b docs/plan/phase-23.md
+The phase 13 assignment row takes the clock `age`.
+@@ WITH
+The phase 13 assignment row takes the clock `age`. A row of this table holds no party data (one row per month and feature), so no party or case hold stops its purge, and it is no longer among the droppable parents of section 3.4.
+@@ END
+@@ FIX R-14-1 docs/plan/phase-14.md
+the bulk decision uses the same constant.
+@@ WITH
+the bulk decision declares its own constant, `StepUpAction::BulkDecision`, `{ name: "screening.alert.bulk_decide", class: decision }`, consumed once for the batch with no resource reference.
+@@ END
+@@ FIX R-14-2a docs/plan/phase-14.md
+(the second form of `GoodGuyProposal`;
+@@ WITH
+(a second body type, `GoodGuyRevoke { action, rule_id, reason_codes, reason_text }`, which the route tells from `GoodGuyProposal` by the `action` field;
+@@ END
+@@ FIX R-14-2b docs/plan/phase-14.md
+`GoodGuyProposal { list_codes: Vec<ListCode>, rule: GoodGuyRuleInput, reason_codes, expires_on, reason_text }`.
+@@ WITH
+`GoodGuyProposal { list_codes: Vec<ListCode>, rule: GoodGuyRuleInput, reason_codes, expires_on, reason_text }`; `GoodGuyRevoke { action, rule_id, reason_codes, reason_text }` (the revoke body of `POST /screening/good-guys`).
+@@ END
+@@ FIX R-14-3 docs/plan/phase-14.md
+No feed format of this release carries one (section 3.2 `list_parse` step 3), so
+@@ WITH
+No feed format of this release carries one (a decision of this phase: no parser of the closed `feed_format` set of section 3.2 reads such a field), so
+@@ END
+@@ FIX R-07-1a docs/plan/phase-04.md
+- **Route table** (31 operations; scope
+@@ WITH
+- **Route table** (32 operations with the evidence route of section 7.2; scope
+@@ END
+@@ FIX R-07-1b docs/plan/phase-04.md
+`admin-users`; 31 operations, each with `x-akr-action`;
+@@ WITH
+`admin-users`; 32 operations (the 31 of section 2 and the evidence route of section 7.2), each with `x-akr-action`;
+@@ END
+@@ FIX R-07-1c docs/plan/phase-04.md
+31 new operations (85 with phases 01 and 03)
+@@ WITH
+32 new operations (86 with phases 01 and 03)
+@@ END
+@@ FIX R-07-1d docs/plan/phase-05.md
+21 new operations (106 with phases 01, 03 and 04)
+@@ WITH
+21 new operations (107 with phases 01, 03 and 04)
+@@ END
+@@ FIX R-07-1e docs/plan/phase-06.md
+14 new operations (120 with phases 01, 03, 04 and 05)
+@@ WITH
+14 new operations (121 with phases 01, 03, 04 and 05)
+@@ END
+@@ FIX R-07-1f docs/plan/phase-07.md
+9 new operations (129 with phases 01 and 03 to 06)
+@@ WITH
+9 new operations (130 with phases 01 and 03 to 06)
+@@ END
+@@ FIX R-01-1a docs/plan/phase-01.md
+   `hydra_client_id`, `owner_user_id`, `expires_at`) and audit `service_client.created {client_id, owner_user_id,
+@@ WITH
+   `display_name` with both keys set to `--name`, `hydra_client_id`, `owner_user_id`, `expires_at`) and audit `service_client.created {client_id, owner_user_id,
+@@ END
+@@ FIX R-01-1b docs/plan/phase-01.md
+The secret is printed once; AKR-TMS stores no
+   copy.
+@@ WITH
+The secret is printed once; AKR-TMS stores no
+   copy. `--name` is also the Hydra client name. A name held by a service principal that is not disabled is refused
+   (exit 2), and `rotate` and `disable` find the principal by it (`kind = 'service'` and `display_name ->> 'en'`).
+@@ END
+@@ FIX R-01-2 docs/plan/phase-01.md
+The pinned list of section 3 covers every route of this phase but two. `POST /auth/session/heartbeat` uses
+@@ WITH
+The pinned list of section 3 left two routes that need an action without one (the two public routes need none).
+`POST /auth/session/heartbeat` uses
+@@ END
+@@ FIX R-00-1 docs/plan/phase-00.md
+the update is guarded by `locked_by`. A heartbeat that matches no row
+@@ WITH
+the update is guarded by `status = 'running'` and `locked_by` (the reaper leaves `locked_by` as it was, so the status test is what stops a late heartbeat). A heartbeat that matches no row
+@@ END
+@@ FIX R-00-2 docs/plan/phase-00.md
+`job.dead` is the one harness event (section 4).
+@@ WITH
+`job.dead` is the one harness event (section 3, the audit-event table).
+@@ END
+@@ FIX R-09-1 docs/plan/phase-09.md
+Section 4's phase 00 and phase 04 bullets include this.
+@@ WITH
+Section 4's phase 00 and phase 04 bullets do not repeat the rename; this paragraph is its record.
+@@ END
+@@ FIX R-09-2a docs/plan/phase-09.md
+and the codes `unknown_queue` and `pool_archived` of section 3.8 are raised by the authority matrix only.
+@@ WITH
+and the codes `unknown_queue` and `pool_archived` are raised by no check of this phase (the authority matrix has no queue or pool field either), so they leave the row of section 3.8.
+@@ END
+@@ FIX R-09-2b docs/plan/phase-09.md
+`role_lacks_scope`, `pool_archived`, `unknown_queue`, `calendar_fixed` |
+@@ WITH
+`role_lacks_scope`, `calendar_fixed` |
+@@ END
+@@ FIX R-09-3 docs/plan/phase-09.md
+nothing migrates (M-75). A rollback is a new change request;
+@@ WITH
+nothing migrates (M-75); the one exception is the save-time scan of forbidden terms (`PolicyPackService::scan`), which
+always reads the active version. A rollback is a new change request;
+@@ END
+@@ FIX R-09-4 docs/plan/phase-09.md
+`reference-release.v1.json` is closed and validates exactly these keys.
+@@ WITH
+`reference-release.v1.json` is closed and validates exactly these keys for the three table files. The fourth release file, the default calendar, carries `release_id`, the columns of its one `ref.calendars` row and its `ref.calendar_days` rows (section 1), and the schema has a branch for it. `reason-codes.v1.json` is not a release file of this schema: `akr-ctl ref seed` reads it (section 3.4, Seed).
+@@ END
+@@ FIX R-12-1 docs/plan/phase-12.md
+In block 7.5, "the latest recon result for its object and field" is this read
+@@ WITH
+In block 7.5, the issue's latest recon result for its object and field is this read
+@@ END
+@@ FIX R-12-2a docs/plan/phase-12.md
+    async fn accepted_for(&self, conn: &mut PgConnection, source_id: Uuid, object: &str, kind: DqKind)
+@@ WITH
+    async fn accepted_for(&self, conn: &mut PgConnection, source_id: Uuid, object: &str, field: &str, kind: DqKind)
+@@ END
+@@ FIX R-12-2b docs/plan/phase-12.md
+`accepted_for(source, <rung>:<object>, kind = recon_break)`
+@@ WITH
+`accepted_for(source, <rung>:<object>, <field>, kind = recon_break)` (the field of the result, block 7.5)
+@@ END
+@@ FIX R-11-1a docs/plan/phase-11.md
+and `source.halt_resolved` carries it.
+@@ WITH
+and `source.halt_resolved` carries it as `as_of_marker`, beside `decision`, `tables` and `check_id`.
+@@ END
+@@ FIX R-11-1b docs/plan/phase-11.md
+| `source.halt_resolved` | resume with a decision (decision, tables, check id) | source |
+@@ WITH
+| `source.halt_resolved` | resume with a decision (decision, tables, check id; `as_of_marker` on a `false_alarm` after an `as_of_regressed` halt, 7.13) | source |
+@@ END
+@@ FIX R-11-2 docs/plan/phase-11.md
+(`akr_ingest` already holds INSERT on `admin.watermarks`). `ingest_load` step 2 calls it after the
+@@ WITH
+(`akr_ingest` already holds INSERT on `admin.watermarks`). The insert also writes `freshness_class`: the caller
+works it out by the class rule of section 3.7 and passes it as one more argument, `class: FreshnessClass`, so the
+column default is never relied on. `ingest_load` step 2 calls it after the
+@@ END
+@@ FIX R-11-3 docs/plan/phase-11.md
+`cost_guard` when the rows grew past the
+   estimate by the same factor); audit
+@@ WITH
+`cost_guard` when the job's own
+   estimate, taken before its first page, is above `replay.estimate_max_rows`); audit
+@@ END
+@@ FIX R-11-4 docs/plan/phase-11.md
+watermark fields NULL (a replay moves no
+@@ WITH
+`watermark_from`, `watermark_to` and `as_of_marker` NULL and `watermark_kind` copied from the table's watermark, since the column is NOT NULL (a replay moves no
+@@ END
+@@ FIX R-11-5a docs/plan/phase-11.md
+FreshnessService, ResumeHandler, BlindPeriodService
+@@ WITH
+FreshnessService, ResumeHandler
+@@ END
+@@ FIX R-11-5b docs/plan/phase-11.md
+akr-api links `domain` and `db` but not `akr-sources`; only akr-ingestd links a driver (phase 05 rule).
+@@ WITH
+akr-api links `domain` and `db` but not `akr-sources`; only akr-ingestd links a driver (phase 05 rule).
+`BlindPeriodService` is not in the akr-ingestd crate: it is a module of `db`, beside its repository, because akr-api
+(declarations), akr-ingestd (the periods the ingest path opens and closes) and, from phase 30, akr-worker and
+akr-ctl all call it, and none of the last three may link a driver.
+@@ END
+@@ FIX R-11-6 docs/plan/phase-11.md
+(the extract file contract of this section, which corrects section
+@@ WITH
+(the extract file contract of section 7.20, which corrects section
+@@ END
+@@ FIX R-11-7 docs/plan/phase-11.md
+against the `columns` of the table's newest receipt (its `manifest`
+@@ WITH
+against the `columns` of the table's newest accepted manifest (its receipt's `manifest`
+@@ END
+@@ FIX R-11-8 docs/plan/phase-11.md
+`control_total_mismatch`, `file_hash_mismatch`, `unit_timeout`,
+@@ WITH
+`control_total_mismatch`, `file_hash_mismatch`, `column_check_failed`, `unit_timeout`,
+@@ END
+@@ FIX R-11-9 docs/plan/phase-11.md
+(the late-arrival block of this section)
+@@ WITH
+(section 7.22, item 4)
+@@ END
+@@ FIX R-11-10a docs/plan/phase-11.md
+conn: &mut PgConnection, source_table: &str, batch_id: Uuid) -> Result<Option<NaiveDate>, RepoError>;`
+@@ WITH
+conn: &mut PgConnection, source_id: Uuid, source_table: &str, batch_id: Uuid) -> Result<Option<NaiveDate>, RepoError>;`
+@@ END
+@@ FIX R-11-10b docs/plan/phase-11.md
+of the newest batch of `source_table` with status `mapped`
+@@ WITH
+of the newest batch of `source_id` and `source_table` with status `mapped`
+@@ END
+@@ FIX R-20-1 docs/plan/phase-20.md
+This phase seeds version 2 of the shipped definition `exit_decision` through `akr-ctl workflow seed` (phase 15 section 7.2 leaves it to this phase): the steps of version 1, with `create_ops_task` after `record_decision`.
+@@ WITH
+This phase ships version 2 of the shipped definition `exit_decision` (phase 15 section 7.2 leaves it to this phase): the steps of version 1, with `create_ops_task` after `record_decision`. The phase 04 seed leaves an existing family alone, so `akr-ctl workflow seed --offer-updates` makes version 2 a draft of the family and the bank publishes it by a workflow change request (phase 04 section 3.8: a release never changes a published definition by itself). An install that has no `exit_decision` family yet gets the new file as its first version.
+@@ END
+@@ FIX R-20-2 docs/plan/phase-20.md
+and the instance as `source_id` (section 3.2).
+@@ WITH
+and the instance as `source_id` (section 1.1, the column comment).
+@@ END
+@@ FIX R-20-3 docs/plan/phase-20.md
+(section 3.3): `kind = canonical_check`, `level`,
+@@ WITH
+(section 3.3): `ops_task_id` (the task checked), `kind = canonical_check`, `level`,
+@@ END
+@@ FIX R-20-4 docs/plan/phase-20.md
+`neutral_text_code` (step 2), `state = open` and `version = 1` (step 4).
+@@ WITH
+`neutral_text_code` (step 2), `state = open` and `version = 1` (step 4), and on the freeze path `authority_ref` set to the task's own `task_ref` (the note on step 6 of section 3.4).
+@@ END
+@@ FIX R-20-5 docs/plan/phase-20.md
+the reference and reference equal to `cbs_reference`
+@@ WITH
+the reference equal to `cbs_reference`
+@@ END
+@@ FIX R-20-6 docs/plan/phase-20.md
+shows "Confirm" (V0) after completion; the server's 409 `copy_matches` (section 3.3, Confirm step 3) decides whether the copy already shows the hold, and the screen shows that answer; with the note that the confirmation is flagged; the completer
+@@ WITH
+shows "Confirm" (V0) after completion, with the note that the confirmation is flagged; the server's 409 `copy_matches` (section 3.3, Confirm step 3) decides whether the copy already shows the hold, and the screen shows that answer; the completer
+@@ END
+@@ FIX R-20-7 docs/plan/phase-20.md
+the day window of the W-OPS screen (section 5.1)
+@@ WITH
+the day window of the W9 screen (section 5.1)
+@@ END
+@@ FIX R-15-1 docs/plan/phase-15.md
+is read from the instance context, never from the body; `NewExitEntry` keeps its fields.
+@@ WITH
+is read from the instance context, never from the body; `NewExitEntry` keeps its fields. Its `party_id` must equal the party frozen in the context: a different one is refused with 422 `E_VALIDATION` at `/party_id`, so an exit is never recorded against a party other than the one decided.
+@@ END
+@@ FIX R-15-2 docs/plan/phase-15.md
+- `ExitDecisionWorkflowSubject`: `resource_kind` `exit_decision`, `attribute_prefix` `exit`, no attributes. `start_context` freezes
+@@ WITH
+- `ExitDecisionWorkflowSubject`: `resource_kind` `exit_decision`, `attribute_prefix` `exit`, no attributes. The instance is started with the resource `("exit_decision", review_id)`, and its title is `{ar: "قرار إنهاء العلاقة", en: "Exit decision"}`. `start_context` reads the review and its party from that id and freezes
+@@ END
+@@ FIX R-15-3 docs/plan/phase-15.md
+attributes `kind` (text) and `level_at_open` (integer). `start_context` freezes both,
+@@ WITH
+attributes `kind` (text) and `level_at_open` (integer); the resource is `("kyc_review", review_id)` and the title `{ar: "مراجعة اعرف عميلك", en: "KYC review"}`. `start_context` freezes both,
+@@ END
+@@ FIX R-15-4 docs/plan/phase-15.md
+over nationality, residence, registration, beneficial-owner residence | wired |
+@@ WITH
+over nationality, residence and beneficial-owner residence (registration joins when it is mapped, Open doubts 10) | wired |
+@@ END
+@@ FIX R-15-5 docs/plan/phase-15.md
+`ar` is the `raw` of the entry's `primary` row with `script = 'ar'` and `en` that of its `primary` row with `script = 'lat'`
+@@ WITH
+`ar` is the `raw` of the entry's row with `alias_class = 'primary'` and `script = 'ar'`, and `en` that of its row with `alias_class = 'primary'` and `script = 'lat'`
+@@ END
+@@ FIX R-15-6 docs/plan/phase-15.md
+`due_at = BusinessClock::add(now,
+     review_within)` on the bank calendar.
+@@ WITH
+`due_at` from `BusinessClock::add(now,
+     review_within.value, BusinessUnit::WorkingDays)` on the bank calendar (7.17).
+@@ END
+@@ FIX R-15-7a docs/plan/phase-15.md
+The method returns the old and the new `due_at`, and the caller
+@@ WITH
+The method returns `(KycReview, bool, Option<DateTime<Utc>>)`: the third value is the `due_at` the open row had before the statement, and the new `due_at` is in the returned review. RETURNING shows only the updated row in PostgreSQL 17, so the old value is read by a leading CTE of the same statement (`WITH prev AS (SELECT due_at FROM kyc.kyc_reviews WHERE party_id = $1 AND kind = $2 AND status IN ('open', 'in_progress', 'awaiting_answer'))`) and returned as `(SELECT due_at FROM prev)`. The caller
+@@ END
+@@ FIX R-15-7b docs/plan/phase-15.md
+    async fn open_or_join(&self, tx: &mut Tx, r: &NewReview) -> Result<(KycReview, bool), RepoError>;
+@@ WITH
+    /// The review, whether it was created, and the due_at the open row had before the statement (7.18).
+    async fn open_or_join(&self, tx: &mut Tx, r: &NewReview) -> Result<(KycReview, bool, Option<DateTime<Utc>>), RepoError>;
+@@ END
+@@ FIX R-16-1 docs/plan/phase-16.md
+adds the four entry points of section 3.2 to phase 13's module
+@@ WITH
+adds the four entry points of sections 3.2 and 3.6 to phase 13's module
+@@ END
+@@ FIX R-16-2 docs/plan/phase-16.md
+a set inside the band that does not loosen is minor and needs a replay;
+@@ WITH
+a set inside the band that does not loosen and has no `capacity` reason is minor and needs a replay;
+@@ END
+@@ FIX R-16-3a docs/plan/phase-16.md
+| Unit and seeded cases of the draft; `draft` to `testing` on pass
+@@ WITH
+| Unit cases of the draft (7.17; seeded cases run by section 3.12); `draft` to `testing` on pass
+@@ END
+@@ FIX R-16-3b docs/plan/phase-16.md
+-- set when the unit and seeded cases pass (DSL A.9)
+@@ WITH
+-- set when the unit cases pass (7.17; DSL A.9)
+@@ END
+@@ FIX R-16-4a docs/plan/phase-16.md
+    batch_id                UUID,                                   -- canon.touched batch (incremental, settled, shadow)
+@@ WITH
+    batch_id                UUID,                                   -- canon.touched batch (incremental, settled, shadow)
+    touch_id                UUID,                                   -- the touch of that batch which started the run (7.9)
+@@ END
+@@ FIX R-16-4b docs/plan/phase-16.md
+    CHECK (batch_id IS NULL OR mode IN ('incremental', 'settled', 'shadow')),
+@@ WITH
+    CHECK (batch_id IS NULL OR mode IN ('incremental', 'settled', 'shadow')),
+    CHECK (touch_id IS NULL OR batch_id IS NOT NULL),
+@@ END
+@@ FIX R-16-4c docs/plan/phase-16.md
+-- A batch is run once per version and mode: a second delivery of the same canon.touched event finds the row and stops
+@@ WITH
+-- A touch of a batch is run once per version and mode (7.9): a second delivery of the same canon.touched event finds the row and stops
+@@ END
+@@ FIX R-16-4d docs/plan/phase-16.md
+CREATE UNIQUE INDEX IF NOT EXISTS uq_scenario_runs_batch ON scn.scenario_runs (scenario_version_id, mode, batch_id)
+    WHERE batch_id IS NOT NULL;
+@@ WITH
+CREATE UNIQUE INDEX IF NOT EXISTS uq_scenario_runs_batch ON scn.scenario_runs (scenario_version_id, mode, touch_id)
+    WHERE touch_id IS NOT NULL;
+@@ END
+@@ FIX R-06-1 docs/plan/phase-06.md
+(absent for a restricted scenario, which carries `restricted: true`).
+@@ WITH
+(absent for a restricted scenario, which carries `restricted: true`); `restricted` itself is present, as true, only on such an entry.
+@@ END
+@@ FIX R-06-2 docs/plan/phase-06.md
+the lifecycle events of section 3.8 cover the run); a run that is not `queued` -> done.
+@@ WITH
+the lifecycle events of section 3.8 cover the run): a `queued` run becomes `running`; a run already `running` is a retry of this job and resumes from the step it reached (section 4); a `completed` or `failed` run -> done.
+@@ END
+@@ FIX R-06-3a docs/plan/phase-06.md
+- **Docker compose:** no change. Gotenberg
+@@ WITH
+- **Docker compose:** one change: akr-worker gains a read-only bind mount of the installation file `deploy/branding.json` at `/etc/akr/branding.json` (the cover of section 3.5 reads the bank name from it; the phase 00 volume list names it). Gotenberg
+@@ END
+@@ FIX R-06-3b docs/plan/phase-00.md
+- Volumes: `model-store`, read-only, mounted into `akr-worker` at `/var/akr/models` with `AKR_MODEL_STORE` set
+@@ WITH
+- Volumes: the installation file `deploy/branding.json`, a read-only bind mount into `akr-worker` at
+  `/etc/akr/branding.json` (phase 06 section 4); `model-store`, read-only, mounted into `akr-worker` at `/var/akr/models` with `AKR_MODEL_STORE` set
+@@ END
+@@ FIX R-06-4 docs/plan/phase-06.md
+from the installation file `deploy/branding.json` of phase 08 section 4, which
+@@ WITH
+from the installation file `deploy/branding.json` of phase 08 section 3.10, which
+@@ END
+@@ FIX R-06-5 docs/plan/phase-06.md
+`reasons` carries `no_scenario` when item rule 1 gives D, and `missing_fields` follows item rule 3.
+@@ WITH
+`reasons` carries `no_scenario` when item rule 1 gives D, and `missing_fields` follows item rule 3. `AttributeKey`, used here and by `Need` and `grade` in section 2, is a newtype over `String` that holds one canonical attribute reference (`<entity>.<field>`, the `CanonicalRef` form of DSL.md B.1) and is checked when it is built.
+@@ END
+@@ FIX R-10-1a docs/plan/phase-10.md
+5. **Facts.** `INSERT ... ON CONFLICT (source_id, source_table, source_pk, <partition key>) DO NOTHING`; a
+@@ WITH
+5. **Facts.** `INSERT ... ON CONFLICT <target> DO NOTHING`, where the target is a unique constraint of the table
+   (PostgreSQL refuses a target that no unique index matches): the source key with the partition key where a
+   `uq_*_source` constraint holds it (`txn`, `payment_message`, `payment_message_party`, `card_txn`, `fx_deal`,
+   `locker_access`, `cbs_user_activity`), the source key alone for `account_hold`, `(txn_id, booking_date, kind)` for
+   `txn_event`, `(txn_id, booking_date)` for `cash_event`, `(account_id, business_date, source)` for
+   `balance_snapshot` and `(message_id, txn_id)` for `payment_link`; a
+@@ END
+@@ FIX R-10-1b docs/plan/phase-10.md
+    PRIMARY KEY (id, received_at),
+    CONSTRAINT fk_pmp_message FOREIGN KEY (message_id, received_at)
+@@ WITH
+    PRIMARY KEY (id, received_at),
+    CONSTRAINT uq_payment_message_party_source UNIQUE (source_id, source_table, source_pk, received_at),
+    CONSTRAINT fk_pmp_message FOREIGN KEY (message_id, received_at)
+@@ END
+@@ FIX R-10-1c docs/plan/phase-10.md
+    CHECK (end_at IS NULL OR end_at > start_at),
+    CHECK ((amount IS NULL) = (currency IS NULL))
+);
+@@ WITH
+    CHECK (end_at IS NULL OR end_at > start_at),
+    CHECK ((amount IS NULL) = (currency IS NULL)),
+    CONSTRAINT uq_account_hold_source UNIQUE (source_id, source_table, source_pk)
+);
+@@ END
+@@ FIX R-10-2 docs/plan/phase-10.md
+in phase 11 it stops the field's load and opens a data incident.
+@@ WITH
+in phase 11 the row is not written: it becomes a quarantine row with reason `card_guard` (7.16), and phase 12 opens a `card_guard` data-quality issue for the field, which is the data incident.
+@@ END
+@@ FIX R-10-3 docs/plan/phase-10.md
+`card_guard` (section 3.3) and `rule_rejected` (a validation rule with `on_fail = quarantine`).
+@@ WITH
+`card_guard` (section 3.3), `unmapped_code` (a row that the gate of section 3.4 step 5 holds for a `txn_type` value with no entry; its `field` is `txn_type`) and `rule_rejected` (a validation rule with `on_fail = quarantine`). `unmapped_codes` of `MappedBatch` counts the unknown values; the rows held by the gate are in `rejected`.
+@@ END
+@@ FIX R-10-4 docs/plan/phase-10.md
+holds `id`, `recorded_from`, `valid_from` and `row_hash`; for `canon.payment_message`
+@@ WITH
+holds `id` and `row_hash`, and for a bi-temporal entity also `recorded_from` and `valid_from` (a fact has neither column and is read by its source key with no `recorded_to` filter); for `canon.payment_message`
+@@ END
+@@ FIX R-10-5 docs/plan/phase-10.md
+(research file 22 section 6.4, N1 to N6)
+@@ WITH
+(research file 22 section 6.4, N1 to N11)
+@@ END
+@@ FIX R-10-6 docs/plan/phase-10.md
+phase 11's `admin.batches.business_to`>,
+@@ WITH
+phase 11's admin.batches.business_to>,
+@@ END
+@@ FIX R-02-1a docs/plan/phase-17.md
+-- No grant to akr_readonly, akr_ingest, akr_audit_writer or akr_monitor: these tables are personal and are read through the API.
+@@ WITH
+GRANT SELECT (case_id, seq, at, hash) ON casework.case_events TO akr_readonly;   -- the phase 02 verifier rebuilds the anchored heads; no payload and no actor column
+-- No other grant to akr_readonly, and none to akr_ingest, akr_audit_writer or akr_monitor: these tables are personal and are read through the API.
+@@ END
+@@ FIX R-02-1b docs/plan/phase-02.md
+  rebuilds the heads from the rows of `[range_from, range_to]` and compares the count, the ids, the last hash and the
+  root (`anchor_root_mismatch`).
+@@ WITH
+  rebuilds the heads from the rows of `[range_from, range_to]` and compares the count, the ids, the last hash and the
+  root (`anchor_root_mismatch`). It reads the four columns `(case_id, seq, at, hash)` as `akr_readonly`, through the
+  column grant of phase 17 section 1; no payload and no actor column is granted.
+@@ END
+@@ FIX R-02-2 docs/plan/phase-02.md
+`ShredOutcome` is what `shred` returns (7.3): `{ shredded_at: DateTime<Utc> }`, the instant the same transaction wrote
+to the row's `shredded_at` column.
+@@ WITH
+`ShredOutcome` is what `shred` returns (7.3): the enum `{ Shredded, AlreadyShredded }` of phase 23 section 7.8.
+`Shredded` is the call that erased `wrapped_dek` and wrote `shredded_at` in the same transaction. `AlreadyShredded` is
+a repeat: it keeps the first `shredded_at` and writes no second event.
+@@ END
+@@ FIX R-02-3a docs/plan/phase-02.md
+4. Return the bytes and their SHA-256; `akr_render_duration_seconds{template}`, `akr_render_failures_total{reason}`.
+@@ WITH
+4. Return the bytes and their SHA-256; `akr_render_duration_seconds`, `akr_render_failures_total{reason}`.
+@@ END
+@@ FIX R-02-3b docs/plan/phase-02.md
+  `akr_clamd_signature_age_hours`, `akr_render_duration_seconds{template}`, `akr_render_failures_total{reason}`. Alert
+@@ WITH
+  `akr_clamd_signature_age_hours`, `akr_render_duration_seconds`, `akr_render_failures_total{reason}`. Alert
+@@ END
+@@ FIX R-02-3c docs/plan/phase-02.md
+version: the caller renders the template before the call.
+@@ WITH
+version: the caller renders the template before the call. For the same reason `akr_render_duration_seconds` has no
+`template` label (step 4 and section 4).
+@@ END
+@@ FIX R-02-4 docs/plan/phase-02.md
+| `validation_pack`, `training_record`, `register_export` | 24 | - |
+@@ WITH
+| `validation_pack` | 24 | R11 |
+| `register_export` | 24 | R6 (register kind `decisions`), R9 (every other register) |
+| `training_record` | 24 | - |
+@@ END
+@@ FIX R-02-5 docs/plan/phase-02.md
+  `failover_drill.recorded`); and the phase 02 kinds whose row says SIEM. No other kind of these three phases is
+  exported.
+@@ WITH
+  `failover_drill.recorded`); and three phase 02 kinds: `audit.chain_break_detected`, `evidence.hash_mismatch` and
+  `evidence.rejected`. The flag is one boolean per kind, so `evidence.rejected` is exported for both outcomes, and its
+  `reason` tells an infected file from a rejected one. No other kind of these three phases is exported.
+@@ END
+@@ FIX R-08-1 docs/plan/phase-08.md
+the reason code, on the list and on the detail, as a badge with words (UX-60).
+@@ WITH
+the reason code on the detail and beside the class badge on the list (the list has no reason-code column), as a badge
+with words (UX-60).
+@@ END
+@@ FIX R-08-2 docs/plan/phase-08.md
+A refused proof on `POST /auth/step-up/verify` is not resent: the dialog asks for a new code.
+@@ WITH
+A refused proof on `POST /auth/step-up/verify` is not resent: the dialog asks for a new proof (a new TOTP code, or a fresh security-key touch).
+@@ END
+@@ FIX R-08-3 docs/plan/phase-08.md
+`prose_digits`, `shortcuts`, `theme`) are the phase 01 `PreferencesV1` fields through `PATCH /me/preferences`.
+@@ WITH
+`prose_digits`) are phase 01 `PreferencesV1` fields through `PATCH /me/preferences`; it writes neither `shortcuts` (the shortcut layer is P1) nor `theme` (hidden while DS-O1 is open).
+@@ END
+@@ FIX R-08-4 docs/plan/phase-08.md
+`RailGroup` is a closed union, one value per rail entry of DESIGN-SYSTEM 8.2:
+@@ WITH
+`RailGroup` is a closed union, one value per rail group of DESIGN-SYSTEM 8.2 (two entries may share a group, section 7.8):
+@@ END
+@@ FIX R-08-5 docs/plan/phase-08.md
+and its source label is the label of that row's `source_field` (the mapped source column, phase 10). A party with no Latin row shows no second line. The product generates no Latin form, so the label `generated` of DESIGN-SYSTEM 7.6 is not used in this plan;
+@@ WITH
+and its source label is the word `typed`: a Latin name held in a CBS column was keyed by staff, and no mapped field says that it was read from a card or a passport (`source_field` is a bare column name, phase 10). A party with no Latin row shows no second line. The product generates no Latin form and reads no document, so the labels `card`, `passport` and `generated` of DESIGN-SYSTEM 7.6 are not used in this plan;
+@@ END
+@@ FIX R-13-2 docs/plan/phase-13.md
+   is not a class `personal`, `secret-str` or `card` column, and is not a protected attribute: gender, religion,
+@@ WITH
+   is not a class `personal`, `secret-str` or `card` column (one exception: the `field` of a `distinct_count` may be
+   `txn.counterparty_id`, a surrogate id that is counted and never stored or shown), and is not a protected attribute: gender, religion,
+@@ END
+@@ FIX R-13-3 docs/plan/phase-13.md
+and a new row opened (`valid_from = as_of`); an unchanged customer writes nothing.
+@@ WITH
+and a new row opened (`valid_from = as_of`); a customer with no open cluster row of that currency (every customer at the first build) has only the new row opened; an unchanged customer writes nothing.
+@@ END
+@@ FIX R-13-4 docs/plan/phase-13.md
+with the sub-code `too_long`, and a `from` after `to`
+@@ WITH
+with the sub-code `range_too_long`, and a `from` after `to`
+@@ END
+@@ FIX R-13-5 docs/plan/phase-13.md
+`active_static` is its `static` case; section 3.3 step 1 uses it for `risk_overlay`.
+@@ WITH
+`active_static` is its `static` case; section 3.3 step 1 calls `active_by_level` for `risk_overlay`.
+@@ END
+@@ FIX R-13-6 docs/plan/phase-13.md
+declared, own history, peer, with `min_history` = `profile.min_history_months`.
+@@ WITH
+declared, own history, peer, with `min_history` = `profile.min_history_months` and `combine` = `all`. `combine` decides a scenario's verdict only; it changes nothing that `profile_refresh` stores (the ratios, the z and the status of step 8).
+@@ END
+@@ FIX R-17-1 docs/plan/phase-17.md
+When the row is valid, set `reason_detail.valid_now = true` and write audit `alert.quarantine_revalidated` in that transaction.
+@@ WITH
+When the row is valid, set `reason_detail.valid_now = true` and `revalidated_at = now()` and write audit `alert.quarantine_revalidated` in that transaction. A row that is still invalid is not written.
+@@ END
+@@ FIX R-17-2 docs/plan/phase-17.md
+or of the pool of an active `alerts` queue whose filter admits the case's family and class (the routing test of section 3.5). The bulk route tests the pool of the queue in its URL.
+@@ WITH
+or of the pool of an active `alerts` queue whose filter admits the case's family and class (the routing test of section 3.5). A pool target of a case (`to: { pool_id }`) must be the case's own `assignee_pool_id` or the pool of such a queue; else 422 `E_VALIDATION` at `/to`. The work limit and the conflict check of step 2 are for a user target only. The bulk route tests the pool of the queue in its URL.
+@@ END
+@@ FIX R-17-3a docs/plan/phase-17.md
+5. `mark_duplicate`: a P0 or P1 alert is `p0_or_p1_duplicate`; a target in state `duplicate` is `target_is_duplicate` (7.11).
+@@ WITH
+5. `mark_duplicate`: a P0 or P1 alert is `p0_or_p1_duplicate`; a target that is missing, hidden, the item itself or not an alert of the item's case is `not_same_case` (the rule of triage in section 3.8; a missing and a hidden target get the same answer); a target in state `duplicate` is `target_is_duplicate` (7.11).
+@@ END
+@@ FIX R-17-3b docs/plan/phase-17.md
+`target_is_duplicate`, `wip_limit`, `conflict_refused`, `lower_refused`. Every reason
+@@ WITH
+`not_same_case`, `target_is_duplicate`, `wip_limit`, `conflict_refused`. `lower_refused` leaves the list: it belongs to the single triage `raise_class`, which is not a bulk action. Every reason
+@@ END
+@@ FIX R-17-5 docs/plan/phase-17.md
+under the `case.assign` check of section 3.8. It does not call the phase 18 `grant` or `revoke`: both need `case.access.change`, which A1 does not hold, and their steps 3 to 5 are for manual grants.
+@@ WITH
+under the `case.assign` check of section 3.17. It does not call the phase 18 `grant` or `revoke`: both need `case.access.change`, which A1 does not hold, and step 5 of `grant` is for manual grants. It applies steps 3 and 4 of `grant` in its own way. Step 3: a second worker must hold `A2` or `M`, else 422 `E_VALIDATION` at `/to` with the phase 18 sub-code `role_cannot_decide`; an assignee who holds `A2` or `M` gets `decide`, and one who holds only `A1` gets `work`. Step 4: the index `uq_case_acl_active` allows one active grant per case and principal, so when the target already holds one (a manual grant, or the `mlro_desk` grant of escalation), a grant of the same or a wider access (`read`, then `work`, then `decide`) is kept and no row is written; a narrower one is revoked and the new row is inserted in the same transaction. A reassignment revokes the previous assignee's grant only when its reason is `assignment` or `second_review`.
+@@ END
+@@ FIX R-19-1a docs/plan/phase-19.md
+XL (31 product routes: 19 rows of API.md 3.12 owned here and 12 added rows;
+@@ WITH
+XL (32 product routes: 19 rows of API.md 3.12 owned here and 13 added rows;
+@@ END
+@@ FIX R-19-1b docs/plan/phase-19.md
+(19 owned rows, section 2) and 12 added rows marked
+@@ WITH
+(19 owned rows, section 2) and 13 added rows marked
+@@ END
+@@ FIX R-19-1c docs/plan/phase-19.md
+Count: 31 product routes (19 owned rows of API.md 3.12, 12 added rows).
+@@ WITH
+Count: 32 product routes (19 owned rows of API.md 3.12, 13 added rows; the thirteenth is the reopen-candidates route of section 7.14, added after DR-157 counted thirty-one).
+@@ END
+@@ FIX R-19-1d docs/plan/phase-19.md
+and gains the 12 added rows marked "(phase 19, added)"
+@@ WITH
+and gains the 13 added rows marked "(phase 19, added)"
+@@ END
+@@ FIX R-19-1e docs/plan/phase-19.md
+lists the 31 paths of section 2 (the 19 owned and the 12 added)
+@@ WITH
+lists the 32 routes of section 2 (the 19 owned and the 13 added)
+@@ END
+@@ FIX R-19-1f docs/plan/phase-19.md
+(the thirty-second product route of DR-157)
+@@ WITH
+(the thirty-second product route; DR-157 counted thirty-one before it)
+@@ END
+@@ FIX R-19-1g docs/plan/status.md
+phase 03 `MASKED_KINDS` `rfi`, DSL E.4 rows (gap pass 1) | 31 | 18 (RfiService,
+@@ WITH
+phase 03 `MASKED_KINDS` `rfi`, DSL E.4 rows (gap pass 1) | 32 | 18 (RfiService,
+@@ END
+@@ FIX R-19-2 docs/plan/phase-19.md
+`unknown_party`, `forbidden_term`, `rfi_open`.
+@@ WITH
+`unknown_party`, `forbidden_term`, `rfi_open`, `not_critical_finding`.
+@@ END
+@@ FIX R-19-3 docs/plan/phase-19.md
+a dialog lists the cases closed by the analyst in the window (at most 25),
+@@ WITH
+a dialog lists the cases closed by the analyst in the window (the candidates of section 7.14, at most 100 rows, of which at most `qa.bulk_reopen_max`, 25, may be selected),
+@@ END
+@@ FIX R-19-4a docs/plan/phase-19.md
+the reason codes and evidence labels, never a party name, an account or a contact |
+@@ WITH
+the reason codes and evidence labels, never a party name, an account or a contact (one exception from phase 28 on: the verified output of an `assistant_draft` item may name parties of its case, section 7+) |
+@@ END
+@@ FIX R-19-4b docs/plan/phase-19.md
+the evidence labels; no party name, account or contact).
+@@ WITH
+the evidence labels; no party name, account or contact, except inside the verified output of an `assistant_draft` item, section 7+).
+@@ END
+@@ FIX R-19-4c docs/plan/phase-19.md
+the verified output of an `assistant_draft` item, section 7+);
+@@ WITH
+the verified output of an `assistant_draft` item, which may name parties of its case, section 7+);
+@@ END
+@@ FIX R-21-1a docs/plan/phase-21.md
+The manifest holds the PDF hash and is built after the sign (section 3.8 steps 4 and 5),
+@@ WITH
+The manifest holds the hashes of the XML and the attachments and is built after the sign (section 3.8 step 4; the PDF of step 5 prints the manifest hash, so the manifest cannot hold the PDF hash),
+@@ END
+@@ FIX R-21-1b docs/plan/phase-21.md
+-- bilingual rendering. Both are sealed through put_generated (phase 02) and their hashes are in the manifest.
+@@ WITH
+-- bilingual rendering. Both are sealed through put_generated (phase 02); the manifest holds the hashes of the XML and the attachments.
+@@ END
+@@ FIX R-21-2 docs/plan/phase-21.md
+- No change to phase 20's freeze, refrain or ops-task tables or routes, except the owner methods of section 4.5 item 9, which phase 20's columns already allow; the freeze clocks are phase 20's.
+@@ WITH
+- No change to phase 20's freeze, refrain or ops-task tables or routes; this phase only implements the phase 20 port method `LetterRequester::delivered` (section 4.5 item 9). The freeze clocks are phase 20's.
+@@ END
+@@ FIX R-21-3 docs/plan/phase-21.md
+-- Reports: the approval and the frozen version are written once.
+@@ WITH
+-- Reports: the approval and the frozen version are written once per submission; a revise from rejected or returned back to draft clears the approval.
+@@ END
+@@ FIX R-21-4 docs/plan/phase-21.md
+1. The excluded set of the `sign` task adds the report's `created_by` and the `created_by` of every version of the
+   report (403 `E_SELF_APPROVAL`).
+@@ WITH
+1. The `sign` task also refuses the report's `created_by` and the `created_by` of every version of the
+   report (403 `E_SELF_APPROVAL`). The workflow subject carries this rule, not the engine's excluded set (section 7.12).
+@@ END
+@@ FIX R-21-5 docs/plan/phase-21.md
+previous, amending, superseding and the STR escalated from a UTR (which cites its number).
+@@ WITH
+previous, amending, superseding and the STR or SAR escalated from a UTR (which cites its number).
+@@ END
+@@ FIX R-22-1 docs/plan/phase-22.md
+An approver learns of an open deciding task through `task.waiting`.
+@@ WITH
+An approver learns of an open deciding task from the phase 04 inbox and, once the task is overdue, from `task.overdue`; `task.waiting` goes to the escalation target only (phase 04 section 7.8).
+@@ END
+@@ FIX R-22-2a docs/plan/phase-22.md
+`by_internal_report(conn, internal_report_ids: &[Uuid]) -> Vec<Observation>`: one read
+@@ WITH
+`by_internal_report(conn, internal_report_ids: &[Uuid]) -> Vec<ObservationView>`: one read
+@@ END
+@@ FIX R-22-2b docs/plan/phase-22.md
+(three fields: `indicator_groups`, `escalation_criteria`, `notes`). The key is set for M only.
+@@ WITH
+(three fields: `indicator_groups`, `escalation_criteria`, `notes`). The key is set for M only. The method selects `notes_enc` as well and decrypts it through the phase 02 personal seal (AAD = the observation id); the register list of phase 19 calls it only when the caller holds M.
+@@ END
+@@ FIX R-24-1 docs/plan/phase-24.md
+classification `restricted` (a file holds whatever rows the requester may read)
+@@ WITH
+classification `personal` (a file holds whatever rows the requester may read; the enum `admin.data_classification` of phase 00 has no value `restricted`)
+@@ END
+@@ FIX R-24-2 docs/plan/phase-24.md
+against amber at one interval and red at two intervals of `review.rules_months`.
+@@ WITH
+plus one interval of `review.rules_months` is its `due_on`, and the state follows the one rule above (amber in the 30 days before, red on and after).
+@@ END
+@@ FIX R-24-3 docs/plan/phase-24.md
+G4 is `GovernanceRegisterService::list` (one export per kind) and G9
+@@ WITH
+G4 is `GovernanceRegisterService::list` (one export per kind: the request's `filters` carry `kind`, one of the five register kinds that route 9 takes from its path; a missing or unknown kind is 422 at `/filters/kind`) and G9
+@@ END
+@@ FIX R-24-4 docs/plan/phase-24.md
+G5 holds counts only and G6 is never exported (section 3.1 step 9), so neither has an entry.
+@@ WITH
+G5 has no entry: its control report is counts only, and its access history is read per record and is not exported. G6 is never exported (section 3.1 step 9).
+@@ END
+@@ FIX R-24-5 docs/plan/phase-24.md
+Zero rows updated is 409 `E_NOT_ALLOWED_IN_STATE` (404 `E_NOT_FOUND` when the row is absent or outside the caller's party visibility), so the second
+@@ WITH
+Before the UPDATE, in the same transaction, `ParallelRunRepository::visible(tx, row_id, predicate) -> Result<bool, RepoError>` reads the row under the caller's party visibility (the predicate of section 7.13 item 4); a row that is absent or not visible is 404 `E_NOT_FOUND`, and nothing is written. Zero rows updated is then 409 `E_NOT_ALLOWED_IN_STATE`, so the second
+@@ END
+@@ FIX R-24-6 docs/plan/phase-24.md
+(phase 04's key, section 7.1)
+@@ WITH
+(phase 04's key, phase 04 section 7.10)
+@@ END
+@@ FIX R-25-1a docs/plan/phase-25.md
+   as entries `{id, title, kinds, group_by: actor, window, threshold}`: repeated denied or conflicting attempts
+@@ WITH
+   as entries `{id, title, kinds, group_by: actor, window, threshold}`. The shipped `window` and `threshold` are
+   proposed starting values that the bank tunes in its SIEM, not product settings: 10 minutes and 5 events for the
+   denied, sign-in and step-up rules, 24 hours and 1 event for break-glass use, 1 hour and 3 events for privileged
+   bursts. The rules: repeated denied or conflicting attempts
+@@ END
+@@ FIX R-25-1b docs/plan/phase-25.md
+   and privileged bursts (role grants, policy activation, key operations). The CI check
+@@ WITH
+   and privileged bursts (role grants, policy activation, and service client and token changes: `role_grant.created`,
+   `policy_bundle.activated`, the `service_client.*` kinds, `token.created` and `token.revoked`). The CI check
+@@ END
+@@ FIX R-25-2 docs/plan/phase-25.md
+- `SweepCounts` of the break-glass sweep is `{ lapsed, expired, review_overdue }`, one count per step; of the support session sweep `{ ended, expired, refused_timeout }`; of the bundle purge `{ archive_deleted }`.
+@@ WITH
+- `SweepCounts` is one type for the four sweeps: a map from a count name to a number (`BTreeMap<&'static str, i64>`). The access review sweep returns `superseded` and `overdue_opened` (section 3.1 sweep step 3); the break-glass sweep `lapsed`, `expired` and `review_overdue`, one count per step; the support session sweep `ended`, `expired` and `refused_timeout`; the bundle purge `archive_deleted`.
+@@ END
+@@ FIX R-25-3 docs/plan/phase-25.md
+read in the forwarder from the phase 02 catalogue entry of the row's kind, as the catalogue name is: `audit.siem_page` returns no severity column.
+@@ WITH
+read in the forwarder from the phase 02 catalogue entry of the row's kind, like the catalogue name, because `audit.siem_page` returns no severity column.
+@@ END
+@@ FIX R-25-4 docs/plan/phase-25.md
+so it clears once the cause is fixed.
+@@ WITH
+so it clears seven days after the last dead letter.
+@@ END
+@@ FIX R-25-5a docs/plan/phase-25.md
+`status() -> SiemStatus { lag_s, dead_letters_open, last_forwarded_at }`
+@@ WITH
+`status() -> SiemStatus { lag_s, dead_letters_7d, last_forwarded_at }` (`dead_letters_7d` is the count of dead letters created in the last 7 days, section 7.16)
+@@ END
+@@ FIX R-25-5b docs/plan/phase-25.md
+`akr_siem_dead_letters_open`, `akr_break_glass_active`
+@@ WITH
+`akr_siem_dead_letters_7d`, `akr_break_glass_active`
+@@ END
+@@ FIX R-25-6 docs/plan/phase-25.md
+after the commit phase 03's `invalidate_user`
+@@ WITH
+after the commit phase 01's `invalidate_user`
+@@ END
+@@ FIX R-25-7a docs/plan/phase-25.md
+a newer verified or approved release not applied | either condition | a newer verified, proposed or approved release has waited unapplied for more than 30 days |
+@@ WITH
+a newer verified, proposed or approved release not applied | either condition | a newer verified, proposed or approved release has waited unapplied for more than 30 days, counted from its `verified_at` |
+@@ END
+@@ FIX R-25-7b docs/plan/phase-25.md
+the existence of a newer `verified` or `approved` release that is not yet applied.
+@@ WITH
+the existence of a newer `verified`, `proposed` or `approved` release that is not yet applied (its wait is counted from `verified_at`).
+@@ END
+@@ FIX R-25-8 docs/plan/phase-25.md
+runs inside the verification transaction of section 3.6 (step 5): it reads `help/*.json` from the verified bundle, checks each article against the schema (`code`, `kind`, `title` and `body` with `ar` and `en`), refuses bidirectional-control characters outside the Arabic and Latin ranges (UX-20), writes one row per article
+@@ WITH
+runs inside the verification transaction of section 3.6 (step 5), after the article check of section 7.20 has passed. That check runs before step 5: it reads `help/*.json` from the verified bundle, tests each article against the schema (`code`, `kind`, `title` and `body` with `ar` and `en`) and refuses bidirectional-control characters outside the Arabic and Latin ranges (UX-20); a failure refuses the release. `import` then writes one row per article
+@@ END
+@@ FIX R-25-9 docs/plan/phase-25.md
+Upload the `rollout.json` of the apply (multipart, `EvidenceStore::stage`): kind `package`,
+@@ WITH
+Upload the `rollout.json` of the apply (multipart, `EvidenceStore::stage`, declared content type `text/plain`: JSON is UTF-8 text, and `application/json` is not in `evidence.allowed_types`): kind `package`,
+@@ END
+@@ FIX R-25-10a docs/plan/phase-25.md
+| POST | `/api/v1/admin/releases/{id}/applied` | `admin.system` | Record that the bank operator applied the approved release; **SU** `approval`; IF; IDEM (added) |
+@@ WITH
+| POST | `/api/v1/admin/releases/{id}/applied` | `admin.system` | Record that the bank operator applied the approved release; **SU** `approval`; IF; IDEM (added) |
+| POST | `/api/v1/admin/releases/{id}/evidence` | `admin.system` | Upload the `rollout.json` of the apply as evidence of owner kind `release`; answers 201 with the evidence id; IDEM (added, section 7.22; Cedar `release.applied`) |
+@@ END
+@@ FIX R-25-10b docs/plan/phase-25.md
+M (21 routes: 12 rows of API.md 3.2, 3.3, 3.20 and the help row owned here, 9 rows added beyond API.md;
+@@ WITH
+M (22 routes: 12 rows of API.md 3.2, 3.3, 3.20 and the help row owned here, 10 rows added beyond API.md;
+@@ END
+@@ FIX R-25-10c docs/plan/phase-25.md
+- **Route count**: 21 rows, of which 12 are owned (API.md 3.2, 3.3, 3.20 and the help row) and 9 are added (the review detail, the review item decision, the break-glass list and review, the release propose and applied records, the support session list
+@@ WITH
+- **Route count**: 22 rows, of which 12 are owned (API.md 3.2, 3.3, 3.20 and the help row) and 10 are added (the review detail, the review item decision, the break-glass list and review, the release propose and applied records, the rollout record upload of section 7.22, the support session list
+@@ END
+@@ FIX R-25-10d docs/plan/status.md
+ 21 (12 owned, 9 added) 
+@@ WITH
+ 22 (12 owned, 10 added) 
+@@ END
+@@ FIX R-26-1 docs/plan/phase-26.md
+with phase 01's closed classes (section 4.5 gains this phase 01 item):
+@@ WITH
+with phase 01's closed classes (both classes exist, so phase 01 does not change):
+@@ END
+@@ FIX R-26-2 docs/plan/phase-26.md
+`decide(tx, id, expected_version, decision) -> PossessionEvidence`; `list_for_deal(deal_id)`;
+    No duplicate method lives here
+@@ WITH
+`decide(tx, id, expected_version, decision) -> PossessionEvidence`; `list_for_deal(deal_id)`.
+    No duplicate method lives here
+@@ END
+@@ FIX R-26-3 docs/plan/phase-26.md
+and as `a2@` the tile is absent.
+@@ WITH
+and as `ch@` and `ia@` the tile is absent (`a2@` holds no `dashboard.read` and gets 403 `E_SCOPE` on the G1 route).
+@@ END
+@@ FIX R-26-4 docs/plan/phase-26.md
+- `content(ctx, deal_id, evidence_id, download: bool) -> VerifiedReader` (Content; phase 02 `open`).
+@@ WITH
+- `content(ctx, deal_id, evidence_id, download: bool, header) -> VerifiedReader` (Content; phase 02 `open`; `header` is the step-up assertion header that step 6 of section 3.4 consumes on a suspicion-tier deal). `IslamicDealService::get` of section 3.4 takes the same `header` parameter.
+@@ END
+@@ FIX R-26-5 docs/plan/phase-26.md
+only the task grouping of section 3.8.
+@@ WITH
+only the task grouping of section 3.8 and the group state rule of section 7.10.
+@@ END
+@@ FIX R-26-6 docs/plan/phase-26.md
+8. Release (`FreezeService::release_freeze`, phase 20 section 3.5 step 5, on approval)
+@@ WITH
+8. Release (the terminal effect `release_freeze`, phase 20 section 3.5 step 5, on approval)
+@@ END
+@@ FIX R-26-7 docs/plan/phase-26.md
+    the list predicate of 3.4 to the Cedar file.
+@@ WITH
+    the list predicate of 3.4 to the Cedar file. A policy test holds the three checks of the file that section 3.13 states: the route
+    scopes against the roles the file permits, the role reach (A1, A2 and M only), and the forbid text against the phase 18 forbids.
+@@ END
+@@ FIX L-17-1 docs/plan/phase-17.md
+the step-up answer is 401
+`E_STEPUP_REQUIRED` before any tier answer, so a caller without step-up learns nothing about the row.
+@@ WITH
+a caller the rules above admit gets 401
+`E_STEPUP_REQUIRED` when the assertion is missing. A caller they refuse gets the masked 404 whatever header is missing, so a caller outside the team learns nothing about the row (phase 03 section 7.14, DR-411).
+@@ END
+@@ FIX R-27-1 docs/plan/phase-27.md
+`bins` are the ten score counts of the 7.x block on bins.
+@@ WITH
+`bins` are the ten score counts of section 7.10.
+@@ END
+@@ FIX R-27-2 docs/plan/phase-27.md
+the cumulative share of the reference counts reaches `model.top_band_percent`.
+@@ WITH
+the cumulative share of the reference counts reaches `model.top_band_percent` / 100 (the setting is in per cent).
+@@ END
+@@ FIX R-27-3 docs/plan/phase-27.md
+| `E_PRECONDITION_REQUIRED` (428), `E_VERSION_CONFLICT` (409) | none | `If-Match` on promote, pin, engage |
+@@ WITH
+| `E_PRECONDITION_REQUIRED` (428), `E_VERSION_CONFLICT` (409) | none | `If-Match` on promote, pin, shadow, engage |
+@@ END
+@@ FIX R-27-4 docs/plan/phase-27.md
+the owner check is phase 04's own 422 | sections 3.1, 3.3, 3.6, 3.8 |
+@@ WITH
+the owner check is phase 04's own 422 | sections 3.1, 3.3, 3.6, 3.8, 3.10 |
+@@ END
+@@ FIX R-27-5 docs/plan/phase-27.md
+6. Insert `alert.model_scores` in one transaction per batch, `ON CONFLICT DO NOTHING`; one audit `model.scored {version_id, role, rows, skipped_missing}` per batch (counts only, no ids).
+@@ WITH
+6. Insert `alert.model_scores` in one transaction per chunk of step 2, `ON CONFLICT DO NOTHING`; one audit `model.scored {version_id, role, rows, skipped_missing}` per batch, written with the last chunk that ran (counts of the committed chunks only, no ids). A batch that an engaged scope stops keeps its committed chunks and scores no further chunk.
+@@ END
+@@ FIX R-27-6 docs/plan/phase-27.md
+`revert` is not implemented.
+@@ WITH
+`revert` returns `ChangeError::NotRevertible`, as in phase 16 (it is never called, because `emergency_allowed` is false).
+@@ END
+@@ FIX R-27-7a docs/plan/phase-27.md
+A suspicion-tier row for a caller without `record_open` step-up answers 401 `E_STEPUP_REQUIRED` first (the step-up check runs before the tier answer, phase 17 section 3.10); any other row not visible to the caller answers the masked 404 `E_NOT_FOUND`. A missing id gives the same body and latency floor.
+@@ WITH
+A row the caller may not see answers the masked 404 `E_NOT_FOUND`, whatever header is missing: a caller outside the team never gets 401 or 422 (phase 03 section 7.14, DR-411). A caller the rule admits to a suspicion-tier alert, with no fresh `record_open` step-up, answers 401 `E_STEPUP_REQUIRED`. A missing id gives the body and the latency floor of the masked 404.
+@@ END
+@@ FIX R-27-7b docs/plan/phase-27.md
+A suspicion-tier alert answers 401 `E_STEPUP_REQUIRED` first to a caller without `record_open` step-up (phase 17 section 3.10), and the masked 404 applies only after step-up.
+@@ WITH
+A caller outside the team gets that 404 with or without a step-up. Only a caller the visibility rule admits to a suspicion-tier alert gets 401 `E_STEPUP_REQUIRED` for a missing `record_open` step-up (phase 03 section 7.14, DR-411).
+@@ END
+@@ FIX R-27-7c docs/plan/phase-27.md
+under the alert's visibility and the alert's own purpose rules; suspicion tier answers masked 404 with step-up first |
+@@ WITH
+under the alert's visibility and the alert's own purpose rules; a suspicion-tier alert answers the masked 404 outside the team, and a team member needs the `record_open` step-up (401 without it) |
+@@ END
+@@ FIX R-27-7d docs/plan/phase-27.md
+| `E_STEPUP_REQUIRED` (401) | none | kill engage, pin, route 16 for a suspicion-tier alert without step-up |
+@@ WITH
+| `E_STEPUP_REQUIRED` (401) | none | kill engage, pin, route 16 for a team member of a suspicion-tier alert without step-up |
+@@ END
+@@ FIX R-27-7e docs/plan/phase-27.md
+as `a1` without step-up: 401 `E_STEPUP_REQUIRED`; with step-up and a missing purpose: 422 `E_PURPOSE_REQUIRED`; with step-up and purpose but outside the team: 404 `E_NOT_FOUND` with the body identical to a missing id, and the latency within the phase 03 floor.
+@@ WITH
+as an `a1` on the case team without step-up: 401 `E_STEPUP_REQUIRED`; on the team with step-up and a missing purpose: 422 `E_PURPOSE_REQUIRED`; as an `a1` outside the team, with or without the step-up and the purpose: 404 `E_NOT_FOUND` with the body identical to a missing id, and the latency within the phase 03 floor (phase 03 section 7.14).
+@@ END
+@@ FIX R-29-1 docs/plan/phase-29.md
+every later change of a hold has its kind below.
+@@ WITH
+every later change of a hold's state has its kind below, and the alert link of section 3.5 step 2 is covered by phase 14's `screening.alert_created`.
+@@ END
+@@ FIX R-29-2 docs/plan/phase-29.md
+`prepare` sets `volume_effect` to `neutral`, and no entry criterion applies.
+@@ WITH
+`prepare` sets `volume_effect` to `neutral`, and no entry criterion applies. `prepare` also requires the rail's `*`, `*`, `*` row in the current matrix (422 `E_VALIDATION`, `errors[].code = wildcard_row_missing`), so step 7 of section 3.1 always finds a fail policy for an assessed rail; a policy set that names the new rail is activated first.
+@@ END
+@@ FIX R-29-3 docs/plan/phase-29.md
+2. **Phase 02**: 17 event kinds of section 3.17 added to the catalogue
+@@ WITH
+2. **Phase 02**: 19 event kinds (the 18 rows of section 3.17 and `assess.rail_added` of section 7+) added to the catalogue
+@@ END
+@@ FIX R-29-4 docs/plan/phase-29.md
+so the PUT is refused as API section 5 says;
+@@ WITH
+so the PUT is refused as the API.md row of this route says;
+@@ END
+@@ FIX R-29-5 docs/plan/phase-29.md
+inserts the new rows with `set_version = previous + 1` and supersedes every current row in the same transaction.
+@@ WITH
+inserts the new rows with `set_version` = `assess.policy_state.set_version` + 1, the global counter after this activation's increment (section 3.11), and supersedes every current row in the same transaction. The set versions of the matrix and of the bands may therefore skip the numbers that a mode or rule activation took.
+@@ END
+@@ FIX R-31-1 docs/plan/phase-31.md
+3. Linked, account offboarded, `directory_active = TRUE`: audit `directory.mismatch {count, email_count}` (SIEM true). Local wins; nothing is changed. `email_count` is the second mismatch of DR-351:
+@@ WITH
+3. Mismatches: audit `directory.mismatch {count, email_count}` (SIEM true), written on a run where either count is above zero. `count` is the linked rows whose account is offboarded while `directory_active = TRUE`. Local wins; nothing is changed. `email_count` is the second mismatch of DR-351, counted over every linked row whatever the state of its account:
+@@ END
+@@ FIX R-30-5 docs/plan/phase-30.md
+a new decision key (`akr-ctl assess keys rotate`)
+@@ WITH
+a new decision key (`akr-ctl assess keys generate --purpose decision`, phase 29)
+@@ END
+@@ FIX R-30-6 docs/plan/phase-30.md
+The signed release bundle is already on offline media (section 3.11).
+@@ WITH
+The operators add the signed bundle of the running release to the same media.
+@@ END
+@@ FIX R-30-7 docs/plan/phase-00.md
+repository on the backup server plus offsite (SP-84) |
+@@ WITH
+repository on the backup server plus offsite, both encrypted by pgBackRest (`repo-cipher-type = aes-256-cbc`) with the passphrase held off the server (SP-84) |
+@@ END
+@@ FIX R-30-8 docs/plan/phase-30.md
+The transit keys are rotated by the key ceremony of phase 00 when the bank's security officer finds that OpenBao itself was exposed.
+@@ WITH
+The transit keys are rotated in OpenBao (a new key version; the older versions stay for reading) by the operators of the OpenBao ceremony runbook (SP-12, phase 00), when the bank's security officer finds that OpenBao itself was exposed.
+@@ END
+@@ FIX R-30-9 docs/plan/phase-30.md
+run on a clean environment from the immutable or offline copy,
+@@ WITH
+run on a clean environment from the offline copy (section 7.7),
+@@ END
+@@ FIX R-30-10a docs/plan/phase-30.md
+on the ports `zones.yaml` names for those destinations.
+@@ WITH
+on the ports `zones.yaml` names for those destinations (the repository is its entry `backup.repository`). The allows select every pod of the namespace `akr-restore` (the Job and the scratch pod are its only pods), so no membership label is needed.
+@@ END
+@@ FIX R-30-10b docs/plan/phase-30.md
+(CBS listeners, bank SMTP, SIEM, the proxy of phase 07, the payment hub CIDRs of section 3.3)
+@@ WITH
+(CBS listeners, bank SMTP, SIEM, the proxy of phase 07, the payment hub CIDRs of section 3.3, and the entry `backup.repository`: the host and port of the pgBackRest repository on the backup server, which section 7.5 reads)
+@@ END
+@@ FIX L-04-1a docs/plan/phase-04.md
+**Complexity:** XL (31 routes and the workflow engine)
+@@ WITH
+**Complexity:** XL (32 routes with the evidence route of section 7.2, and the workflow engine)
+@@ END
+@@ FIX L-04-1b docs/plan/status.md
+policy_bundles FKs) | 31 | 10 (ChangeRequestService
+@@ WITH
+policy_bundles FKs) | 32 | 10 (ChangeRequestService
+@@ END
+@@ FIX L-06-1 docs/plan/status.md
+ | 13 | 8 (CatalogueInstaller
+@@ WITH
+ | 14 | 8 (CatalogueInstaller
+@@ END
+@@ FIX L-11-1 docs/plan/phase-11.md
+`ensure_rows(conn, source, table, branches: &[String], kind: WatermarkKind) -> Result<u64, RepoError>`
+@@ WITH
+`ensure_rows(conn, source, table, branches: &[String], kind: WatermarkKind, class: FreshnessClass) -> Result<u64, RepoError>`
+@@ END
+@@ FIX L-15-1a docs/plan/phase-15.md
+**Complexity:** XL (32 routes, 16 tables and four ports;
+@@ WITH
+**Complexity:** XL (34 routes: the 32 of section 2 and the two count views of sections 7.4 and 7.5; 16 tables and four ports;
+@@ END
+@@ FIX L-15-1b docs/plan/phase-15.md
+`rating-models` (6): 32 in
+  all, each with `x-akr-action` (section 2).
+@@ WITH
+`rating-models` (6): 32 in
+  all, each with `x-akr-action` (section 2). The two routes of sections 7.4 and 7.5 join the tags `ownership` and
+  `rating`, which makes 34.
+@@ END
+@@ FIX L-15-1c docs/plan/phase-15.md
+9. Swagger UI lists 32 new operations, each with `x-akr-action`;
+@@ WITH
+9. Swagger UI lists 34 new operations (the 32 of section 2 and the two of sections 7.4 and 7.5), each with `x-akr-action`;
+@@ END
+@@ FIX L-15-1d docs/plan/status.md
+ | 32 | 14 (RatingEngine
+@@ WITH
+ | 34 | 14 (RatingEngine
+@@ END
+@@ FIX L-18-1a docs/plan/phase-18.md
+XL (25 product routes, of which 9 are rows of API.md 3.12 owned here and 16 are added rows;
+@@ WITH
+XL (28 product routes: the 25 of section 2, of which 9 are rows of API.md 3.12 owned here and 16 are added rows, and the three of sections 7.11 to 7.13;
+@@ END
+@@ FIX L-18-1b docs/plan/phase-18.md
+Count: 25 product routes (9 owned rows of API.md 3.12, 16 added rows); no dev route.
+@@ WITH
+Count: 25 product routes in this table (9 owned rows of API.md 3.12, 16 added rows); sections 7.11, 7.12 and 7.13 add one route each, so the phase has 28; no dev route.
+@@ END
+@@ FIX L-18-1c docs/plan/phase-18.md
+7. Swagger UI shows the 25 routes of section 2 and the extended `GET /cases/{id}`;
+@@ WITH
+7. Swagger UI shows the 25 routes of section 2, the three routes of sections 7.11 to 7.13 and the extended `GET /cases/{id}`;
+@@ END
+@@ FIX L-18-1d docs/plan/status.md
+ | 25 | 15 (CaseAggregate
+@@ WITH
+ | 28 | 15 (CaseAggregate
+@@ END
+@@ FIX L-24-1a docs/plan/phase-24.md
+XL (31 routes: 19 rows of API.md 3.3, 3.4, 3.15 and 3.16 owned or extended here,
+@@ WITH
+XL (39 routes: the eight of sections 7.12 and 7.13, and the 31 of section 2, which are 19 rows of API.md 3.3, 3.4, 3.15 and 3.16 owned or extended here,
+@@ END
+@@ FIX L-24-1b docs/plan/phase-24.md
+- **Route count:** 31 rows (XL): 19 are rows
+@@ WITH
+- **Route count:** 31 rows in this table (XL; sections 7.12 and 7.13 add eight more, three export routes and five parallel-run routes): 19 are rows
+@@ END
+@@ FIX L-24-1c docs/plan/phase-24.md
+6. Swagger UI lists the 31 routes of section 2 with their scopes;
+@@ WITH
+6. Swagger UI lists the 31 routes of section 2 and the eight routes of sections 7.12 and 7.13 with their scopes;
+@@ END
+@@ FIX L-24-1d docs/plan/status.md
+| 28 (+ 3 phase 06 pack routes extended) |
+@@ WITH
+| 36 (+ 3 phase 06 pack routes extended) |
+@@ END
+@@ FIX L-99-1 docs/plan/status.md
+| Routes | 0 | 564 | about 366 (API.md) |
+@@ WITH
+| Routes | 0 | 581 (the sum of the Routes + column; it equals the 581 rows of API.md) | about 366 (API.md at the start of planning; it lists 581 rows after the gap passes) |
+@@ END
+
+@@ FIX S-11-1 docs/plan/phase-11.md
+akr-ctl all call it, and none of the last three may link a driver.
+@@ WITH
+akr-ctl all call it, and of these four only akr-ingestd links a driver.
+@@ END
+
+@@ FIX S-27-1 docs/plan/phase-27.md
+The sweep and the monitor never hold a lock across the batch: each batch is one transaction.
+@@ WITH
+The sweep and the monitor never hold a lock across the batch: a sweep chunk (section 3.4 step 6) and a monitor batch are each one transaction.
+@@ END
+
+@@ FIX S-01-1 docs/plan/phase-01.md
+   (exit 2), and `rotate` and `disable` find the principal by it (`kind = 'service'` and `display_name ->> 'en'`).
+@@ WITH
+   (exit 2), and `rotate` and `disable` find the principal by it (`kind = 'service'`, `status = 'active'` and
+   `display_name ->> 'en'`), so a disabled principal that still carries the name is never the one found.
+@@ END
+
+@@ FIX S-21-1 docs/plan/phase-21.md
+this phase only implements the phase 20 port method `LetterRequester::delivered` (section 4.5 item 9). The freeze clocks are phase 20's.
+@@ WITH
+this phase only implements the phase 20 port `LetterRequester` (`request` in section 3.15, `delivered` in section 4.5 item 9). The freeze clocks are phase 20's.
+@@ END
+
+@@ FIX S-03-2 docs/plan/phase-03.md
+policy file `policies/dev.cedar`, which `loader::load` appends to the active bundle only when the feature is on and
+`AKR_ENV != production`. A release build has neither,
+@@ WITH
+policy file `policies/dev.cedar`, which `loader::load` appends to the active bundle whenever the feature is on
+(`AKR_ENV` governs only the mount of the routes, 7.13). A release build has neither,
+@@ END
+
+@@ FIX S-03-1 docs/plan/phase-03.md
+its `tier` and `access_list` attributes. So the inventory of section 3.1 step 3 holds in both builds.
+@@ WITH
+its `tier` and `access_list` attributes. The permits of `dev.cedar` carry `@role("*")`, which step 3 of section 3.1
+accepts for the `dev.*` actions as it does for the `self` group (no `actor_role`). So the inventory of section 3.1
+step 3 holds in both builds, and the schema test of section 2 compares `Action::ALL` with the shipped text plus the
+fragment when the feature is on.
+@@ END
+
+@@ FIX S-05-1 docs/plan/phase-05.md
+     years are read: `index_range` with the per-year counts kept (they show the volume curve the backfill planner of
+     phase 12 uses);
+@@ WITH
+     years are read: `index_range` with the per-year counts kept (they show the volume curve of the object over the
+     years);
+@@ END
+
+@@ FIX S-15-1 docs/plan/phase-15.md
+    /// Opens a review unless one of the same party and kind is open; returns (review, created). A new event trigger on
+@@ WITH
+    /// Opens a review unless one of the same party and kind is open. A new event trigger on
+@@ END
+
+@@ FIX S-16-1 docs/plan/phase-16.md
+DSL D.3 holds: a set inside the band that does not loosen and has no `capacity` reason is minor and needs a replay;
+@@ WITH
+DSL D.3 holds, with the `capacity` rule of the `reason_code` row of DSL D.1 (S-39): a set inside the band that does not loosen and has no `capacity` reason is minor and needs a replay;
+@@ END
+
+@@ FIX S-22-1 docs/plan/phase-22.md
+An approver learns of an open deciding task from the phase 04 inbox and, once the task is overdue, from `task.overdue`; `task.waiting` goes to the escalation target only (phase 04 section 7.8).
+@@ WITH
+An approver learns of an open deciding task from the phase 04 inbox and, where the step has a `remind` timeout, from `task.overdue` once the task is overdue (a step with an `escalate` timeout alone sends its approver no overdue notice); `task.waiting` goes to the escalation target only (phase 04 section 7.8).
+@@ END
+
+@@ FIX S-19-1 docs/plan/phase-19.md
+no party name, account or contact, except inside the verified output of an `assistant_draft` item, section 7+).
+@@ WITH
+no party name, account or contact, except that the verified output of an `assistant_draft` item may name parties of its case, section 7+).
+@@ END
+
+@@ FIX S-04-1 docs/plan/phase-04.md
+32 operations (the 31 of section 2 and the evidence route of section 7.2), each with `x-akr-action`;
+@@ WITH
+32 operations (the 31 of section 2 and the evidence route of section 7.2, a ninth operation of the tag `change-control`, mounted in `change_control::router()`), each with `x-akr-action`;
+@@ END
+
+@@ FIX S-27-2a docs/plan/phase-27.md
+on the team with step-up and a missing purpose: 422 `E_PURPOSE_REQUIRED`; as an `a1` outside the team,
+@@ WITH
+on the team with step-up and a missing purpose: 404 `E_NOT_FOUND`, the masked answer (rule 5 of phase 17 admits no caller without a purpose code; 422 `E_PURPOSE_REQUIRED` is the answer on a restricted alert only); as an `a1` outside the team,
+@@ END
+
+@@ FIX S-27-2b docs/plan/phase-27.md
+| `E_PURPOSE_REQUIRED` (422) | none | `GET /alerts/{id}/model-score` on a restricted or suspicion-tier alert without the purpose phase 17 requires |
+@@ WITH
+| `E_PURPOSE_REQUIRED` (422) | none | `GET /alerts/{id}/model-score` on a restricted alert without the purpose rule 4 of phase 17 requires (on a suspicion-tier alert a missing purpose is the masked 404 of section 3.4, as for any caller rule 5 does not admit) |
+@@ END
+
+@@ FIX S-06-1 docs/plan/phase-06.md
+`AttributeKey`, used here and by `Need` and `grade` in section 2, is a newtype over `String` that holds one canonical attribute reference (`<entity>.<field>`, the `CanonicalRef` form of DSL.md B.1) and is checked when it is built.
+@@ WITH
+`AttributeKey`, used here, by `Need` in section 2 and by `grade` in section 3.2, is a newtype over `String` that holds one key of the `AttributeCatalogue` (section 7.3: the form `<namespace>.<name>`, which is a canonical `<table>.<column>` or a registered `feat.` or `rating.` key); the form is checked when it is built.
+@@ END
+
+@@ FIX S-09-1 docs/plan/phase-09.md
+Keys: each file of `backend/packs/reference/` carries its `release_id` (1 to 64 characters) and the rows of one table. A `countries` row
+@@ WITH
+Keys: each file of `backend/packs/reference/` carries its `release_id` (1 to 64 characters) and the rows of one table (the calendar file, below, of two). A `countries` row
+@@ END
+
+@@ FIX S-11-2 docs/plan/phase-11.md
+audit `source.halt_resolved {decision, tables, check_id}` (`check_id` is the fresh check of step 2;
+@@ WITH
+audit `source.halt_resolved {decision, tables, check_id}` (plus `as_of_marker` on a `false_alarm` after an `as_of_regressed` halt, 7.13; `check_id` is the fresh check of step 2;
+@@ END
+
+@@ FIX S-11-3 docs/plan/phase-11.md
+A table with no receipt yet is refused with `E_VALIDATION` at
+@@ WITH
+A table with no accepted manifest yet is refused with `E_VALIDATION` at
+@@ END
+
+@@ FIX S-03-4 docs/plan/phase-08.md
+  database): `{bundle_hash, roles: {<role>: [<action>, ...]}}` from the permits' `@role` annotations evaluated against
+@@ WITH
+  database): `{bundle_hash, roles: [{role, actions}]}` (the `RoleActions` list of phase 03 section 7.16) from the permits' `@role` annotations evaluated against
+@@ END
+
+@@ FIX S-03-5 docs/plan/phase-03.md
+so a miss and a refusal on them cannot be told apart by an event or by timing.
+@@ WITH
+so a caller cannot tell a miss from a refusal on them by the answer or by its timing.
+@@ END
+
+@@ FIX S-27-3 docs/plan/phase-27.md
+and the latency within the phase 03 floor (phase 03 section 7.14).
+@@ WITH
+and the latency within the phase 03 floor (phase 03 section 3.6 step 3 for the floor, section 7.14 for the answer).
+@@ END
+
+@@ FIX S-30-1 docs/plan/phase-30.md
+the signed bundle at the DR site and on offline media (section 3.11) |
+@@ WITH
+the signed bundle at the DR site and on offline media (section 7.7 item 1) |
+@@ END
+
+@@ FIX S-30-2 docs/plan/phase-30.md
+The allows select every pod of the namespace `akr-restore` (the Job and the scratch pod are its only pods), so no membership label is needed.
+@@ WITH
+The allows select the pods that carry the label `akr.io/net-restore: "true"` (the label form of section 3.3; a membership of this namespace only, not a network of `zones.yaml`), which the Job and the scratch pod carry and no other pod does, so the unlabelled known-bad probe of item 2 reaches nothing.
+@@ END
+
+@@ FIX S-30-3 docs/plan/phase-30.md
+gains three keys that the renderer reads (`cluster.apiserver`, `cbs.listeners`, `gateway.cidrs`),
+@@ WITH
+gains four keys that the renderer reads (`cluster.apiserver`, `cbs.listeners`, `gateway.cidrs`, and `backup.repository` of section 7.5),
+@@ END
+
+@@ FIX S-17-1 docs/plan/phase-17.md
+with the phase 18 sub-code `role_cannot_decide`; an assignee who holds `A2` or `M` gets `decide`,
+@@ WITH
+with the phase 18 sub-code `role_cannot_decide` (the `E_SELF_APPROVAL` refusal of section 3.8 step 4 is checked before this one, so a first worker named as second worker gets the 403 whatever role they hold); an assignee who holds `A2` or `M` gets `decide`,
+@@ END
+
+@@ FIX L2-01-1 docs/plan/phase-01.md
+puts it in the Cedar context; a `record_open` step-up proves presence and is never consumed.
+@@ WITH
+puts it in the Cedar context. Reading `fresh_until` spends nothing; an assertion of the class `record_open` is spent
+by `consume` like one of any other class, in the handler of the open (phase 17 section 3.10).
+@@ END
+
+@@ FIX L2-17-1a docs/plan/phase-17.md
+  reason `second_review`; a reassignment revokes the previous assignee's grant (`revoked_by` is the actor).
+@@ WITH
+  reason `second_review`; a reassignment revokes the previous assignee's grant of these two reasons (`revoked_by` is
+  the actor; a grant of another reason stays, 7.25).
+@@ END
+
+@@ FIX L2-17-1b docs/plan/phase-18.md
+(reason `second_review`). A reassignment revokes the previous assignee's grant (`revoked_by` is the actor).
+@@ WITH
+(reason `second_review`). A reassignment revokes the previous assignee's grant of these two reasons (`revoked_by` is the actor); a grant of another reason stays, and an assignee who already holds a grant of the same or a wider access keeps it (phase 17 section 7.25).
+@@ END
+
+@@ FIX S-04-1b docs/plan/phase-04.md
+`api::routes::change_control::router()` (8 + the three phase 03 CR branches),
+@@ WITH
+`api::routes::change_control::router()` (8 + the three phase 03 CR branches; 9 with the evidence route of section 7.2),
+@@ END
+@@ FIX T-01-1a docs/plan/phase-01.md
+   `display_name ->> 'en'`), so a disabled principal that still carries the name is never the one found.
+@@ WITH
+   `display_name ->> 'en'`), so a disabled principal that still carries the name is never the one rotated or disabled
+   (the rerun of `disable` in step 3 is the one read of disabled principals by name: it only deletes their Hydra
+   clients).
+@@ END
+@@ FIX T-01-1b docs/plan/phase-01.md
+   active, so a failed Hydra call leaves no access and the command can be run again.
+@@ WITH
+   active, so a failed Hydra call leaves no access and the command can be run again: when no active principal carries
+   the name, `disable` reads the disabled service principals that carry it and repeats only the Hydra delete, for the
+   `hydra_client_id` of each (a client that Hydra no longer has counts as deleted). The rerun changes no row and writes
+   no second audit event.
+@@ END
+@@ FIX T-04-1 docs/plan/phase-04.md
+- **OpenAPI registration:** tags `change-control` (8), `inbox` (10),
+@@ WITH
+- **OpenAPI registration:** tags `change-control` (9: the eight of section 2 and the evidence route of section 7.2), `inbox` (10),
+@@ END
+@@ FIX T-18-1 docs/plan/phase-18.md
+writes the access-list grants of section 3.2 in the assignment transaction, and revokes the previous assignee's grant on reassignment.
+@@ WITH
+writes the access-list grants of section 3.2 in the assignment transaction, and on a reassignment revokes the previous assignee's grant of the reasons `assignment` and `second_review` (section 3.2).
+@@ END
+@@ FIX L3-00-1 docs/plan/phase-00.md
+- Keys read by the renderer, added to `deploy/zones.yaml`: `cluster.apiserver`, `cbs.listeners`, `gateway.cidrs`
+  (phase 30 section 4.4) and `egress.proxy` (phase 07 section 4).
+@@ WITH
+- Keys read by the renderer, added to `deploy/zones.yaml`: `cluster.apiserver`, `cbs.listeners`, `gateway.cidrs` and
+  `backup.repository` (phase 30 sections 4.4 and 7.5) and `egress.proxy` (phase 07 section 4).
+@@ END
+@@ FIX L3-30-1 docs/plan/phase-30.md
+Inputs (both in `deploy/`, the first new in this phase):
+@@ WITH
+Inputs (both in `deploy/`, the second new in this phase):
+@@ END
+@@ FIX L4-27-1 docs/plan/phase-27.md
+6. Visibility pin: a generated set of principals and alert rows, the predicate of `services::visibility::build` and the Cedar permit of `alert.model_score.read` agree on every row (phase 17 check 6 pattern, extended to route 16).
+@@ WITH
+6. Visibility pin: over the generated principals and alert rows of phase 17 check 6, route 16 answers the masked 404 on exactly the rows on which phase 17 `GET /alerts/{id}` answers it for the same caller and headers. Route 16 applies the visibility rules in the handler through `services::visibility::build` (section 3.4 step 1), and phase 17 check 6 pins that predicate to the Cedar decision for `alert.read`. The permits of `alert.model_score.read` are by role only (section 3.12) and no forbid of phase 17 names the action, so this pin is on the handler, not on a Cedar decision for the action.
+@@ END

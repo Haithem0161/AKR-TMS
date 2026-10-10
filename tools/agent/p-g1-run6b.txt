@@ -1,0 +1,110 @@
+You are drafting part of GAP PASS 1 for the AKR-TMS implementation plan (an AML/KYC transaction-monitoring product
+for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Read first: .claude/rules/planning.md (section
+"Gap Analysis Methodology"), tools/agent/b3-conventions.md, tools/agent/gap1-plan.md.
+
+YOUR RUN: run 6b = COVERAGE of research requirement IDs that no phase carries. Your IDs (50), prefix T (research
+file 21, technology approaches):
+
+T-01 T-03 T-05 T-06 T-08 T-09 T-11 T-12 T-16 T-17 T-18 T-19 T-20 T-23 T-24 T-25 T-26 T-27 T-28 T-29
+T-30 T-31 T-32 T-33 T-34 T-35 T-36 T-37 T-38 T-39 T-40 T-41 T-42 T-45 T-46 T-47 T-52 T-53 T-54 T-55
+T-56 T-57 T-58 T-59 T-60 T-61 T-62 T-64 T-65 T-66
+
+Module ownership: docs/MODULES.md names only T-02, T-04, T-07, T-13..T-15, T-21, T-22, T-43 and T-48. Machine
+learning, the assistant and the models are P2 (docs/ROADMAP.md "Models and the assistant", phases 27 and 28 are
+macro-phase P2): a T item that only a P2 phase could build is NOT-CARRIED (P2) unless phase 27 or 28 builds it, in
+which case it is CARRIED or Partly there.
+
+Background. Every phase file names the research IDs it carries on its "**Requirements carried:**" header (lines
+"Implemented here", "Partly implemented", "Connected", and "Not carried"). tools/coverage.py found that these IDs
+are carried by no phase header. Some are built in substance by a phase that simply forgot to name the ID; some are out of
+scope or later (P2, P3, the bank's own work); some are true gaps. Your job is to classify each ID with evidence.
+
+Runs 1 to 6a are applied: read DR-356 and every later DR in docs/plan/research.md first (DR-394, DR-396 and DR-397 list the
+items already decided as P2, vendor programme or bank process). Already decided, do not reopen: S-48 is P2 (DR-380);
+SP-30 canary records are P2 (DR-391).
+
+For each ID, in the order above:
+1. Find its row: grep -n -E "^\|\s*\**ID\**\s*\|" research/*.md (for example grep -n -E "^\|\s*\**C-05\**\s*\|"
+   research/*.md). Read the row and, if needed, the research section it cites, so you know what is required.
+2. Pick two or three distinctive keywords from the requirement (a table, a job, a metric, a screen, a rule) and grep
+   docs/plan/phase-*.md and docs/MODULES.md for them. Read the matching lines in context.
+3. Classify the ID as exactly one of:
+   - CARRIED: a phase builds the requirement in substance (a table, route, job, rule or screen that does what the row
+     asks). Name the phase, its section and quote the line (at most 15 words). Proposed action: "add ID to phase NN
+     header, line <Implemented here | Partly implemented>" (Partly when the phase builds only part of it; say which
+     part is missing).
+   - NOT-CARRIED: no phase builds it and it belongs outside this release: P2 or P3 in docs/ROADMAP.md, the bank's own
+     process, a vendor programme item, or a research suggestion that a DR rejected. Give the reason with a source
+     (ROADMAP line, DR number, MODULES line). Proposed action: "add ID to phase NN header, line Not carried (<reason in
+     at most 10 words>)", choosing the phase whose subject is closest.
+   - GAP: the requirement is in scope for this release (MODULES or ROADMAP puts it in P0 or P1) and no phase builds
+     it. Write a full finding (format below) with the target phase and the exact Section 7 text.
+   Do not mark CARRIED on a keyword match alone: the quoted line must do what the requirement asks.
+
+Lessons from run 6a (follow them):
+- A module's tier is not a P0/P1 line. "M10 is P1" does not make every idea in its research file P1: quote a feature
+  line of MODULES ("- P1: ...") or ROADMAP that names the substance, or classify NOT-CARRIED. In run 6a all 7 drafted
+  gaps argued from module tiers and were rejected.
+- Read the research row's exact words before proposing logic (run 6a read "no minimum score" as the name-match score;
+  it meant an amount threshold, which no phase has).
+- DR-397 lists more P2 items; read it.
+
+Lessons from run 5b (follow them):
+- Before proposing a new table, setting or column, look for an existing generic mechanism that already does it: the
+  controls matrix (DSL.md C.7), the scenario outputs and their link kinds (phase 16), the registers of phase 24, the
+  periodic packs of phase 21, the trigger library, the case access list. In run 5b, 2 of 6 drafted gaps (K-20, K-36)
+  were already met this way.
+- Reuse an existing Cedar action for a new read route when the same roles read the same kind of data (for example
+  `rating.distribution.read` for counts-only rating views). Never invent action names.
+- A register can be the existing rows of a table (manual grants in `casework.case_acl`), not a new table.
+- Read the DDL's CHECK constraints and guards before changing a row's lifecycle (run 5b: a revoke CHECK required a
+  revoker, so an automatic expiry needed that CHECK changed).
+- New routes must also appear in docs/API.md; name the API.md section the row belongs in.
+
+Lessons from run 5a (follow them):
+- GAP only when docs/MODULES.md or docs/ROADMAP.md puts the requirement in P0 or P1 (quote that line). In run 5a, 9 of
+  12 drafted gaps were P2 or the bank's own process; those are NOT-CARRIED with the reason and source.
+- Check the target table's DDL before proposing a writer: a table with NOT NULL lineage columns (source_id, batch_id,
+  mapping_version_id) is filled by a mapping, not by a computed job.
+- For Partly, name the built part precisely; name a missing part only after grepping all phases for it (run 5a called
+  NTP missing, but phase 30 builds chrony on every node).
+
+Lessons from earlier runs (follow them):
+- Verify every name you write by grep. Do not invent tables, routes, jobs, settings, helpers or enum values; if no
+  phase names it, it does not exist. Run 4a invented `UserRoleQuery::holders` (the real one was phase 01
+  `GrantRepository::active_holders`).
+- Never propose a new value for a closed list (step-up class, access verb, role code, problem code) when an existing
+  value fits.
+- When the object a GAP needs is created by a later phase, the target gets a note "from phase NN on", never a call
+  that would not compile at the target's own phase.
+- Prefer no new column or channel when an existing record serves (the screens are the notice; an evidence object's
+  owner link is the record).
+- Do not put line numbers inside Proposed 7.x text; cite sections. Line numbers go only in Sources and Check.
+- Prefer a concrete proposal with a one-line reason over UNCLEAR; use UNCLEAR only when two sources truly disagree.
+
+Output file: tools/agent/gap1-run6b.md. Create it at the start with the header line
+"# Gap pass 1, run 6b (coverage: T; Haiku draft for lead review)" and then:
+
+Part 1, a table, one row per ID, appended as soon as each ID is classified (the machine may crash):
+| ID | Research row (file:line) | Requirement (at most 15 words) | Class | Evidence (phase-NN.md:LINE "quote" or source) | Proposed action |
+
+Part 2, after the table: one finding per GAP, in this format:
+
+### G1-PP-NN Short title   (PP = the target phase number)
+- Severity: HIGH | MEDIUM | LOW   (HIGH: core P0/P1 function missing; MEDIUM: a rule or field missing from a built
+  function; LOW: wording or an informative list)
+- Category: one of Missing Table, Missing Fields, Missing Endpoint, Missing Logic, Missing Report, Missing Integration,
+  Missing Event, Missing Audit Event, Missing Policy, Missing Requirement, Incomplete Coverage
+- Requirement: ID and research file:line
+- Target: phase-PP.md section X.Y
+- Check: the greps you ran and their results
+- Proposed 7.x text: "### 7.N <title>" with the change stated concretely (SQL using the target's own DDL column names,
+  route rows in the format | Method | Path | Scope | Description |, numbered steps, audit event names). Name the ID.
+
+Rules:
+- Write ONLY tools/agent/gap1-run6b.md. Do not edit any other file.
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Do not read cbs-discovery/ or test-poc/ (not needed).
+- At the end append "## Summary": counts by class (CARRIED, Partly, NOT-CARRIED, GAP), GAP findings by severity, and
+  a list of anything UNCLEAR.
+- Your final reply: the counts and the file path, nothing else.

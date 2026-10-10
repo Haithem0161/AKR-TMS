@@ -1,0 +1,23 @@
+Replacements made in docs/plan/phase-01.md by the first re-check (DR-413). 3 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-01-1a]
+WHY: R-01-1 | CONFIRMED MEDIUM | step 1 of `client create` (7.9) inserts the service row without `display_name` (NOT NULL, both keys), and `--name` is never stored, so `rotate` and `disable` cannot find the row | `display_name` set from `--name`; the name is unique among service principals not disabled and is the lookup key
+OLD:    `hydra_client_id`, `owner_user_id`, `expires_at`) and audit `service_client.created {client_id, owner_user_id,
+NEW:    `display_name` with both keys set to `--name`, `hydra_client_id`, `owner_user_id`, `expires_at`) and audit `service_client.created {client_id, owner_user_id,
+
+=== F2 [R-01-1b]
+WHY: R-01-1 | CONFIRMED MEDIUM | step 1 of `client create` (7.9) inserts the service row without `display_name` (NOT NULL, both keys), and `--name` is never stored, so `rotate` and `disable` cannot find the row | `display_name` set from `--name`; the name is unique among service principals not disabled and is the lookup key
+OLD: The secret is printed once; AKR-TMS stores no
+   copy.
+NEW: The secret is printed once; AKR-TMS stores no
+   copy. `--name` is also the Hydra client name. A name held by a service principal that is not disabled is refused
+   (exit 2), and `rotate` and `disable` find the principal by it (`kind = 'service'` and `display_name ->> 'en'`).
+
+=== F3 [R-01-2]
+WHY: R-01-2 | CONFIRMED LOW (raised MEDIUM) | 7.10 says the pinned list covers every route "but two" (heartbeat, logout), section 3 says the two public routes have no action | wording: two routes needed an action; the public ones need none
+OLD: The pinned list of section 3 covers every route of this phase but two. `POST /auth/session/heartbeat` uses
+NEW: The pinned list of section 3 left two routes that need an action without one (the two public routes need none).
+`POST /auth/session/heartbeat` uses

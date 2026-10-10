@@ -1,0 +1,59 @@
+Replacements made in docs/plan/phase-19.md by the first re-check (DR-413). 11 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-19-1a]
+WHY: R-19-1 | CONFIRMED MEDIUM (raised MEDIUM) | the route table has 32 rows (13 added) and the header, the count sentence, 4.5 item 16, check 7 and status.md still say 31 and 12 | the counts become 32 and 13; 7.14 says DR-157 counted thirty-one before the new route
+OLD: XL (31 product routes: 19 rows of API.md 3.12 owned here and 12 added rows;
+NEW: XL (32 product routes: 19 rows of API.md 3.12 owned here and 13 added rows;
+
+=== F2 [R-19-1b]
+WHY: R-19-1 | CONFIRMED MEDIUM (raised MEDIUM) | the route table has 32 rows (13 added) and the header, the count sentence, 4.5 item 16, check 7 and status.md still say 31 and 12 | the counts become 32 and 13; 7.14 says DR-157 counted thirty-one before the new route
+OLD: (19 owned rows, section 2) and 12 added rows marked
+NEW: (19 owned rows, section 2) and 13 added rows marked
+
+=== F3 [R-19-1c]
+WHY: R-19-1 | CONFIRMED MEDIUM (raised MEDIUM) | the route table has 32 rows (13 added) and the header, the count sentence, 4.5 item 16, check 7 and status.md still say 31 and 12 | the counts become 32 and 13; 7.14 says DR-157 counted thirty-one before the new route
+OLD: Count: 31 product routes (19 owned rows of API.md 3.12, 12 added rows).
+NEW: Count: 32 product routes (19 owned rows of API.md 3.12, 13 added rows; the thirteenth is the reopen-candidates route of section 7.14, added after DR-157 counted thirty-one).
+
+=== F4 [R-19-1d]
+WHY: R-19-1 | CONFIRMED MEDIUM (raised MEDIUM) | the route table has 32 rows (13 added) and the header, the count sentence, 4.5 item 16, check 7 and status.md still say 31 and 12 | the counts become 32 and 13; 7.14 says DR-157 counted thirty-one before the new route
+OLD: and gains the 12 added rows marked "(phase 19, added)"
+NEW: and gains the 13 added rows marked "(phase 19, added)"
+
+=== F5 [R-19-1e]
+WHY: R-19-1 | CONFIRMED MEDIUM (raised MEDIUM) | the route table has 32 rows (13 added) and the header, the count sentence, 4.5 item 16, check 7 and status.md still say 31 and 12 | the counts become 32 and 13; 7.14 says DR-157 counted thirty-one before the new route
+OLD: lists the 31 paths of section 2 (the 19 owned and the 12 added)
+NEW: lists the 32 routes of section 2 (the 19 owned and the 13 added)
+
+=== F6 [R-19-1f]
+WHY: R-19-1 | CONFIRMED MEDIUM (raised MEDIUM) | the route table has 32 rows (13 added) and the header, the count sentence, 4.5 item 16, check 7 and status.md still say 31 and 12 | the counts become 32 and 13; 7.14 says DR-157 counted thirty-one before the new route
+OLD: (the thirty-second product route of DR-157)
+NEW: (the thirty-second product route; DR-157 counted thirty-one before it)
+
+=== F7 [R-19-2]
+WHY: R-19-2 | CONFIRMED LOW (raised MEDIUM) | `not_critical_finding` is missing from the closed sub-code list of section 3.11 | appended
+OLD: `unknown_party`, `forbidden_term`, `rfi_open`.
+NEW: `unknown_party`, `forbidden_term`, `rfi_open`, `not_critical_finding`.
+
+=== F8 [R-19-3]
+WHY: R-19-3 | CONFIRMED LOW (raised MEDIUM) | the dialog lists "at most 25" cases and its route returns up to 100 | up to 100 candidates, at most `qa.bulk_reopen_max` selected
+OLD: a dialog lists the cases closed by the analyst in the window (at most 25),
+NEW: a dialog lists the cases closed by the analyst in the window (the candidates of section 7.14, at most 100 rows, of which at most `qa.bulk_reopen_max`, 25, may be selected),
+
+=== F9 [R-19-4a]
+WHY: R-19-4 | CONFIRMED LOW (raised MEDIUM) | three places say a QA item never shows a party name; the verified output of an `assistant_draft` item may name parties | the exception is written in the three places
+OLD: the reason codes and evidence labels, never a party name, an account or a contact |
+NEW: the reason codes and evidence labels, never a party name, an account or a contact (one exception from phase 28 on: the verified output of an `assistant_draft` item may name parties of its case, section 7+) |
+
+=== F10 [R-19-4b]
+WHY: R-19-4 | CONFIRMED LOW (raised MEDIUM) | three places say a QA item never shows a party name; the verified output of an `assistant_draft` item may name parties | the exception is written in the three places
+OLD: the evidence labels; no party name, account or contact).
+NEW: the evidence labels; no party name, account or contact, except inside the verified output of an `assistant_draft` item, section 7+).
+
+=== F11 [R-19-4c]
+WHY: R-19-4 | CONFIRMED LOW (raised MEDIUM) | three places say a QA item never shows a party name; the verified output of an `assistant_draft` item may name parties | the exception is written in the three places
+OLD: the verified output of an `assistant_draft` item, section 7+);
+NEW: the verified output of an `assistant_draft` item, which may name parties of its case, section 7+);

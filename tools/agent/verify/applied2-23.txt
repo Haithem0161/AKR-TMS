@@ -1,0 +1,19 @@
+Replacements made in docs/plan/phase-23.md by the first re-check (DR-413). 3 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-23-1]
+WHY: R-23-1 | CONFIRMED LOW (raised MEDIUM) | the party-path sentence can be read as giving `facility` no path | wording: `facility` and `trade_instrument` each through `customer_id`
+OLD: `account_hold`, `card` (through `account_id`), `facility`, `trade_instrument` (through `customer_id` and `canon.customer.party_id`)
+NEW: `account_hold` and `card` (each through `account_id`), `facility` and `trade_instrument` (each through `customer_id` and `canon.customer.party_id`)
+
+=== F2 [R-23-2a]
+WHY: R-23-2 | CONFIRMED LOW | section 3.4 still lists `feat.feature_runs` among the droppable parents; 7.10 made it a record purge by age and does not say whether a hold applies | removed from 3.4; 7.10 says no hold applies (no party data)
+OLD: `canon.payment_message_party`, `feat.feature_runs` and `feat.segment_stats` have no party path
+NEW: `canon.payment_message_party` and `feat.segment_stats` have no party path
+
+=== F3 [R-23-2b]
+WHY: R-23-2 | CONFIRMED LOW | section 3.4 still lists `feat.feature_runs` among the droppable parents; 7.10 made it a record purge by age and does not say whether a hold applies | removed from 3.4; 7.10 says no hold applies (no party data)
+OLD: The phase 13 assignment row takes the clock `age`.
+NEW: The phase 13 assignment row takes the clock `age`. A row of this table holds no party data (one row per month and feature), so no party or case hold stops its purge, and it is no longer among the droppable parents of section 3.4.

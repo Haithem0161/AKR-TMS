@@ -1,0 +1,197 @@
+Fixes applied to docs/plan/phase-27.md by the verification pass (DR-413). 46 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/27.txt)
+OLD: the count of missing features is stored in `shap` for live rows only.
+NEW: no per-row count is stored: `shap` holds only the contributions of step 5, and the batch total of values passed as missing is the `skipped_missing` count of step 6.
+
+=== F2 BLOCK (from fixes/27.txt)
+### 7.N The inventory item is created before its object row (V-27-02-a, HIGH; V-27-02-d, LOW; DR-413)
+`inventory_item_id` is `NOT NULL` with a foreign key that is not deferrable, on `admin.models` and on `admin.model_versions`, so the row cannot be inserted before its item. Section 3.1 step 2, the version item paragraph and section 3.3 step 5 run in this order, in the one transaction they already use:
+1. Generate the family id (or the version id) app-side.
+2. Call phase 04 `InventoryService::create` with `kind = model`, `object_id` = that id and the fields of section 3.1. The family item's `name` is the family's bilingual `name`; a version item's `name` is the family's name with ` v<version_no>` appended in both languages.
+3. Insert `admin.models` (or `admin.model_versions`) with that id and `inventory_item_id` = the new item's id. For a family, its `admin.model_kill_state` row follows in the same transaction.
+Phase 04 allows an item before its object (phase 04 section 3.9) and calls no resolver at create. The resolver of kind `model` that this phase registers is called by the use gate of section 3.1, and it finds the id in `admin.models` or `admin.model_versions`. The transaction commits both or neither, so no item is left without its row.
+
+=== F3 REP (from fixes/27.txt)
+OLD: `closure_code_not_allowed` | sections 3.1, 3.3, 3.6, 3.8 |
+NEW: `closure_code_not_allowed`, `name_not_bilingual` (a `name` or `purpose` without `ar` or `en`), `recalibration_due_required` (a starter without the date); the owner check is phase 04's own 422 | sections 3.1, 3.3, 3.6, 3.8 |
+
+=== F4 BLOCK (from fixes/27.txt)
+### 7.N Reads of the daily monitor, and its audit (V-27-03-a, V-27-03-c, MEDIUM; DR-413)
+Section 2 gains the reads behind the metrics of section 3.8:
+- `ScoreRepository::score_window(conn, version_id, role, from, to) -> ScoreWindow { scored, top_band, bins }`: the `alert.model_scores` rows of the version in that role and window; `bins` are the ten score counts of the 7.x block on bins.
+- `ScoreRepository::entered_window(conn, from, to, not_before) -> i64`: the alerts of `alert.alerts` created in the window and on or after `not_before` (the denominator of `scored_count`).
+- `MonitorRepository::override_window(conn, from, to) -> (i64, i64)`: the decisions of the window on cases with live-scored alerts and, of those, the overrides by the two rules of section 3.8. It reads `casework.decisions` (`type`, `decided_at`), `casework.case_alerts` and the live `top_band` flags.
+- The feature values of `feature_psi` come from phase 13's `FeatureValueReader::read`, as in section 3.4 step 3.
+After its last insert, the daily run writes one audit `model.monitored {day, points, suppressed, red}` (counts only; resource System; SIEM flag false), and section 3.13 gains that row. A day whose points all exist already writes none.
+
+=== F5 REP (from fixes/27.txt)
+OLD: and a `body` with the metric, value, band, threshold and the five permitted decisions.
+NEW: the fixed bilingual `title` {"ar": "تجاوز الحد الأحمر في مراقبة النموذج", "en": "Model monitor: red breach"}, and a `body` with the metric, value, band, threshold and the five permitted decisions. The job calls phase 24's `RegisterRepository::find_by_source_key` first and `insert` only when no row has the key.
+
+=== F6 REP (from fixes/27.txt)
+OLD: live-scored alerts over alerts that entered the queue in the window |
+NEW: alerts the version scored in its role over alerts that entered the queue in the window; a live version counts alerts created on or after its `live_from`, a shadow or challenger version those created on or after its `shadow_started_at` |
+
+=== F7 REP (from fixes/27.txt)
+OLD: the family's `model_monitor` findings must be closed (else `breach_open`).
+NEW: the family's `model_monitor` findings must be closed (else `breach_open`): the check reads phase 24's `RegisterRepository::list` with source `model_monitor` and a status other than `closed`, and keeps the rows whose `source_key` names a version of the family.
+
+=== F8 BLOCK (from fixes/27.txt)
+### 7.N Reference bins and the provisional top-band cut (V-27-05-b, MEDIUM; DR-413)
+`reference_bins` has one shape: `{"score": [ten counts], "features": {"<key>@<version>": {"edges": [nine ascending numbers], "counts": [ten counts]}}}`. The score uses ten equal-width bins on 0 to 1 (bin k covers from (k-1)/10 up to, not including, k/10; the last bin includes 1), so it carries no edges. Each feature of `feature_keys` carries its nine inner edges and ten counts; a missing value is not binned. A manifest without the score counts or without a feature of its list, or with arrays of another length, is `manifest_invalid` (section 3.3 step 4). `score_psi` and `feature_psi` of section 3.8 count the stored values in the same bins.
+Provisional cut (section 3.6 step 4): scanning the score bins from the top, the cut is the lower edge of the first bin at which the cumulative share of the reference counts reaches `model.top_band_percent`. Nothing is interpolated. The promotion replaces it with the percentile of the version's own shadow rows (section 3.7 step 4).
+
+=== F9 BLOCK (from fixes/27.txt)
+### 7.N Shadow start checks If-Match (V-27-05-c, LOW; DR-413)
+Section 6 check 8 gains item q: `POST /models/{id}/shadow` without `If-Match` answers 428 `E_PRECONDITION_REQUIRED`, and with a stale version it answers 409 `E_VERSION_CONFLICT`.
+
+=== F10 REP (from fixes/27.txt)
+OLD: step-up `approval`, `ModelPin` constant):
+NEW: step-up `approval` with the constant `ModelPin` = `{name: "model.pin", class: approval}` and the resource ref `model_pin:<family id>`; 401 `E_STEPUP_REQUIRED` without it):
+
+=== F11 BLOCK (from fixes/27.txt)
+### 7.N Pin targets are checked (V-27-06-b, MEDIUM; DR-413)
+Section 3.10 Pin, before `pinned_version_id` is set: a `version_id` that is not a version of this family is 422 `E_VALIDATION` at `/version_id`; a version whose status is not `registered`, `shadow`, `challenger` or `live` is 409 `E_NOT_ALLOWED_IN_STATE` with sub-code `not_pinnable`. A null `version_id` unpins and needs neither check.
+
+=== F12 REP (from fixes/27.txt)
+OLD: `role_taken`, `no_champion`, `other_family_live` |
+NEW: `role_taken`, `no_champion`, `other_family_live`, `not_pinnable` |
+
+=== F13 REP (from fixes/27.txt)
+OLD: Wait for the card's evidence to be `clean` (`av_status`), else retry (attempts 3, phase 00 back-off). An infected card: refusal `manifest_invalid`.
+NEW: Wait for the card's evidence to be `clean` (`av_status`): while it is `pending` the job returns `JobError::Retryable` (`max_attempts` 10 with the phase 00 back-off, about half an hour in all). An `infected` or `rejected` card is refusal `manifest_invalid`. A card still `pending` at the last attempt (`JobContext.attempt`) is refused with `manifest_invalid` too, so a version never stays in `importing` and the family's `import_pending` refusal always ends. Step 8 writes the refusal in each case; the artifact of a refused version is not imported again (`uq_model_artifact`), so the supplier issues a new one.
+
+=== F14 REP (from fixes/27.txt)
+OLD: 1, 3 | enqueued in the request transaction of
+NEW: 1, 10 | enqueued in the request transaction of
+
+=== F15 REP (from fixes/27.txt)
+OLD: Section 6 adds route 16
+NEW: This phase adds route 16
+
+=== F16 REP (from fixes/27.txt)
+OLD: 2. Batch (`model.sweep_batch`):
+NEW: 2. Batch (`model.sweep_batch`, scored in chunks of 50 alerts; step 1 is applied again before each chunk, so an engaged scope stops the batch):
+
+=== F17 REP (from fixes/27.txt)
+OLD: forced low-score sample reused as the unbiased set, section 3.4)
+NEW: forced low-score sample reused as the unbiased set, section 3.6)
+
+=== F18 REP (from fixes/27.txt)
+OLD: with the family's tier, owner, developer and committee.
+NEW: with the family's tier, `tier_basis`, owner, developer and committee.
+
+=== F19 REP (from fixes/27.txt)
+OLD: override monitors with green, amber and red bands, section 3.7)
+NEW: override monitors with green, amber and red bands, section 3.8)
+
+=== F20 REP (from fixes/27.txt)
+OLD: `casework.decisions` with `type` and `decided_at`, `casework.case_alerts`)
+NEW: `casework.decisions` with `type` and `decided_at`; `casework.case_alerts` is phase 17's table)
+
+=== F21 REP (from fixes/27.txt)
+OLD: and the model-ladder read of route 15)
+NEW: and the model-ladder read of route 4)
+
+=== F22 REP (from fixes/27.txt)
+OLD: Record an evaluation (route 6, `model.validation.record`, MRO).
+NEW: Record an evaluation (route 8, `model.validation.record`, MRO).
+
+=== F23 REP (from fixes/27.txt)
+OLD: The model-ladder read (route 15) shows the gate of each family
+NEW: The model-ladder read (route 4) shows the gate of each family
+
+=== F24 REP (from fixes/27.txt)
+OLD: **`prepare` (route 8, the change request is created and submitted in the request;
+NEW: **`prepare` (route 10, the change request is created and submitted in the request;
+
+=== F25 REP (from fixes/27.txt)
+OLD: **Engage (route 10; Cedar `model.kill.engage`
+NEW: **Engage (route 12; Cedar `model.kill.engage`
+
+=== F26 REP (from fixes/27.txt)
+OLD: **Release request (route 11; Cedar `model.kill.release_request`)
+NEW: **Release request (route 13; Cedar `model.kill.release_request`)
+
+=== F27 REP (from fixes/27.txt)
+OLD: **Drill (route 13; `model.kill.drill`, MRO)
+NEW: **Drill (route 14; `model.kill.drill`, MRO)
+
+=== F28 REP (from fixes/27.txt)
+OLD: **Pin (route 9;
+NEW: **Pin (route 11;
+
+=== F29 REP (from fixes/27.txt)
+OLD: The drill is recorded by a person's statement (route 13)
+NEW: The drill is recorded by a person's statement (route 14)
+
+=== F30 REP (from fixes/27.txt)
+OLD: No route admits a role that its permits do not name.
+NEW: A route scope may admit a role that no permit names: SEC is admitted by `audit.read` on the six GET routes that carry it, and Cedar refuses it with `E_FORBIDDEN` (403).
+
+=== F31 BLOCK (from fixes/27.txt)
+### 7.N ModelSwitch: the other ChangeTarget methods (V-27-04-c, LOW; DR-413)
+`ModelSwitch` implements phase 04 `ChangeTarget` with: `kind() = model_switch`; `reason_families() = ["change"]`; `generic_create() = false` (the only entry is the release route of section 3.9 step 3); `emergency_allowed() = false`; `inventory_kind() = None` (the GV-01 gate applies to promotion only, section 3.7); `revert` is not implemented. `current_version(conn, cr)` returns the `version` of the `admin.model_kill_state` row named by the change's `object_key` (`kill:<scope>`), which is the base version of the release, so phase 04's `E_STALE_BASE` applies when it has moved. `on_submitted` writes nothing. `diff(cr)` shows `engaged` going from `true` to `false`; the scope and its `reason_code` do not change. `on_closed` changes nothing: a rejected, withdrawn or failed release leaves the scope engaged.
+
+=== F32 BLOCK (from fixes/27.txt)
+### 7.N The shadow start is one repository call (V-27-05-a, MEDIUM; DR-413)
+`VersionRepository` (section 2) gains `begin_shadow(tx, id, role, shadow_criteria, top_band_cut, expected_version)`. It runs one `UPDATE` of `admin.model_versions` with `WHERE id = $1 AND version = $expected_version`, which sets `status` to the role, `shadow_started_at = now()`, `shadow_criteria`, `top_band_cut`, `retired_at = NULL` and `version = version + 1`. Section 3.6 step 4 is this one call; `set_status` is not used for it. Every column it sets is in the `UPDATE` grant of section 1.3, and the version guard admits the edges it uses (`registered` to `shadow`, and the rollback `retired` to `shadow` with new criteria).
+
+=== F33 REP (from fixes/27.txt)
+OLD: with the success criteria frozen; `Idempotency-Key`
+NEW: with the success criteria frozen; `If-Match` on the version; `Idempotency-Key`
+
+=== F34 REP (from fixes/27.txt)
+OLD: Start a shadow or challenger run (route 7, `ModelRegistry::start_shadow`
+NEW: Start a shadow or challenger run (route 9, `ModelRegistry::start_shadow`
+
+=== F35 REP (from fixes/27.txt)
+OLD: frozen at start (route 7)
+NEW: frozen at start (route 9)
+
+=== F36 REP (from fixes/27.txt)
+OLD: through `retired -> shadow` (route 7)
+NEW: through `retired -> shadow` (route 9)
+
+=== F37 REP (from fixes/27.txt)
+OLD: Pin or unpin the live version;
+NEW: Pin or unpin a version of the family (section 3.10);
+
+=== F38 REP (from fixes/27.txt)
+OLD: A row not visible, or a suspicion-tier row for a caller without `record_open` step-up, answers the masked 404 `E_NOT_FOUND`; the step-up check runs before the tier answer (phase 17 rule).
+NEW: A suspicion-tier row for a caller without `record_open` step-up answers 401 `E_STEPUP_REQUIRED` first (the step-up check runs before the tier answer, phase 17 section 3.10); any other row not visible to the caller answers the masked 404 `E_NOT_FOUND`.
+
+=== F39 REP (from fixes/27.txt)
+OLD: | none | kill engage, pin |
+NEW: | none | kill engage, pin, route 16 for a suspicion-tier alert without step-up |
+
+=== F40 REP (from fixes/27.txt)
+OLD: `for_alert_live(conn, alert_id, alert_created_at, live_id)`
+NEW: `for_alert_live(conn, alert_id, alert_created_at)`: the latest `live` row of the alert, of any live version (section 3.4 "Single read", step 2)
+
+=== F41 REP (from fixes/27.txt)
+OLD: Insert `admin.model_versions` with `status = importing`
+NEW: Insert `admin.model_versions` with `model_id` (the family of the path), `artifact_key` and `manifest_sha256` (from the request), `created_by` (the caller) and `status = importing`
+
+=== F42 REP (from fixes/27.txt)
+OLD: The inventory item is created in `registered` (phase 04 default).
+NEW: The version's inventory item, created at import (section 3.1), keeps its phase 04 default status `registered`.
+
+=== F43 REP (from fixes/27.txt)
+OLD: Import, synchronous (route 4, akr-api
+NEW: Import, synchronous (route 6, akr-api
+
+=== F44 REP (from fixes/27.txt)
+OLD: 1. Lock order 1:
+NEW: 1. Lock order 2:
+
+=== F45 REP (from fixes/27.txt)
+OLD: `InventoryService::update` on the inventory item to set
+NEW: `InventoryService::update` on the inventory item (`if_match` = the item's `version`, read in the same transaction) to set
+
+=== F46 REP (from fixes/27.txt)
+OLD: the body carries no score, band or reason code.
+NEW: the body carries no score, band or reason code. A suspicion-tier alert answers 401 `E_STEPUP_REQUIRED` first to a caller without `record_open` step-up (phase 17 section 3.10), and the masked 404 applies only after step-up.

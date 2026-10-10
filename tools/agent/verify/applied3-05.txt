@@ -1,0 +1,11 @@
+Replacements made in docs/plan/phase-05.md by the second re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-05-1]
+WHY: S-05-1 | CONFIRMED LOW (raised MEDIUM) | section 3.3 still says the per-year counts show the curve "the backfill planner of phase 12 uses"; the trailer (the R-05-4 text) and DR-380 say no phase builds one. A stale aside with no building consequence | the aside names the object's volume curve only
+OLD:      years are read: `index_range` with the per-year counts kept (they show the volume curve the backfill planner of
+     phase 12 uses);
+NEW:      years are read: `index_range` with the per-year counts kept (they show the volume curve of the object over the
+     years);

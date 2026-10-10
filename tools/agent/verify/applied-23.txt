@@ -1,0 +1,179 @@
+Fixes applied to docs/plan/phase-23.md by the verification pass (DR-413). 44 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 BLOCK (from fixes/10.txt)
+### 7.N The canonical writer takes the party lock (V-10-06-a, MEDIUM; DR-413)
+Section 3.15 step 1 gains a third taker of the party lock, beside hold placement and the party purge: the canonical writer of phase 10 (phase 10 section 7+, the party lock in the writer), before its tombstone read of a `canon.customer` or `canon.account` row, in ascending party id, held to the commit of its batch transaction.
+
+=== F2 BLOCK (from fixes/13.txt)
+### 7.N Counterparty links follow their counterparty (V-13-12-a, MEDIUM; DR-413)
+Section 3.2: `feat.counterparty_links` (phase 13 section 7.5) is an R2 row with clock `owner`. Its handler's `parent_key` is `canon.counterparty` by `counterparty_id`, so the table is `report_only` while its parent is (the R2 row of section 3.2, Open doubts 22), and its rows are deleted in the counterparty's transaction once that purge opens.
+
+=== F3 REP (from fixes/23.txt)
+OLD: | GET | `/api/v1/retention/report` | `audit.read` |
+NEW: | GET | `/api/v1/retention/report` | `audit.read`, `admin.system` |
+
+=== F4 REP (from fixes/23.txt)
+OLD: | GET | `/api/v1/retention/runs` | `audit.read` |
+NEW: | GET | `/api/v1/retention/runs` | `audit.read`, `admin.system` |
+
+=== F5 REP (from fixes/23.txt)
+OLD: | GET | `/api/v1/retention/runs/{id}` | `audit.read` |
+NEW: | GET | `/api/v1/retention/runs/{id}` | `audit.read`, `admin.system` |
+
+=== F6 REP (from fixes/23.txt)
+OLD: (section 3.10); `held` is `null` for IA and SEC
+NEW: (section 3.10); `held` is `null` for IA, SEC and ADM
+
+=== F7 REP (from fixes/23.txt)
+OLD: One run with its items; `held` is `null` for IA and SEC
+NEW: One run with its items; `held` is `null` for IA, SEC and ADM
+
+=== F8 REP (from fixes/23.txt)
+OLD: (`GET /retention/report`, scope `audit.read`)
+NEW: (`GET /retention/report`, scope `audit.read` or `admin.system`)
+
+=== F9 REP (from fixes/23.txt)
+OLD: are `null` for IA and SEC (section 3.13)
+NEW: are `null` for IA, SEC and ADM (section 3.13)
+
+=== F10 REP (from fixes/23.txt)
+OLD: the reason code `legal_hold` are `null` for IA and SEC.
+NEW: the reason code `legal_hold` are `null` for IA, SEC and ADM.
+
+=== F11 REP (from fixes/23.txt)
+OLD: `execute(run_id) -> RunSummary`
+NEW: `execute(run_id) -> RunSummary` (the value stored in the `summary` column of section 1.1: the class totals, `truncated`, and the later-of count and earliest due date of section 3.10)
+
+=== F12 REP (from fixes/23.txt)
+OLD: `list(ctx, HoldFilter) -> Page<HoldView>`, `get(ctx, id) -> HoldView`. `HoldView` is the view of section 3.8
+NEW: `list(ctx, HoldFilter) -> Page<LegalHoldView>`, `get(ctx, id) -> LegalHoldView`. `LegalHoldView` (so named because phase 29 has a `HoldView` in the same OpenAPI document) is the view of section 3.8
+
+=== F13 REP (from fixes/23.txt)
+OLD: `ProposeHoldRelease`, `HoldView`, `HoldPage`
+NEW: `ProposeHoldRelease`, `LegalHoldView`, `HoldPage`
+
+=== F14 REP (from fixes/23.txt)
+OLD: 2. Validate the body: the field combination must match `kind` (`E_VALIDATION`);
+NEW: 2. Validate the body: the field combination must match `kind` (`E_VALIDATION`), and `reason_text`, when given, is at most 500 characters (`E_VALIDATION`);
+
+=== F15 REP (from fixes/23.txt)
+OLD: scanned, section 3.2)
+NEW: scanned, section 3.8)
+
+=== F16 REP (from fixes/23.txt)
+OLD: `card`, `facility`, `trade_instrument` (through `account_id`)
+NEW: `card` (through `account_id`), `facility`, `trade_instrument` (through `customer_id` and `canon.customer.party_id`)
+
+=== F17 REP (from fixes/23.txt)
+OLD: `canon.txn` has no index on `account_id` in phase 10 as far as this draft reads, and the account purge needs one.
+NEW: `canon.txn` has the index `idx_txn_account` on `account_id` in phase 10, which the account purge uses.
+
+=== F18 REP (from fixes/23.txt)
+OLD: `rpt.reports` (`subject_party_id`). The list is closed in this phase: a case, an alert or a report is R5 or R6 and is not deleted here,
+NEW: `rpt.reports` (`subject_party_id`), `alert.screening_alerts` (`subject_id`, where `subject_kind` is `party`). The list is closed in this phase: a case, an alert, a report or a screening alert is R5, R6 or R7 and is not deleted here,
+
+=== F19 REP (from fixes/23.txt)
+OLD: The party columns of the screening tables (phase 14) and of `ref.list_*` are not checked, so the blocking list of section 3.5 is closed on the four tables named.
+NEW: The party columns of `ref.list_*` are not checked. The blocking list of section 3.5 names five tables; the party subject of `alert.screening_alerts` is in the phase 14 DDL (`subject_kind`, `subject_id`).
+
+=== F20 REP (from fixes/23.txt)
+OLD: `feat.feature_values`, `feat.feature_runs`, `feat.segment_stats`, `feat.profiles` |
+NEW: `feat.feature_values`, `feat.segment_stats`, `feat.profiles`; `feat.feature_runs` is not partitioned and leaves by `record_purge` by age on `as_of`, in batches (section 7+) |
+
+=== F21 REP (from fixes/23.txt)
+OLD: 'canon.payment_message_party', 'feat.feature_values', 'feat.feature_runs', 'feat.segment_stats',
+NEW: 'canon.payment_message_party', 'feat.feature_values', 'feat.segment_stats',
+
+=== F22 REP (from fixes/23.txt)
+OLD: 'feat.profiles', 'alert.alerts')
+NEW: 'feat.profiles', 'alert.alerts', 'assess.decisions')
+
+=== F23 REP (from fixes/23.txt)
+OLD: (the COMPLIANCE bucket of phase 02, under the prefix `certificates/`)
+NEW: (the phase 02 bucket `akr-evidence`, COMPLIANCE mode, under the prefix `certificates/`; every PUT sets its own lock, section 3.7)
+
+=== F24 REP (from fixes/23.txt)
+OLD: and `s3:PutObject` under `certificates/`
+NEW: and `s3:PutObject` on `akr-evidence` under `certificates/`
+
+=== F25 REP (from fixes/23.txt)
+OLD: `RetentionReportService` applies this rule (section 3.10).
+NEW: The engine computes the number of reports due under this rule into the run summary (section 3.10), and `RetentionReportService` reads it from there.
+
+=== F26 REP (from fixes/23.txt)
+OLD: ('retention.period_days.R1'
+NEW: ('retention.period_days.r1'
+
+=== F27 REP (from fixes/23.txt)
+OLD: ('retention.period_years.R2'
+NEW: ('retention.period_years.r2'
+
+=== F28 REP (from fixes/23.txt)
+OLD: ('retention.period_years.R3'
+NEW: ('retention.period_years.r3'
+
+=== F29 REP (from fixes/23.txt)
+OLD: ('retention.period_years.R4'
+NEW: ('retention.period_years.r4'
+
+=== F30 REP (from fixes/23.txt)
+OLD: ('retention.period_years.R5'
+NEW: ('retention.period_years.r5'
+
+=== F31 REP (from fixes/23.txt)
+OLD: ('retention.period_years.R6'
+NEW: ('retention.period_years.r6'
+
+=== F32 REP (from fixes/23.txt)
+OLD: ('retention.period_years.R7'
+NEW: ('retention.period_years.r7'
+
+=== F33 REP (from fixes/23.txt)
+OLD: ('retention.period_years.R8'
+NEW: ('retention.period_years.r8'
+
+=== F34 REP (from fixes/23.txt)
+OLD: `retention.period_days.R1` and `retention.period_years.R2` to `R8`
+NEW: `retention.period_days.r1` and `retention.period_years.r2` to `r8`
+
+=== F35 REP (from fixes/23.txt)
+OLD: `retention.period_years.R2` configured at 5 with floor 7 gives 7
+NEW: `retention.period_years.r2` configured at 5 with floor 7 gives 7
+
+=== F36 REP (from fixes/23.txt)
+OLD: setting `retention.period_years.R2` to 5 is refused
+NEW: setting `retention.period_years.r2` to 5 is refused
+
+=== F37 REP (from fixes/23.txt)
+OLD: created with the phase 02 anchor key by `akr-ctl ops provision`
+NEW: created with the other transit keys of the OpenBao layout by the ceremony runbook, and by `make bao-dev` in development (phase 00 section 7+)
+
+=== F38 REP (from fixes/23.txt)
+OLD: re-read the holds for the party (party holds on it, case holds whose `case_parties` contain it)
+NEW: re-read the holds for the party (party holds on it, and case holds matched as in section 3.8, which follows `merged_into` as 7.4 says)
+
+=== F39 BLOCK (from fixes/23.txt)
+### 7.N Two audit events of the run (V-23-01-d, V-23-01-e, MEDIUM; DR-413)
+Section 3.12 gains two rows. `retention.dry_run_requested` | `POST /retention/dry-runs` (section 3.1), in the transaction that inserts the run row | `retention_run` | `run_id`, `as_of` (the actor is the requester). `retention.item_failed` | a failed item (section 3.1 step 8) | table | `run_id`, `retention_class`, `table`, `reason_code` (a partition item adds `partition`; no party id and no case id). Both names are new.
+
+=== F40 BLOCK (from fixes/23.txt)
+### 7.N A repeat shred is a no-op (V-23-03-a, MEDIUM; DR-413)
+`ShredOutcome { Shredded, AlreadyShredded }`. `EvidenceShredder::shred` on a row whose `shredded_at` is set returns `AlreadyShredded`, keeps the first `shredded_at` and writes no second `retention.evidence_shredded` event. Section 3.6 "sets `shredded_at = now()`" holds for the first call only.
+
+=== F41 BLOCK (from fixes/23.txt)
+### 7.N RelationshipEndResolver in section 2 (V-23-04-c, LOW; DR-413)
+Section 2, services: `RelationshipEndResolver::end_date(conn, party_id: Uuid) -> Result<Option<NaiveDate>, RepoError>` (`akr-worker`). It gives the party end date of section 3.5, and `None` while the party is not due: the relationship is open, or the party has no customer and no account role.
+
+=== F42 BLOCK (from fixes/23.txt)
+### 7.N `feat.feature_runs` is purged by row (V-23-06-a, MEDIUM; DR-413)
+Lead decision. Phase 13 does not partition `feat.feature_runs` (one row per month and feature), so a partition drop could never run. Its R4 handler is `record_purge` by age on `as_of`, in batches, as for `admin.quarantine_items`. Migration `0072` (section 1.2): the DELETE grant of `akr_retention` gains `feat.feature_runs`, and the table leaves the allow-list of `admin.retention_drop_partition`. The phase 13 assignment row takes the clock `age`.
+
+=== F43 BLOCK (from fixes/23.txt)
+### 7.N `assess.decisions` in the drop function, and the R7 exception (V-23-10-a, MEDIUM; V-23-10-b, LOW; DR-413)
+The allow-list of `admin.retention_drop_partition` (section 1.2 step 1) names `assess.decisions` from this migration on. The table arrives with phase 29; until then step 2 refuses the name, because no partition is a child of it. Phase 29 therefore re-creates nothing. Class R7 is `report_only` (section 3.2 and 7.2) with this one exception: `assess.decisions` is R7 on a partition clock and leaves by partition drop under the rule of 7.2.
+
+=== F44 REP (from fixes/28.txt)
+OLD: | R11 | `age` | kept | 10 years | `report_only` | `kyc.rating_shadow_runs`, `kyc.rating_shadow_items` |
+NEW: | R11 | `age`, `retirement` | kept | 10 years | `report_only` | `kyc.rating_shadow_runs`, `kyc.rating_shadow_items`; on the `retirement` clock (never due): `admin.models`, `admin.model_versions` (phase 27) and `admin.assistant_versions` (phase 28) |

@@ -1,0 +1,78 @@
+Phase 08 fixes (lead-reviewed from tools/agent/verify/draft/08.txt; verdicts in tools/agent/verify-verdict.md).
+
+@@ REP 04
+`comment?` (approve), `comment` (reject)
+@@ WITH
+`comment?` (approve and sign, section 3.4 step 3), `comment` (reject)
+@@ END
+
+(V-08-01-b: the 30 s poll is already replaced by fixes/04.txt, same finding from phase 04.)
+@@ REP 08
+`E_CLAIMED`, `E_STALE_ASSIGNEE` and `E_SELF_APPROVAL` are explained in words
+@@ WITH
+`E_CLAIMED` and `E_STALE_ASSIGNEE` are explained in words, and 403 `E_SELF_APPROVAL` is explained in words
+@@ END
+
+@@ REP 08
+Text columns sort through `collator()`;
+@@ WITH
+Text columns sort through `collator()` (a header sort reorders the rows loaded so far; the list routes take no sort parameter and each keeps the server order its phase states);
+@@ END
+
+@@ REP 08
+a 401 `E_STEPUP_REQUIRED` on any request (an assertion spent or expired meanwhile) reopens the
+@@ WITH
+a 401 `E_STEPUP_REQUIRED` on any request except `POST /auth/step-up/verify` (an assertion spent or expired meanwhile) reopens the
+@@ END
+@@ REP 08
+dialog with the class from the problem body and retries once with the same `Idempotency-Key`. Assertions are held only
+@@ WITH
+dialog with the class from the problem body and retries once with the same `Idempotency-Key`. A refused proof on `POST /auth/step-up/verify` is not resent: the dialog asks for a new code. Assertions are held only
+@@ END
+
+@@ REP 08
+API refuses otherwise and the screen says why).
+@@ WITH
+API answers 202 with the check id and the source stays paused until that check passes, and the screen says why).
+@@ END
+@@ REP 08
+resume is refused until a fresh check passes, with the reason in words.
+@@ WITH
+resume answers 202 and the source stays paused until a fresh check passes, with the reason in words.
+@@ END
+
+@@ BLOCK 01
+### 7.N SessionView carries the heartbeat interval (V-08-06-a, MEDIUM; DR-413)
+`SessionView` (section 2) gains `heartbeat_min_interval_s` (seconds), the current value of the setting `session.heartbeat_min_interval_s`, as `warning_s` carries `session.warning_s`. `GET /auth/session` and `POST /auth/session/heartbeat` return it, so the client applies the heartbeat rule of phase 08 section 3.6 from the session view alone. The idle timeout reaches the client as `idle_expires_at`. No route is added and no setting changes.
+@@ END
+
+@@ REP 08
+The preferences it writes (`density`, `locale`,
+@@ WITH
+The preferences it writes (`density`,
+@@ END
+@@ REP 08
+`prose_digits`, `shortcuts`, `theme`) are the phase 01 `PreferencesV1` fields through `PATCH /me/preferences`.
+@@ WITH
+`prose_digits`, `shortcuts`, `theme`) are the phase 01 `PreferencesV1` fields through `PATCH /me/preferences`. `locale` is not a `PreferencesV1` field: it is the `admin.users.locale` column of phase 01, written by the same `PATCH /me/preferences`.
+@@ END
+
+@@ BLOCK 08
+### 7.N The code points of scanControls (V-08-08-a, LOW; DR-413)
+`scanControls(s)` in the section 3.3 `bidi.ts` row returns offsets only and changes no text. `bidi` flags U+202A to U+202E, U+2066 to U+2069, U+200E, U+200F and U+061C. `zero_width` flags U+200C, U+200D and U+FEFF. The sets are those of research/31-analyst-ux.md section 4.2 rule 4 and of research/22-arabic-name-matching.md section 6.2 (row "Invisible format characters"). Removal for matching is phase 14 N3 (section 3.1).
+@@ END
+
+@@ BLOCK 10
+### 7.N Name flags for bidirectional and zero-width characters (V-08-08-b, MEDIUM; DR-413)
+UX-20's flagging as data quality is carried by the `quality_flags` of N-12 (section 3.3), with no new column and no register kind. From phase 11 on the canonical writer sets `bidi_control` on a `party_name` row whose `raw` holds a character of the `bidi` set of phase 08 (section 7+, the code points of scanControls) and `zero_width` on a row whose `raw` holds one of its `zero_width` set; the same two values are set in `quality_flags` of a `counterparty` or `payment_message_party` row whose name holds one. The raw value is stored unchanged. As N-12 says, a flag never lowers a match score. Phase 08's pointer "flagging as data quality arrives with ingestion in phase 11" means this.
+@@ END
+
+@@ BLOCK 08
+### 7.N The board pack rail entry (V-08-10-a, LOW; DR-413)
+The CH rail entry `board pack` of DESIGN-SYSTEM 8.2 is the R4 screen (`/packs`, the board pack and evidence pack builder of DESIGN-SYSTEM 8.1). It takes `RailGroup` `reports`, the group of the R series; the closed union of section 7.2 gains no value.
+@@ END
+
+@@ BLOCK 08
+### 7.N The transliteration under a name (V-08-11-a, MEDIUM; DR-413)
+The `Name` component shows what the source gives. The original is the party's `canon.party_name` row in Arabic or Kurdish script; the transliteration beneath it is the row of the same party and `name_type` with `script = 'lat'`, when the source supplied one, and its source label is the label of that row's `source_field` (the mapped source column, phase 10). A party with no Latin row shows no second line. The product generates no Latin form, so the label `generated` of DESIGN-SYSTEM 7.6 is not used in this plan; phase 14's back-transliteration serves matching only.
+@@ END

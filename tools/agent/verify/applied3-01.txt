@@ -1,0 +1,16 @@
+Replacements made in docs/plan/phase-01.md by the second re-check (DR-413). 2 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-01-1]
+WHY: S-01-1 | CONFIRMED MEDIUM | section 7.9 step 1 (the R-01-1b text): a name is refused only while a principal that is not disabled holds it, so a disabled principal and a later active one can share a name, and the lookup of `rotate` and `disable` has no status condition and can match both rows | the lookup names `status = 'active'`
+OLD:    (exit 2), and `rotate` and `disable` find the principal by it (`kind = 'service'` and `display_name ->> 'en'`).
+NEW:    (exit 2), and `rotate` and `disable` find the principal by it (`kind = 'service'`, `status = 'active'` and
+   `display_name ->> 'en'`), so a disabled principal that still carries the name is never the one found.
+
+=== F2 [L2-01-1]
+WHY: L2-01-1 | CONFIRMED LOW (lead) | phase 01 section 3 says "a `record_open` step-up proves presence and is never consumed"; the steps of `consume` in the same section spend every assertion, the ledger is single-use (DR-29), and phases 17, 18, 19, 26, 27 and 28 call `consume` for a suspicion open and list a spent assertion among its refusals. One clause against the rest of the plan | the clause says that reading `fresh_until` spends nothing and that a `record_open` assertion is spent by `consume` like any other
+OLD: puts it in the Cedar context; a `record_open` step-up proves presence and is never consumed.
+NEW: puts it in the Cedar context. Reading `fresh_until` spends nothing; an assertion of the class `record_open` is spent
+by `consume` like one of any other class, in the handler of the open (phase 17 section 3.10).

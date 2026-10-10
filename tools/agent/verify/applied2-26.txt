@@ -1,0 +1,42 @@
+Replacements made in docs/plan/phase-26.md by the first re-check (DR-413). 7 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-26-1]
+WHY: R-26-1 | CONFIRMED LOW (raised LOW) | "section 4.5 gains this phase 01 item" points at nothing; phase 01 does not change | "both classes exist, so phase 01 does not change"
+OLD: with phase 01's closed classes (section 4.5 gains this phase 01 item):
+NEW: with phase 01's closed classes (both classes exist, so phase 01 does not change):
+
+=== F2 [R-26-2]
+WHY: R-26-2 | CONFIRMED LOW (raised LOW) | a stray semicolon before the new sentence of the repository bullet | full stop
+OLD: `decide(tx, id, expected_version, decision) -> PossessionEvidence`; `list_for_deal(deal_id)`;
+    No duplicate method lives here
+NEW: `decide(tx, id, expected_version, decision) -> PossessionEvidence`; `list_for_deal(deal_id)`.
+    No duplicate method lives here
+
+=== F3 [R-26-3]
+WHY: R-26-3 | CONFIRMED MEDIUM (raised MEDIUM) | the test says the duplicate tile is absent for `a2@`, who gets 403 on G1 and never reads a tile | the test uses `ch@` and `ia@`; `a2@` gets 403 `E_SCOPE`
+OLD: and as `a2@` the tile is absent.
+NEW: and as `ch@` and `ia@` the tile is absent (`a2@` holds no `dashboard.read` and gets 403 `E_SCOPE` on the G1 route).
+
+=== F4 [R-26-4]
+WHY: R-26-4 | CONFIRMED LOW (raised MEDIUM) | `content` has no step-up header parameter though its step 1 consumes the step-up; `get` has the same gap | both take `header`
+OLD: - `content(ctx, deal_id, evidence_id, download: bool) -> VerifiedReader` (Content; phase 02 `open`).
+NEW: - `content(ctx, deal_id, evidence_id, download: bool, header) -> VerifiedReader` (Content; phase 02 `open`; `header` is the step-up assertion header that step 6 of section 3.4 consumes on a suspicion-tier deal). `IslamicDealService::get` of section 3.4 takes the same `header` parameter.
+
+=== F5 [R-26-5]
+WHY: R-26-5 | CONFIRMED LOW (raised MEDIUM) | the trailer says phase 20 changes only by the task grouping; 7.10 adds the group state rule | the trailer names both
+OLD: only the task grouping of section 3.8.
+NEW: only the task grouping of section 3.8 and the group state rule of section 7.10.
+
+=== F6 [R-26-6]
+WHY: R-26-6 | CONFIRMED LOW (raised LOW) | `FreezeService::release_freeze` is not a method; it is a terminal effect | "the terminal effect `release_freeze`"
+OLD: 8. Release (`FreezeService::release_freeze`, phase 20 section 3.5 step 5, on approval)
+NEW: 8. Release (the terminal effect `release_freeze`, phase 20 section 3.5 step 5, on approval)
+
+=== F7 [R-26-7]
+WHY: R-26-7 | CONFIRMED LOW (raised LOW) | check 10 does not hold the three file checks that section 3.13 sends to it | check 10 gains them
+OLD:     the list predicate of 3.4 to the Cedar file.
+NEW:     the list predicate of 3.4 to the Cedar file. A policy test holds the three checks of the file that section 3.13 states: the route
+    scopes against the roles the file permits, the role reach (A1, A2 and M only), and the forbid text against the phase 18 forbids.

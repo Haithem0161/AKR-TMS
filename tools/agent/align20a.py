@@ -1,0 +1,20 @@
+import re
+p='docs/plan/research.md'
+t=open(p).read()
+rows='''| DR-158 | 2026-10-09 | A freeze is a row of `casework.freezes` (one per screening alert, created in phase 14's decision transaction through `FreezeTrigger`); a task is a row of `casework.ops_tasks` written in its owner's transaction; no phase 20 path writes a case event or takes a case lock | A freeze is a legal duty with clocks that must run even when the case is closed and sealed |
+| DR-159 | 2026-10-09 | Operations see a neutral instruction (restrict, hold or lift, with reference), the account numbers, the authority reference, the due time and their completion; no action kind, source, case, party name, list, reason or level; the view follows the caller's scope and its field set is a closed, tested list | Tipping-off rule (M-68) with the operational need to act on an account |
+| DR-160 | 2026-10-09 | Verification from the canonical copy: V1 hold row with the operator's reference, V2 adds a current copy and no posted debit, V0 flagged second-operator confirmation, V3 attested screenshot approved as a workflow act; the level only rises; debits are watched until release | A hold row does not say a freeze order was issued; the reference is the only link (RP-55) |
+| DR-161 | 2026-10-09 | Freeze task due 8 hours (governed setting `ops.freeze_task_hours`, 1 to 8); the 24-hour limit, 48-hour Committee report and 7-working-day refrain clock are fixed ClockRegistry entries; second report two calendar months after the first request; the three-day clock of file 25 C-63 is superseded (M-34) | CBI-set clocks must not be movable by a policy pack |
+| DR-162 | 2026-10-09 | A freeze is released only by the workflow `freeze_release` (M, four-eyes, step-up `decision`) when the active list version no longer carries the entry or marks it `delisted_on`; the release cancels the four timers, records the delisting version and creates a lift task | The research forbids a silent lift by delisting alone (RP-59) |
+| DR-163 | 2026-10-09 | An Office refrain instruction runs a 7-working-day clock; the hold is confirmed by the copy; an expired clock raises an alarm and never releases the hold; referral to the Committee's technical committee is a person's act with a letter request | A clock must not make a decision (RP-45, RP-58) |
+| DR-164 | 2026-10-09 | Process failures are incidents in `casework.ops_incidents` (one open per kind and subject) for the MLRO; clock breaches and post-order debits are alarms in the phase 19 register, whose CHECK gains three kinds; a debit raises both | Reuse of the phase 19 alarm register (DR-156); RP-55 needs a P1 exception |
+| DR-165 | 2026-10-09 | The Committee report, second report and referral are letters of phase 21; phase 20 defines the port `LetterRequester` and ships a recording stub; requests carry ids, codes and counts only | The reporting channel waits on the Office's answer (RP-56) |
+| DR-166 | 2026-10-09 | DATA-MODEL s.13 reconciled: `timer_id` leaves tasks and refrains, `ops_verifications` keeps counts and the evidence object, `freezes` gains the section 1 columns; all five tables R7 with closure or owner clocks | A freeze in force must never be due for deletion; R7 is the screening and sanctions class |
+| DR-167 | 2026-10-09 | One-time `freeze_backfill` creates a late freeze for each true decision phase 14's recording stub logged; it writes no block and no release | The bank must see what was not done in the core system |
+| DR-168 | 2026-10-09 | Phase 20 shape: shipped definitions `freeze_release`, `ops_attestation`, effects `release_freeze`, `record_verification`, `create_ops_task`; migrations 0066-0067, 5 tables and a sequence, 22 routes (11 owned API.md 3.14 rows, 11 added; `POST /exits` superseded by phase 15), team view by scope `case.decide`, Cedar `93_ops.cedar`, size L | Every release, attestation and refrain decision is a workflow act with four-eyes and step-up |
+'''
+anchor=[l for l in t.split('\n') if l.startswith('| DR-157 |')][0]+'\n'
+assert t.count(anchor)==1
+t=t.replace(anchor,anchor+rows)
+open(p,'w').write(t)
+print('ok')

@@ -1,0 +1,266 @@
+Phase 23 fixes (lead review of tools/agent/verify/draft/23.txt against docs/plan/phase-23.md, 2026-10-10).
+23 claims stood at the refuter. Lead result: 20 confirmed (2 HIGH, 11 MEDIUM, 7 LOW), 1 rejected, 2 duplicates.
+Lead decisions on the four open points: a repeat shred is a no-op (V-23-03-a); `feat.feature_runs` is purged by row,
+not partitioned (V-23-06-a); certificates go to `akr-evidence` under `certificates/` (V-23-06-b); the transit keys are
+created by the OpenBao ceremony runbook, and no `akr-ctl ops provision` exists (V-23-09-a). V-23-12-a is down-rated to
+LOW (stale base text under 7.4; the blocking references defer the party anyway). V-23-12-b is rejected: the test is
+stated in 7.4. V-23-07-a repeats V-23-01-a, and V-23-03-b is already fixed by fixes/02.txt. `assess.decisions` joins the allow-list in this phase's own function, so
+phase 29 re-creates nothing.
+
+@@ REP 23
+| GET | `/api/v1/retention/report` | `audit.read` |
+@@ WITH
+| GET | `/api/v1/retention/report` | `audit.read`, `admin.system` |
+@@ END
+
+@@ REP 23
+| GET | `/api/v1/retention/runs` | `audit.read` |
+@@ WITH
+| GET | `/api/v1/retention/runs` | `audit.read`, `admin.system` |
+@@ END
+
+@@ REP 23
+| GET | `/api/v1/retention/runs/{id}` | `audit.read` |
+@@ WITH
+| GET | `/api/v1/retention/runs/{id}` | `audit.read`, `admin.system` |
+@@ END
+
+@@ REP 23
+(section 3.10); `held` is `null` for IA and SEC
+@@ WITH
+(section 3.10); `held` is `null` for IA, SEC and ADM
+@@ END
+
+@@ REP 23
+One run with its items; `held` is `null` for IA and SEC
+@@ WITH
+One run with its items; `held` is `null` for IA, SEC and ADM
+@@ END
+
+@@ REP 23
+(`GET /retention/report`, scope `audit.read`)
+@@ WITH
+(`GET /retention/report`, scope `audit.read` or `admin.system`)
+@@ END
+
+@@ REP 23
+are `null` for IA and SEC (section 3.13)
+@@ WITH
+are `null` for IA, SEC and ADM (section 3.13)
+@@ END
+
+@@ REP 23
+the reason code `legal_hold` are `null` for IA and SEC.
+@@ WITH
+the reason code `legal_hold` are `null` for IA, SEC and ADM.
+@@ END
+
+@@ REP 23
+`execute(run_id) -> RunSummary`
+@@ WITH
+`execute(run_id) -> RunSummary` (the value stored in the `summary` column of section 1.1: the class totals, `truncated`, and the later-of count and earliest due date of section 3.10)
+@@ END
+
+@@ REP 23
+`list(ctx, HoldFilter) -> Page<HoldView>`, `get(ctx, id) -> HoldView`. `HoldView` is the view of section 3.8
+@@ WITH
+`list(ctx, HoldFilter) -> Page<LegalHoldView>`, `get(ctx, id) -> LegalHoldView`. `LegalHoldView` (so named because phase 29 has a `HoldView` in the same OpenAPI document) is the view of section 3.8
+@@ END
+
+@@ REP 23
+`ProposeHoldRelease`, `HoldView`, `HoldPage`
+@@ WITH
+`ProposeHoldRelease`, `LegalHoldView`, `HoldPage`
+@@ END
+
+@@ REP 23
+2. Validate the body: the field combination must match `kind` (`E_VALIDATION`);
+@@ WITH
+2. Validate the body: the field combination must match `kind` (`E_VALIDATION`), and `reason_text`, when given, is at most 500 characters (`E_VALIDATION`);
+@@ END
+
+@@ REP 23
+scanned, section 3.2)
+@@ WITH
+scanned, section 3.8)
+@@ END
+
+@@ REP 23
+`card`, `facility`, `trade_instrument` (through `account_id`)
+@@ WITH
+`card` (through `account_id`), `facility`, `trade_instrument` (through `customer_id` and `canon.customer.party_id`)
+@@ END
+
+@@ REP 23
+`canon.txn` has no index on `account_id` in phase 10 as far as this draft reads, and the account purge needs one.
+@@ WITH
+`canon.txn` has the index `idx_txn_account` on `account_id` in phase 10, which the account purge uses.
+@@ END
+
+@@ REP 23
+`rpt.reports` (`subject_party_id`). The list is closed in this phase: a case, an alert or a report is R5 or R6 and is not deleted here,
+@@ WITH
+`rpt.reports` (`subject_party_id`), `alert.screening_alerts` (`subject_id`, where `subject_kind` is `party`). The list is closed in this phase: a case, an alert, a report or a screening alert is R5, R6 or R7 and is not deleted here,
+@@ END
+
+@@ REP 23
+The party columns of the screening tables (phase 14) and of `ref.list_*` are not checked, so the blocking list of section 3.5 is closed on the four tables named.
+@@ WITH
+The party columns of `ref.list_*` are not checked. The blocking list of section 3.5 names five tables; the party subject of `alert.screening_alerts` is in the phase 14 DDL (`subject_kind`, `subject_id`).
+@@ END
+
+@@ REP 23
+`feat.feature_values`, `feat.feature_runs`, `feat.segment_stats`, `feat.profiles` |
+@@ WITH
+`feat.feature_values`, `feat.segment_stats`, `feat.profiles`; `feat.feature_runs` is not partitioned and leaves by `record_purge` by age on `as_of`, in batches (section 7+) |
+@@ END
+
+@@ REP 23
+'canon.payment_message_party', 'feat.feature_values', 'feat.feature_runs', 'feat.segment_stats',
+@@ WITH
+'canon.payment_message_party', 'feat.feature_values', 'feat.segment_stats',
+@@ END
+
+@@ REP 23
+'feat.profiles', 'alert.alerts')
+@@ WITH
+'feat.profiles', 'alert.alerts', 'assess.decisions')
+@@ END
+
+@@ REP 13
+('feat', 'feature_runs',        'R4', 'partition',  'as_of',
+@@ WITH
+('feat', 'feature_runs',        'R4', 'age',        'as_of',
+@@ END
+
+@@ REP 23
+(the COMPLIANCE bucket of phase 02, under the prefix `certificates/`)
+@@ WITH
+(the phase 02 bucket `akr-evidence`, COMPLIANCE mode, under the prefix `certificates/`; every PUT sets its own lock, section 3.7)
+@@ END
+
+@@ REP 23
+and `s3:PutObject` under `certificates/`
+@@ WITH
+and `s3:PutObject` on `akr-evidence` under `certificates/`
+@@ END
+
+@@ REP 23
+`RetentionReportService` applies this rule (section 3.10).
+@@ WITH
+The engine computes the number of reports due under this rule into the run summary (section 3.10), and `RetentionReportService` reads it from there.
+@@ END
+
+@@ REP 23
+('retention.period_days.R1'
+@@ WITH
+('retention.period_days.r1'
+@@ END
+
+@@ REP 23
+('retention.period_years.R2'
+@@ WITH
+('retention.period_years.r2'
+@@ END
+
+@@ REP 23
+('retention.period_years.R3'
+@@ WITH
+('retention.period_years.r3'
+@@ END
+
+@@ REP 23
+('retention.period_years.R4'
+@@ WITH
+('retention.period_years.r4'
+@@ END
+
+@@ REP 23
+('retention.period_years.R5'
+@@ WITH
+('retention.period_years.r5'
+@@ END
+
+@@ REP 23
+('retention.period_years.R6'
+@@ WITH
+('retention.period_years.r6'
+@@ END
+
+@@ REP 23
+('retention.period_years.R7'
+@@ WITH
+('retention.period_years.r7'
+@@ END
+
+@@ REP 23
+('retention.period_years.R8'
+@@ WITH
+('retention.period_years.r8'
+@@ END
+
+@@ REP 23
+`retention.period_days.R1` and `retention.period_years.R2` to `R8`
+@@ WITH
+`retention.period_days.r1` and `retention.period_years.r2` to `r8`
+@@ END
+
+@@ REP 23
+`retention.period_years.R2` configured at 5 with floor 7 gives 7
+@@ WITH
+`retention.period_years.r2` configured at 5 with floor 7 gives 7
+@@ END
+
+@@ REP 23
+setting `retention.period_years.R2` to 5 is refused
+@@ WITH
+setting `retention.period_years.r2` to 5 is refused
+@@ END
+
+@@ REP 14
+`retention.period_years.R7`
+@@ WITH
+`retention.period_years.r7`
+@@ END
+
+@@ REP 23
+created with the phase 02 anchor key by `akr-ctl ops provision`
+@@ WITH
+created with the other transit keys of the OpenBao layout by the ceremony runbook, and by `make bao-dev` in development (phase 00 section 7+)
+@@ END
+
+@@ REP 23
+re-read the holds for the party (party holds on it, case holds whose `case_parties` contain it)
+@@ WITH
+re-read the holds for the party (party holds on it, and case holds matched as in section 3.8, which follows `merged_into` as 7.4 says)
+@@ END
+
+@@ BLOCK 23
+### 7.N Two audit events of the run (V-23-01-d, V-23-01-e, MEDIUM; DR-413)
+Section 3.12 gains two rows. `retention.dry_run_requested` | `POST /retention/dry-runs` (section 3.1), in the transaction that inserts the run row | `retention_run` | `run_id`, `as_of` (the actor is the requester). `retention.item_failed` | a failed item (section 3.1 step 8) | table | `run_id`, `retention_class`, `table`, `reason_code` (a partition item adds `partition`; no party id and no case id). Both names are new.
+@@ END
+
+@@ BLOCK 23
+### 7.N A repeat shred is a no-op (V-23-03-a, MEDIUM; DR-413)
+`ShredOutcome { Shredded, AlreadyShredded }`. `EvidenceShredder::shred` on a row whose `shredded_at` is set returns `AlreadyShredded`, keeps the first `shredded_at` and writes no second `retention.evidence_shredded` event. Section 3.6 "sets `shredded_at = now()`" holds for the first call only.
+@@ END
+
+@@ BLOCK 23
+### 7.N RelationshipEndResolver in section 2 (V-23-04-c, LOW; DR-413)
+Section 2, services: `RelationshipEndResolver::end_date(conn, party_id: Uuid) -> Result<Option<NaiveDate>, RepoError>` (`akr-worker`). It gives the party end date of section 3.5, and `None` while the party is not due: the relationship is open, or the party has no customer and no account role.
+@@ END
+
+@@ BLOCK 23
+### 7.N `feat.feature_runs` is purged by row (V-23-06-a, MEDIUM; DR-413)
+Lead decision. Phase 13 does not partition `feat.feature_runs` (one row per month and feature), so a partition drop could never run. Its R4 handler is `record_purge` by age on `as_of`, in batches, as for `admin.quarantine_items`. Migration `0072` (section 1.2): the DELETE grant of `akr_retention` gains `feat.feature_runs`, and the table leaves the allow-list of `admin.retention_drop_partition`. The phase 13 assignment row takes the clock `age`.
+@@ END
+
+@@ BLOCK 23
+### 7.N `assess.decisions` in the drop function, and the R7 exception (V-23-10-a, MEDIUM; V-23-10-b, LOW; DR-413)
+The allow-list of `admin.retention_drop_partition` (section 1.2 step 1) names `assess.decisions` from this migration on. The table arrives with phase 29; until then step 2 refuses the name, because no partition is a child of it. Phase 29 therefore re-creates nothing. Class R7 is `report_only` (section 3.2 and 7.2) with this one exception: `assess.decisions` is R7 on a partition clock and leaves by partition drop under the rule of 7.2.
+@@ END
+
+@@ BLOCK 00
+### 7.N Who creates the transit keys (V-23-09-a, MEDIUM; DR-413)
+The transit keys of the OpenBao layout (section 3 and 7.6) are created once per install by the OpenBao ceremony runbook (SP-12), and by `make bao-dev` in development. No `akr-ctl` command creates a key; phase 23 named an `akr-ctl ops provision` that does not exist.
+@@ END

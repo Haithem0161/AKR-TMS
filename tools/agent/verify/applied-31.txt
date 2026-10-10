@@ -1,0 +1,141 @@
+Fixes applied to docs/plan/phase-31.md by the verification pass (DR-413). 33 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/31.txt)
+OLD: returns `passed_first`, `cases_passed_first`, `cases_attempted` and `attempts`.
+NEW: returns `passed_first`, `cases_passed_first`, `cases_attempted` and `attempts`. `passed_first` is TRUE when at least one case of the course was passed on its first attempt. It is not a course pass: the two counts beside it are the measure.
+
+=== F2 REP (from fixes/31.txt)
+OLD: "passed on first attempt" with the number of cases passed first time out of the cases tried, "not passed on first attempt", or "no attempt";
+NEW: "passed on first attempt" (shown when `passed_first` is TRUE, that is, at least one case was passed first time) with the number of cases passed first time out of the cases tried, "not passed on first attempt" (cases tried, none passed first time), or "no attempt";
+
+=== F3 BLOCK (from fixes/31.txt)
+### 7.N ClassAggregate and the snapshot reads of the forecast (V-31-02-a, MEDIUM; DR-413)
+Section 2.1: `ClassAggregate { pool_id: Uuid, work_kind: WorkKind, class_code: String, arrivals: i64, decided: i64, handling_minutes_sum: i64 }`. Each number is the sum over the window of the snapshot column of the same name, for pool rows only (the unassigned total is left out), grouped by pool, work kind and class. The type holds no person field. It is what `CapacityRepository::window_aggregate` returns and what step 1 of section 3.4 reads.
+Section 2.2: `CapacityRepository` gains two reads that steps 1, 6, 9 and 10 of section 3.4 need and no method gave.
+1. `snapshot_dates(from, to) -> Vec<NaiveDate>`: the distinct bank dates in the window that have a snapshot row. `W` of step 1 is the number of bank working days among them (phase 09 calendar).
+2. `recent_buckets(hours: i64) -> Vec<(CapacitySnapshot, DateTime<Utc>)>`: the rows of the latest `hours` complete buckets, each with its `computed_at`. The forecast calls it with 24. `B_0` of step 6 is the sum of `backlog_end` over the pool's rows of the newest bucket. The hourly totals of step 9 are the sums of `arrivals` and `decided` per pool and bucket. `data_as_of` of step 10 is the newest `computed_at`.
+
+=== F4 REP (from fixes/31.txt)
+OLD: A re-run replaces the values of the bucket and does nothing else.
+NEW: A re-run replaces the values of the bucket and does nothing else. The snapshot is a derived rebuild of counts, so it writes no audit row (section 3.14 lists none for it), as the anchors of phase 02 write none; `computed_at` is its record.
+
+=== F5 REP (from fixes/31.txt)
+OLD: Scope `{period}`; languages `ar` and `en`;
+NEW: Scope `{period}`: the body of `POST /packs` is the phase 06 `PackRequest` as `{kind, scope: {period}}`, answered by the phase 06 202 `PackAccepted`; `lang` is left out, and the build publishes one pack row per language. Languages `ar` and `en`;
+
+=== F6 REP (from fixes/31.txt)
+OLD: The pack has kind `correspondent` or `validator`, status built, and a period that has ended (422 sub-code `pack_not_ready`).
+NEW: The pack is a row of `admin.packs` (a row exists only once its build is published: phase 02 `PackService::publish`, step 3; the table has no status column), of kind `correspondent` or `validator`, whose `scope.period` is a bank month that has ended. Anything else, a pack of another kind and an unknown id included, is refused with 422 sub-code `pack_not_ready`.
+
+=== F7 BLOCK (from fixes/31.txt)
+### 7.N Repository methods of the correspondent list and the pack links (V-31-04-b, MEDIUM; DR-413)
+Section 2.2 gains two things.
+1. `RfiPackRepository` (new; it owns `casework.rfi_packs`): `insert(tx, rfi_id, pack_id, linked_by, at) -> bool` with `ON CONFLICT (rfi_id, pack_id) DO NOTHING`, and `for_rfis(conn, rfi_ids: &[Uuid]) -> Vec<(Uuid, Uuid, String)>` (RFI id, pack id and pack kind, joined to `admin.packs`). `insert` returns `false` for a repeat of the pair; section 3.9 step 5 then answers 200 with no version bump and no second audit row.
+2. The phase 19 `RfiRepository` gains `correspondent_page(conn, direction: Option<RfiDirection>, page) -> Vec<Rfi>`: the rows of `kind = 'correspondent'` under the same `visibility_sql` as `desk`, newest first. `desk` is not reused, because its filter is by status.
+Section 2.3: `RfiService::attach_pack(ctx, rfi_id, body: AttachPackBody, if_match, idem)` and `RfiService::correspondent_list(ctx, direction: Option<RfiDirection>, cursor)`, which returns a cursor page of `CorrespondentRfiRow`. That row has the fields of the list in section 3.9: `id`, `direction`, `status`, `deadline_at`, `recipient_ref`, `questions_answered`, `questions_total`, `overdue` and `packs` (pack id and kind). The two question counts come from the phase 19 question and answer repositories.
+
+=== F8 REP (from fixes/31.txt)
+OLD: CHECK (outcome IN ('applied', 'ignored', 'refused', 'deferred'))
+NEW: CHECK (outcome IN ('applied', 'ignored', 'refused'))
+
+=== F9 REP (from fixes/31.txt)
+OLD: 'disable_deferred', 'unknown_user')),
+NEW: 'unknown_user')),
+
+=== F10 REP (from fixes/31.txt)
+OLD: `deferred` with reason `disable_deferred` when the Kratos step is deferred (phase 03 enqueues `offboard_finalize`);
+NEW: the outcome stays `applied` when the Kratos step after the commit fails (phase 03 enqueues `offboard_finalize`; the account is already disabled and its tokens revoked);
+
+=== F11 REP (from fixes/31.txt)
+OLD: and the outcome is `deferred` (reason `disable_deferred`).
+NEW: and the outcome stays `applied`: the event row is written in the transaction of step 2 and never updated, the account is already disabled, and the phase 03 mirror refuses its sessions at their next request. No outcome `deferred` exists (DR-413).
+
+=== F12 REP (from fixes/31.txt)
+OLD: (Cedar `user.disable`, not `user.offboard`; outcome `disable_deferred`)
+NEW: (Cedar `user.disable`, not `user.offboard`; the outcome is `applied`, and a Kratos failure after the commit is the phase 03 `offboard_finalize` retry, DR-413)
+
+=== F13 REP (from fixes/31.txt)
+OLD: ctx: DirectoryCtx
+NEW: ctx
+
+=== F14 REP (from fixes/31.txt)
+OLD: 4. The Cedar check is on the directory path only (section 3.17, E0: action `user.disable`).
+NEW: 4. `ctx` is the caller context that every service method takes; no new type is added. On the event path it holds the verified service principal `polis-directory`, and Cedar checks `user.disable` with `context.via == "webhook_hmac"` (section 3.17, E0). On the reconciliation path (section 3.11, item 1) it is the job's system context: no Cedar check runs, as for every job, and the audit actor is `System` (phase 02).
+
+=== F15 REP (from fixes/31.txt)
+OLD: `finish_run(tx, id, status, result, completed_at)`.
+NEW: `run(id) -> Option<CapacityRun>`; `start_run(tx, id)` (sets `running`); `finish_run(tx, id, status, result, completed_at)`; `replay_daily_counts(replay_id) -> Vec<(NaiveDate, i64)>` (per `business_date`, the number of `scn.replay_results` rows of the replay with `would_alert = TRUE`; it selects no other column).
+
+=== F16 REP (from fixes/31.txt)
+OLD: 1. Mark the run `running`. Re-read the replay; a replay that is no longer `completed` fails the run.
+NEW: 1. Mark the run `running` (`CapacityRepository::start_run`). This write has no audit row of its own: the pair `capacity.simulation_requested` and `capacity.simulation_completed` of section 3.14 brackets the run, and step 8 records how it ended. Re-read the replay with phase 16 `ReplayRepository::get`; a replay that is no longer `completed` fails the run.
+
+=== F17 REP (from fixes/31.txt)
+OLD: 2. Read `scn.replay_results` of the replay for the columns `business_date` and `would_alert` only
+NEW: 2. Read `scn.replay_results` of the replay through `CapacityRepository::replay_daily_counts`, for the columns `business_date` and `would_alert` only
+
+=== F18 REP (from fixes/31.txt)
+OLD: `class_mix` (shares of P0 to P3 that sum to 1; default: the measured mix of section 3.4)
+NEW: `class_mix` (shares of P0 to P3 that sum to 1; required, with no default: the requester states the mix, DR-342 and Open doubts 5; a missing mix or one that does not sum to 1 is 422 `E_VALIDATION` at `/inputs/class_mix`)
+
+=== F19 REP (from fixes/31.txt)
+OLD: `compute(period_month) -> ExposureRunSummary`
+NEW: `compute(period_month) -> ExposureRunSummary` (`ExposureRunSummary { period_month, rows, suppressed_rows }`: the month, the rows upserted and those of them with `suppressed = TRUE`, which is the detail of `exposure.computed`)
+
+=== F20 REP (from fixes/31.txt)
+OLD: - `update`: the display name is replaced; the e-mail of a `linked` user is not applied to the account (the identifier changes only through phase 03). The outcome is `applied`.
+NEW: - `update`: the display name and the directory e-mail (`user_name_enc`) of the directory row are replaced. The e-mail is never applied to an account, linked or not: `admin.users.email` changes only through phase 03, and the reconciliation counts the difference (item 3). The outcome is `applied`.
+
+=== F21 REP (from fixes/31.txt)
+OLD: 3. Linked, account offboarded, `directory_active = TRUE`: audit `directory.mismatch {count}` (SIEM true). Local wins; nothing is changed.
+NEW: 3. Linked, account offboarded, `directory_active = TRUE`: audit `directory.mismatch {count, email_count}` (SIEM true). Local wins; nothing is changed. `email_count` is the second mismatch of DR-351: the linked rows (`DirectoryRepository::list` with state `linked`) whose decrypted `user_name_enc` differs from `admin.users.email` of the linked account, compared case-insensitively as link step 4 does. The job decrypts in memory and writes the two counts only; no e-mail is written or logged.
+
+=== F22 REP (from fixes/31.txt)
+OLD: | `directory.mismatch` | `directory` | true | `count` |
+NEW: | `directory.mismatch` | `directory` | true | `count`, `email_count` |
+
+=== F23 REP (from fixes/31.txt)
+OLD: Section 3.12 implements phase 03's
+NEW: The `directory` module of this phase (not section 3.12, which holds the disable only) implements phase 03's
+
+=== F24 REP (from fixes/31.txt)
+OLD: takes `max(its rate, capacity.surge_qc_percent)`; otherwise it is unchanged.
+NEW: raises the size of a draw that takes its size from the settings to at least `ceil(N * capacity.surge_qc_percent / 100)` items (the formula is in phase 19 section 7.5); otherwise it is unchanged.
+
+=== F25 REP (from fixes/31.txt)
+OLD: takes `max(qa rate, capacity.surge_qc_percent)` for the sampled population.
+NEW: samples at least `capacity.surge_qc_percent` percent of the population of a draw sized from the settings.
+
+=== F26 REP (from fixes/31.txt)
+OLD: `forecast(ctx, query: ForecastQuery { handling_pct, arrivals_pct })`
+NEW: `forecast(ctx)`
+
+=== F27 REP (from fixes/31.txt)
+OLD: subject: ('pool', pool_id), stage: NULL
+NEW: subject_kind: pool, subject_id: pool_id, stage: NULL
+
+=== F28 REP (from fixes/31.txt)
+OLD: per list in `ref.lists`, the versions activated in the period, and for each the hours from `loaded_at` to `activated_at` (phase 14)
+NEW: per list in `ref.lists`, the versions of `ref.list_versions` activated in the period, and for each version the hours from its `loaded_at` to its `activated_at` (phase 14)
+
+=== F29 REP (from fixes/31.txt)
+OLD: Cedar: create for M only (section 3.16, E2).
+NEW: Cedar: create for M only (section 3.17, E2).
+
+=== F30 REP (from fixes/31.txt)
+OLD: (partition pruning by business date and by creation month)
+NEW: (the BRIN index `idx_txn_business_brin` on `business_date`, phase 10, because `canon.txn` is partitioned by `booking_date`; `alert.alerts` is pruned by creation month)
+
+=== F31 REP (from fixes/31.txt)
+OLD: (phase 03 `POST /admin/users/{id}/grants`
+NEW: (phase 04 `POST /admin/users/{id}/grants`
+
+=== F32 REP (from fixes/31.txt)
+OLD: `directory_verifier: Arc<DirectoryWebhookVerifier>`
+NEW: `directory_verifier: Arc<DirectoryWebhookVerifier>`, `directory_link: Arc<dyn DirectoryLinkQuery>` (`PgDirectoryLinkQuery` while `pack.polis` is on, phase 03 `NoDirectory` while it is off)
+
+=== F33 REP (from fixes/31.txt)
+OLD: `akr_retention` deletes practice attempts only through the retention run (a direct `DELETE` by `akr_app` fails with `insufficient_privilege`).
+NEW: `akr_retention` holds SELECT only on `train.practice_attempts` in this release (section 7.3), so no deletion path exists yet. A direct `DELETE` by `akr_app` fails with `insufficient_privilege`.

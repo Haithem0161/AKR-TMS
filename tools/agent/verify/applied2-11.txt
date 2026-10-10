@@ -1,0 +1,81 @@
+Replacements made in docs/plan/phase-11.md by the first re-check (DR-413). 14 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-11-1a]
+WHY: R-11-1 | CONFIRMED LOW (raised MEDIUM) | 7.13 says `source.halt_resolved` carries the marker; the payload of step 4 and the audit row do not list it | payload and row name `as_of_marker`
+OLD: and `source.halt_resolved` carries it.
+NEW: and `source.halt_resolved` carries it as `as_of_marker`, beside `decision`, `tables` and `check_id`.
+
+=== F2 [R-11-1b]
+WHY: R-11-1 | CONFIRMED LOW (raised MEDIUM) | 7.13 says `source.halt_resolved` carries the marker; the payload of step 4 and the audit row do not list it | payload and row name `as_of_marker`
+OLD: | `source.halt_resolved` | resume with a decision (decision, tables, check id) | source |
+NEW: | `source.halt_resolved` | resume with a decision (decision, tables, check id; `as_of_marker` on a `false_alarm` after an `as_of_regressed` halt, 7.13) | source |
+
+=== F3 [R-11-2]
+WHY: R-11-2 | CONFIRMED MEDIUM | `ensure_rows` (7.14) inserts with no `freshness_class`, so every watermark starts as the default F3, against the class rule of section 3.7 | the caller passes the class
+OLD: (`akr_ingest` already holds INSERT on `admin.watermarks`). `ingest_load` step 2 calls it after the
+NEW: (`akr_ingest` already holds INSERT on `admin.watermarks`). The insert also writes `freshness_class`: the caller
+works it out by the class rule of section 3.7 and passes it as one more argument, `class: FreshnessClass`, so the
+column default is never relied on. `ingest_load` step 2 calls it after the
+
+=== F4 [R-11-3]
+WHY: R-11-3 | CONFIRMED LOW | job step 7 raises `cost_guard` "by the same factor"; no factor exists | the job's own estimate against `replay.estimate_max_rows`
+OLD: `cost_guard` when the rows grew past the
+   estimate by the same factor); audit
+NEW: `cost_guard` when the job's own
+   estimate, taken before its first page, is above `replay.estimate_max_rows`); audit
+
+=== F5 [R-11-4]
+WHY: R-11-4 | CONFIRMED MEDIUM (raised HIGH) | a replay receipt is said to have its "watermark fields NULL"; `watermark_kind` is NOT NULL | the three nullable fields are named; the kind is copied
+OLD: watermark fields NULL (a replay moves no
+NEW: `watermark_from`, `watermark_to` and `as_of_marker` NULL and `watermark_kind` copied from the table's watermark, since the column is NOT NULL (a replay moves no
+
+=== F6 [R-11-5a]
+WHY: R-11-5 | CONFIRMED MEDIUM (raised HIGH) | the crate tree puts `BlindPeriodService` in akr-ingestd, while akr-api holds it and phase 30 calls it from akr-worker and akr-ctl; linking akr-ingestd would pull in the drivers | the service is a module of `db`
+OLD: FreshnessService, ResumeHandler, BlindPeriodService
+NEW: FreshnessService, ResumeHandler
+
+=== F7 [R-11-5b]
+WHY: R-11-5 | CONFIRMED MEDIUM (raised HIGH) | the crate tree puts `BlindPeriodService` in akr-ingestd, while akr-api holds it and phase 30 calls it from akr-worker and akr-ctl; linking akr-ingestd would pull in the drivers | the service is a module of `db`
+OLD: akr-api links `domain` and `db` but not `akr-sources`; only akr-ingestd links a driver (phase 05 rule).
+NEW: akr-api links `domain` and `db` but not `akr-sources`; only akr-ingestd links a driver (phase 05 rule).
+`BlindPeriodService` is not in the akr-ingestd crate: it is a module of `db`, beside its repository, because akr-api
+(declarations), akr-ingestd (the periods the ingest path opens and closes) and, from phase 30, akr-worker and
+akr-ctl all call it, and none of the last three may link a driver.
+
+=== F8 [R-11-6]
+WHY: R-11-6 | CONFIRMED LOW | pointer "of this section" should name 7.20 | pointer
+OLD: (the extract file contract of this section, which corrects section
+NEW: (the extract file contract of section 7.20, which corrects section
+
+=== F9 [R-11-7]
+WHY: R-11-7 | CONFIRMED LOW (raised MEDIUM) | 7.20 item 4 reads the columns from the newest receipt, 7.5 from the newest accepted manifest | 7.20 says accepted manifest
+OLD: against the `columns` of the table's newest receipt (its `manifest`
+NEW: against the `columns` of the table's newest accepted manifest (its receipt's `manifest`
+
+=== F10 [R-11-8]
+WHY: R-11-8 | CONFIRMED LOW | `column_check_failed` is missing from the receipt-reason list of section 3.10 | added
+OLD: `control_total_mismatch`, `file_hash_mismatch`, `unit_timeout`,
+NEW: `control_total_mismatch`, `file_hash_mismatch`, `column_check_failed`, `unit_timeout`,
+
+=== F11 [R-11-9]
+WHY: R-11-9 | CONFIRMED LOW | pointer "the late-arrival block of this section" should name 7.22 item 4 | pointer
+OLD: (the late-arrival block of this section)
+NEW: (section 7.22, item 4)
+
+=== F12 [R-11-10a]
+WHY: R-11-10 | CONFIRMED MEDIUM | `previous_mapped_business_to` takes no source, though two sources may read a table of one name | `source_id` added
+OLD: conn: &mut PgConnection, source_table: &str, batch_id: Uuid) -> Result<Option<NaiveDate>, RepoError>;`
+NEW: conn: &mut PgConnection, source_id: Uuid, source_table: &str, batch_id: Uuid) -> Result<Option<NaiveDate>, RepoError>;`
+
+=== F13 [R-11-10b]
+WHY: R-11-10 | CONFIRMED MEDIUM | `previous_mapped_business_to` takes no source, though two sources may read a table of one name | `source_id` added
+OLD: of the newest batch of `source_table` with status `mapped`
+NEW: of the newest batch of `source_id` and `source_table` with status `mapped`
+
+=== F14 [L-11-1]
+WHY: L-11-1 | CONFIRMED LOW (lead, second look) | after R-11-2 the text says `ensure_rows` takes the class as one more argument, and the signature printed beside it did not have it | signature gains `class: FreshnessClass`
+OLD: `ensure_rows(conn, source, table, branches: &[String], kind: WatermarkKind) -> Result<u64, RepoError>`
+NEW: `ensure_rows(conn, source, table, branches: &[String], kind: WatermarkKind, class: FreshnessClass) -> Result<u64, RepoError>`

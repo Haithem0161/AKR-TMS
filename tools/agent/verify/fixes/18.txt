@@ -1,0 +1,129 @@
+Fixes for phase 18 (verification pass, lead-reviewed 2026-10-10). 23 claims: 19 confirmed (0 HIGH, 5 MEDIUM, 14 LOW),
+4 rejected (the refuter's four). Lead choices: `POST /cases/{id}/opened-views` records panels only (an evidence item
+is recorded by its content read, so the gate cannot be met without the access event); a reject comment passes the
+decision-text guard; an over-cap search `limit` is refused; the counterparty decide route writes through the phase 13
+`replace_open`; step e is stale base text under 7.3 (down-rated from HIGH).
+
+@@ BLOCK 18
+### 7.N Sub-codes that join the closed list (V-18-01-a, V-18-06-a, LOW; DR-413)
+Section 3.17, closed list: `no_running_proposal`, `report_sign_required` and `filing_not_acknowledged` join it, as 7.8 does for the sub-codes of phase 19. `no_running_proposal` is the sub-code of section 3.8 step d(ii) and of route step 1: the case is not `in_review`, or the proposal of the instance has ended (409 `E_NOT_ALLOWED_IN_STATE`). The other two are the sub-codes of 7.3.
+@@ END
+
+@@ BLOCK 18
+### 7.N Writers of the alert rows in the contribution step (V-18-02-a, LOW; DR-413)
+Section 3.8 step i, for each attached alert it changes: `AlertRepository::lock` (after the case lock, the order of phase 17 section 7.9), `AlertRepository::update` with the version read under the lock, and `AlertRepository::append_event` (phase 17) with `NewAlertEvent { actor: the decider, kind: "alert.contribution_set", payload: {outcome, inherited} }`.
+@@ END
+
+@@ REP 18
+Record that a panel or an evidence item was opened (DR-136);
+@@ WITH
+Record that a panel was opened (DR-136; an evidence item is recorded by its content read, section 3.4);
+@@ END
+
+@@ BLOCK 18
+### 7.N Steps of the opened-views route (V-18-03-a, MEDIUM; DR-413)
+`POST /cases/{id}/opened-views`, body `{view_kind, view_key}`:
+1. Cedar `case.read` on Case (the forbids of section 3.19 apply). A case the caller cannot see is 404 `E_NOT_FOUND` (section 3.10).
+2. `view_kind` must be `panel` and `view_key` one of the six `PanelKey` values; else 422 `E_VALIDATION` at `/view_kind` or `/view_key`. The route does not take `evidence`: the row of an evidence item is written only by the content read (section 3.4 step 6), after its access event, so the gate of section 3.9 cannot be met without opening the item.
+3. In the request transaction: `OpenedViewRepository::insert` with the caller as `actor_id` and `opened_at = now()`; audit `case.view_opened {view_kind, view_key}`; no chain event. Response 201.
+@@ END
+
+@@ BLOCK 18
+### 7.N The chain append is CaseRepository::append_event (V-18-04-a, LOW; DR-413)
+Where the intro of section 3 names `CaseChain` as the writer, and where section 3.3 step 5 and section 3.12 step 6 write `CaseChain::append_event(tx, case_id, kind, payload)`, the call is `CaseRepository::append_event(tx, case, e)` of phase 17 section 2, with `e` a `NewCaseEvent` of that kind and payload. It runs under the case row lock and sets the sequence, the time and the head (phase 17 section 3.7). `CaseChain` is the verifier only (`CaseChain::verify`).
+@@ END
+
+@@ REP 18
+9. `set_closure(case, closed_at, sealed_at, seal_hash)`;
+@@ WITH
+9. `set_closure(tx, id, closed_at, sealed_at, seal_hash, outcome)`;
+@@ END
+
+@@ REP 18
+a `reject` needs `comment`).
+@@ WITH
+a `reject` needs `comment`: a missing one is 422 `E_VALIDATION` at `/comment`, sub-code `note_required`, and it must pass `GenericTextGuard::check(conn, comment, casework.decision_text_min_chars)` (section 3.3), else 422 at `/comment` with `forbidden_term` or `text_too_short`).
+@@ END
+
+@@ REP 18
+4. `GenericTextGuard::check(body, 1)`.
+@@ WITH
+4. `GenericTextGuard::check(conn, body, min_chars)`: `min_chars` is 1 for an ordinary note and `casework.decision_text_min_chars` for the note of a manual grant (section 3.2 `grant` step 5).
+@@ END
+
+@@ REP 18
+the step-up prompt of 7.12 (class `decision`)
+@@ WITH
+the step-up prompt of DESIGN-SYSTEM 7.12 (class `decision`)
+@@ END
+
+@@ REP 18
+`sign` behaves as `approve` for `case_report_approval`.
+@@ WITH
+`sign` behaves as `approve` for `case_report_approval` only when the act carries `via = "report"` (7.3); without it the sign is refused with 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `report_sign_required`.
+@@ END
+
+@@ REP 00
+| `work_item_due` | `work_item` | phase 18 |
+@@ WITH
+| `work_item_due` | `work_item` | phase 18 |
+| `case_acl_expiry` | `case_acl` | phase 18 |
+@@ END
+
+@@ BLOCK 18
+### 7.N Jobs, timer kind and handler of the grant expiry (V-18-07-b, V-18-07-c, MEDIUM; DR-413)
+Section 4.1 gains two rows: `timer_case_acl_expiry` | worker | timer row (owner `case_acl`, kind `case_acl_expiry`) [grant id] | 2, 3 | fired by the phase 00 timer sweep at `expires_at` (7.10 items 3 and 4); and `case_acl_expiry_scan` | worker | `{}` [`case_acl_expiry_scan`] | 1, 3 | `schedule.case_acl_expiry_scan` (hourly at minute 15), the backstop of 7.10 item 5.
+Section 4.2: this phase also registers the timer kind `case_acl_expiry` (owner kind `case_acl`) in the phase 00 timer kind registry. Section 4.3, akr-worker, gains `case_acl_expiry: Arc<CaseAclExpiryHandler>` (the timer handler and the scan). Section 4.5 item 13 covers the kind, the two job kinds and the setting `schedule.case_acl_expiry_scan`.
+@@ END
+
+@@ REP 18
+The rule-5 visibility clause (section 3.9)
+@@ WITH
+The rule-5 visibility clause (section 3.10)
+@@ END
+
+@@ REP 18
+if_match) -> CaseAccessView`**
+@@ WITH
+if_match) -> AccessView`**
+@@ END
+
+@@ REP 18
+`analyst_rejected` with `decided_by`;
+@@ WITH
+`analyst_rejected` with `decided_by`, both through phase 13 `CounterpartyLinkRepository::replace_open` (it sets `valid_from` of the new row to the instant that closes the old one);
+@@ END
+
+@@ BLOCK 18
+### 7.N Search response and its rows (V-18-09-a, LOW; DR-413)
+7.12: the response of `GET /api/v1/search` is `SearchResponse { party: SearchGroup<PartyHit>, case: SearchGroup<CaseHit> }` (utoipa `ToSchema`), with `SearchGroup<T> { rows: Vec<T>, has_more: bool }` and no total. `PartyHit { party_id: Uuid, name: String }` holds the current name, Arabic first, read by `CanonPartyReader::current_names`. `CaseHit { case_id: Uuid, case_ref: String }`.
+@@ END
+
+@@ REP 18
+`limit` at most 10 per group;
+@@ WITH
+`limit` at most 10 per group (a larger value is 422 `E_VALIDATION` at `/limit`);
+@@ END
+
+@@ REP 18
+5. `set_reopened(case)`:
+@@ WITH
+5. `set_reopened(tx, id, at)`, with `at = now()`:
+@@ END
+
+@@ REP 18
+has an `outcome` (sub-code `decided`)
+@@ WITH
+has an `outcome` (sub-code `already_decided`)
+@@ END
+
+@@ REP 17
+`decided`, `work_items_open`) and phase 19 on
+@@ WITH
+`already_decided`, `work_items_open`) and phase 19 on
+@@ END
+
+@@ BLOCK 18
+### 7.N Deny event of a refused link add (V-18-12-b, LOW; DR-413)
+7.19: the deny access event is written through `AccessLog::record` in its own transaction (phase 03 section 3.2 step 8), with `action = view` (the add reads the target to refuse it), `decision = deny`, `resource_type = customer`, `resource_id` and `subject_party` the owner party of the target, `tier` = `casework.effective_tier(owner party)` and the request's purpose code.
+@@ END

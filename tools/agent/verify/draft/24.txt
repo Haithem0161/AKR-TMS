@@ -1,0 +1,221 @@
+Fixes for the claims of tools/agent/verify/refute-24.md (phase 24; draft for lead review; each fix checked against docs/plan/phase-24.md).
+@@ REP 24
+`resource_id`, `case_id`, and for `access_event` only `decision` and `tier`.
+@@ WITH
+`resource_id`, `case_id` (on `audit_log` only: `access_event` has no case column, so the filter never matches an `access_event` row), and for `access_event` only `decision` and `tier`.
+@@ END
+# V-24-01-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `audit.access_event` phase-02.md:142-168 (no case column); `case_id` of `audit_log` phase-02.md:122; step 6 passes NULL for the case on access_event rows, phase-24.md:596 | NEW: none
+
+@@ REP 24
+`unknown_pack_kind`, `sample_too_large` |
+@@ WITH
+`unknown_pack_kind`, `sample_too_large`, `title_not_bilingual`, `severity_not_allowed`, `subject_key_required`, `owner_not_governance`, `unknown_register_kind`, `explanation_code_not_allowed`, `note_too_long` |
+@@ END
+# V-24-02-a, V-24-12-d | LOW | grep -c -F gave 1 | names used and where they exist: `E_VALIDATION` 422 phase-00.md:499 (the status and code of every validation refusal); `user_not_active` and `kind_not_writable` in this row, phase-24.md:1057; the refusals: 3.4 step 2 phase-24.md:645 (title, severity, subject_key, owner role), 7.13 step 3 phase-24.md:1421-1422, note CHECK phase-24.md:1380 | NEW: `title_not_bilingual`, `severity_not_allowed`, `subject_key_required`, `owner_not_governance`, `unknown_register_kind`, `explanation_code_not_allowed`, `note_too_long` (no existing sub-code names these refusals; `user_not_active` covers only the active check; the register kind follows phase 06's `unknown_pack_kind`)
+
+@@ BLOCK 24
+### 7.N `sync_post_review` finding: title, body and the join (V-24-02-b, MEDIUM; DR-413)
+Section 3.4 `sync_post_review`, per event. The finding `title` is fixed by outcome: `concern` {"ar": "ملاحظة من المراجعة بعد التغيير", "en": "Concern from the post-change review"}; `rollback_needed` {"ar": "المراجعة بعد التغيير تطلب التراجع", "en": "Post-change review asks for a rollback"}. `body` holds `change_request_id`, `outcome`, `day` and `event_seq` only. The join: the event's `instance_id` is a `cr_post_review` instance (`admin.workflow_instances` with `purpose = 'post_review'` and `resource_kind = 'change_request'`); its `resource_id` is the change request, and `owner_id` is that request's `maker_id`.
+@@ END
+# V-24-02-b | MEDIUM | names used and where they exist: `maker_id` of `admin.change_requests` phase-04.md:130; `admin.workflow_instances` phase-04.md:328 (`resource_id` 332, `purpose` 333); `admin.instance_events` phase-04.md:353; `cr_post_review` phase-04.md:941-944 and 1272 (the `record_post_review` effect runs in that instance); bilingual `title` CHECK phase-24.md:47 | NEW: none. Phase 04 line 944 says the event goes on "the request's timeline"; the block reads the post-review instance, which the effect runs in. Lead to confirm against phase 04 before applying. Also settles Open doubts 31 (the maker column is `maker_id`).
+
+@@ BLOCK 24
+### 7.N Step-up action constants of this phase (V-24-02-c, V-24-11-e, LOW; DR-413)
+Declared as `StepUpAction { name, class }` constants (phase 01 rule; closed classes of phase 03): `register.accept_risk`
+(class `approval`) for the PATCH of section 3.4 when `status` becomes `accepted_risk`, with the row as resource ref; and
+`export.download` (class `export`) for the file route of section 7.12. Phase 06's `pack.download` (class `export`) is the model.
+@@ END
+# V-24-02-c, V-24-11-e | LOW | names used and where they exist: `StepUpAction { name, class }` phase-01.md:711; `pack.download` phase-06.md:978; the classes `approval` and `export` of the closed list (tools/agent/b3-conventions.md:46-48); the PATCH rule phase-24.md:653; the file row phase-24.md:1337 | NEW: `register.accept_risk`, `export.download` (no action of these names exists; phase 06 has `readiness.declare` and `pack.download`)
+
+@@ BLOCK 24
+### 7.N Calendar sweep: entry point and row reader (V-24-03-a, LOW; DR-413)
+Job `review_calendar_sweep` (section 4.1) calls `GovernanceRegisterService::sweep_calendar(now)`. The job has no `ctx`, so
+the method runs the row query of `review_calendar` (section 3.4) with no caller predicate; calendar rows hold no customer,
+case or narrative data (section 3.15). It calls `RegisterWriter::warn` (section 7.7) once for each red row, with the source
+key of section 3.4.
+@@ END
+# V-24-03-a | LOW | names used and where they exist: `review_calendar` phase-24.md:657; `RegisterWriter::warn` phase-24.md:1297-1298; `GovernanceRegisterService` phase-24.md:522; the job row phase-24.md:1143 | NEW: `sweep_calendar` (no sweep method is named; the job runs without a caller, so the route method cannot serve it)
+
+@@ REP 24
+`amber` within 30 days, `red` past due):
+@@ WITH
+`amber` within 30 days before `due_on`, `red` on and after `due_on`):
+@@ END
+# V-24-03-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `due_on` phase-24.md:657; 7.3 "red on the due date" phase-24.md:1277 (the 7.x block wins over base text); DR-231 (phase-24.md:1471) does not set the boundary | NEW: none. The scenario rule (red at two intervals, phase-24.md:662) is left as it is; the lead should check that scenario rows carry a `due_on`. Alternative: keep "past due" and change phase-24.md:1277 to "the day after the due date".
+
+# DECIDE V-24-03-c | option A: drop `horizon_days` from `review_calendar(ctx, horizon_days)` (phase-24.md:657); route 13 names no parameter (phase-24.md:559), and the calendar returns every open row with its state | option B: `horizon_days` (default 30, bounds 1 to 365) keeps the rows whose `due_on` falls within that many days, plus every red row (evidence: phase-24.md:657 amber rule; phase-24.md:1277 "Amber 30 days before"; the other `horizon` hits are the clocks board and the command centre, phase-24.md:468 and 736)
+
+@@ BLOCK 24
+### 7.N Board pack: tiles, predicate and builder (V-24-04-a LOW, V-24-04-b HIGH; DR-413)
+The board pack (section 3.11 board row) holds the FINAL periodic row (`BoardSource::periodic_final`) and the 3.7 tiles whose
+"Visible to" column includes both CH and IA: Late and at-risk clocks, Verification (status only), Data and coverage incidents,
+Arrivals against throughput, Backlog by elapsed age, Top scenarios with cases, QA status, Regulatory deadlines, Branch liaison
+reports and Governance open items (which holds the counts of 3.4 and 3.5). Not in the pack: Decisions waiting for me, Productive
+alerts, UTRs and STRs, and the Tipping-off summary. `BoardSource::payload(period) -> Value` (NEW method on the port) reads each
+tile through its `CommandReadRepository` method (`ClockReadRepository` for the clocks) under the normal-tier predicate of a CH
+reader with no access-list entry or QA grant (section 3.8). The small-number rule of section 3.7 applies.
+@@ END
+# V-24-04-a, V-24-04-b | 04-a LOW, 04-b HIGH | names used and where they exist: `BoardSource::periodic_final` phase-24.md:541; `CommandReadRepository` and `ClockReadRepository` phase-24.md:540 (one method per tile); the tile table and its "Visible to" column phase-24.md:715-730; M-only tiles phase-24.md:723, 724, 730 and the suspicion subjects of clocks phase-24.md:718; the normal-tier rule for CH and IA phase-24.md:756; `VisibilityPredicate` phase-17.md:1216; `PackBuilder` is not used (phase-24.md:522) | NEW: `BoardSource::payload` (the builder). Consistent with DR-227 (phase-24.md:1463) and the 3.15 rows at phase-24.md:1110-1112.
+
+@@ BLOCK 24
+### 7.N Case packs: an unknown case id (V-24-05-a, MEDIUM; DR-413)
+`POST /packs` with kind `case` checks Cedar first: a caller without M gets 403 `E_FORBIDDEN` whatever the id. For M, the case
+id is looked up before the enqueue, so an unknown id is 404 `E_NOT_FOUND` with the missing-id body (phase 06 checks its source
+the same way before its enqueue). A case gone between the request and the job fails the build with
+`pack.build_failed {kind: case, reason: case_not_found}`.
+@@ END
+# V-24-05-a | MEDIUM | names used and where they exist: `pack.build_failed {kind, reason}` phase-06.md:691; the enqueue and 202 phase-06.md:683-685; the source check before the enqueue phase-06.md:680; the missing-id 404 body phase-24.md:1055; Cedar `pack.case.m` phase-24.md:981-983 | NEW: `case_not_found` (a reason value of `pack.build_failed`; a case build has none today)
+
+@@ BLOCK 24
+### 7.N Case read model of `GET /cases/{id}` (V-24-05-b, LOW; DR-413)
+The route `GET /api/v1/cases/{id}` is phase 17's. Its read model is phase 17's `CaseReadService::header` (phase 17 section 7+),
+which phase 18 extends with its fields (phase 18 section 4.5). Section 2 and the case row of section 3.11 cite phase 17 for it,
+not phase 18, and `CaseFileSource` wraps that method with no second query.
+@@ END
+# V-24-05-b (part 1 of 2) | LOW | names used and where they exist: the route phase-17.md:849; `CaseView` phase-17.md:865; `CaseFileSource` phase-24.md:541; the case row phase-24.md:800; the phase 18 extension phase-18.md:618 | NEW: none in this entry (the method is in part 2)
+
+@@ BLOCK 17
+### 7.N The header read of `GET /cases/{id}` (V-24-05-b, LOW; DR-413)
+From phase 24 on, the header of this row (class, tier, status, merged alerts, clocks; suspicion tier with step-up `record_open`)
+is built by `CaseReadService::header(ctx, case_id) -> CaseView`, under the visibility predicate of section 3.10. Phase 18's
+fields are added to the same view (phase 18 section 4.5). The phase 17 `CaseRepository` has no get-by-id method, so the header needs this service method.
+@@ END
+# V-24-05-b (part 2 of 2) | LOW | names used and where they exist: `CaseRepository` phase-17.md:814 (no get-by-id method); `VisibilityPredicate` phase-17.md:1216; `CaseView` phase-17.md:865 | NEW: `CaseReadService`, `header` (phase 17 names no method for its own route; the block goes to the owner's file)
+
+@@ BLOCK 24
+### 7.N The assessor cap is `access.assessor_max_days` only (V-24-06-a, LOW; DR-413)
+Section 1.4 seed rows: the `assessor.grant_max_days` row is not inserted (delete its row: from the line that begins `('assessor.grant_max_days'` to its label line). Sections 3.9 and 3.16 and the lead correction of the Decisions read the cap as `access.assessor_max_days` (phase 04's key, phase 04 section 7.10), with its floor `{"max": 30}`. This phase names no `assessor.grant_max_days`.
+@@ END
+# V-24-06-a | LOW | names used and where they exist: `access.assessor_max_days` phase-04.md:590 (seed) and phase-04.md:1726 (7.10); phase-25.md:1359 already reads this key; the old uses phase-24.md:464, 760, 1122, 1473 | NEW: none. Related finding for the lead (phase 04, not this fix): the phase 04 seed row (phase-04.md:590) says default '90', while its 7.10 (phase-04.md:1726) says default 30 with max 30.
+
+@@ BLOCK 24
+### 7.N Route 27: the method and one access event per item (V-24-07-a MEDIUM, V-24-07-b LOW; DR-413)
+`AssessorService::sample(ctx, id) -> AssessorSampleView` (`assessor.sample`) reads `SampleRepository::get`, then writes one
+access event per item it returns: `resource_type` `alert` or `report` by the frame, `resource_id` the item id, `action = view`,
+`purpose_code = supervisory_inspection`, every tier, in one transaction before the response. `scope.record_hits` is not used,
+because it skips normal-tier rows. In section 3.9 step 2, "viewed" means "shown" (DR-226). No audit kind is added: the read writes access events only.
+@@ END
+# V-24-07-a, V-24-07-b | 07-a MEDIUM, 07-b LOW | names used and where they exist: `SampleRepository::get` phase-24.md:537; `AssessorSampleView` phase-24.md:542; route 27 phase-24.md:573; `AccessScope` and `record_hits` phase-02.md:719 and 732; `access_event.action` values phase-02.md:142-168; DR-226 phase-24.md:1461 ("each item shown"); the other `AssessorService` methods phase-24.md:762-775 | NEW: `AssessorService::sample` (no method calls `SampleRepository::get`; `d2_matrix`, `draw` and `trace` exist)
+
+@@ BLOCK 24
+### 7.N Route 9: the list method and its reads (V-24-08-a, MEDIUM; DR-413)
+`GovernanceRegisterService::list(ctx, kind, filter, cursor) -> Page<RegisterView>` (route 9, `register.read`) reads findings
+and warnings with `RegisterRepository::list`, fairness with `FairnessRepository::list`, exclusions with phase 12
+`CoverageRepository::list_exclusions` (an exclusion holds no party or case, so no predicate applies), and decisions with `CaseDecisionRepository::register_page(conn, predicate: &VisibilityPredicate, keyset)`.
+Phase 24 extends phase 18's `CaseDecisionRepository` with `register_page`; the predicate is the caller's, as section 3.4 states.
+@@ END
+# V-24-08-a | MEDIUM | names used and where they exist: `RegisterRepository::list` phase-24.md:533; `FairnessRepository::list` phase-24.md:535; `RegisterView` phase-24.md:542; `CoverageRepository::list_exclusions` phase-12.md:511; `CaseDecisionRepository` phase-18.md:575; `VisibilityPredicate` phase-17.md:1216 | NEW: `GovernanceRegisterService::list` (this service has no list method yet; `list` is also the name of the training and clocks reads), `register_page` (the decisions read is not in phase 18)
+
+@@ BLOCK 24
+### 7.N Route 9: a kind outside the list (V-24-08-b, LOW; DR-413)
+A `kind` on `GET /registers/{kind}` other than the five named (decisions, exclusions, findings, warnings, fairness) is 422
+`E_VALIDATION` with sub-code `unknown_register_kind`, listed in the section 3.13 Validation row. Phase 06 answers an unknown
+pack kind the same way (`unknown_pack_kind`).
+@@ END
+# V-24-08-b | LOW | names used and where they exist: route 9 kinds phase-24.md:555 and the kinds of section 3.4 phase-24.md:636-641; `unknown_pack_kind` phase-06.md:677; `E_VALIDATION` 422 phase-00.md:499 | NEW: `unknown_register_kind` (listed in the 3.13 row by the REP entry for V-24-02-a and V-24-12-d)
+
+# DECIDE V-24-08-c | option A: MRO reads the metric under review only; the route 14 answer for `fairness.review` (MRO holds the action, phase-24.md:829 and 940-942) returns that one metric row, and the prose at phase-24.md:686 and 1108 is rewritten to match | option B: MRO reads fairness as a register: a `fairness.read` policy for MRO in the pattern of phase-24.md:898-914, and MRO added to the scope of routes 9 and 15 (dashboard.read admits M, CH, IA only, API.md:99) | option C: MRO has no fairness read or review: MRO removed from route 14 (phase-24.md:560), from `fairness.review.mro` (phase-24.md:940-942) and from the prose at phase-24.md:686 and 1108; the action table (phase-24.md:826) and the three gov.read policies already say M, CH, IA. Note: phase-24.md:682 calls the review "route 15"; the table numbers it 14.
+
+@@ REP 24
+later phases add their
+@@ WITH
+this phase's two variants are `ReviewCalendarRed` (source `review_calendar`; title {"ar": "حان موعد المراجعة", "en": "Review due date reached"}) and `FairnessRateReview` (source `fairness`; title {"ar": "معدل مجموعة يحتاج إلى مراجعة إنصاف", "en": "Group rate needs a fairness review"}); later phases add their
+@@ END
+# V-24-09-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `WarningTitle` phase-24.md:1300; `RegisterWriter::warn` phase-24.md:1297-1298; warning sources `review_calendar` and `fairness` (phase-24.md:663 and 678; the `source` CHECK phase-24.md:45); later variant lists phase-26.md:882 and phase-29.md:1480 | NEW: `ReviewCalendarRed`, `FairnessRateReview` (the titles are new; one variant per warning source, as the claim asks)
+
+@@ REP 24
+jobs (section 1.1), and
+@@ WITH
+jobs (section 4.1), and
+@@ END
+# V-24-09-b | LOW | grep -c -F gave 1 | names used and where they exist: the job kinds of section 4.1 phase-24.md:1137-1145; the DDL of section 1.1 phase-24.md:33 | NEW: none
+
+@@ BLOCK 24
+### 7.N Control report: case counts from a definer function (V-24-10-a, HIGH; DR-413)
+Section 3.2 control report: the two case counts of section 7.11 come from `audit.control_grant_counts(p_from, p_to)` (NEW;
+migration 0078, section 1.3, owned and granted as `audit.tier_rank` is), not from `readonly_pool`. The other counts stay there.
+```sql
+CREATE OR REPLACE FUNCTION audit.control_grant_counts(p_from TIMESTAMPTZ, p_to TIMESTAMPTZ) RETURNS TABLE (granted BIGINT, expired BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$ SELECT count(*) FILTER (WHERE a.reason = 'manual' AND a.granted_at >= p_from AND a.granted_at < p_to), count(*) FILTER (WHERE a.revoked_by IS NULL AND a.revoked_at >= p_from AND a.revoked_at < p_to) FROM casework.case_acl a JOIN casework.cases c ON c.id = a.case_id WHERE c.tier = 'suspicion' $$;
+```
+@@ END
+# V-24-10-a | HIGH | names used and where they exist: `readonly_pool` phase-24.md:615; no casework grant to `akr_readonly` phase-24.md:303; `audit.tier_rank` phase-24.md:251-302 (the OWNER, REVOKE and GRANT lines); `casework.case_acl` columns (`reason`, `granted_at`, `revoked_by`, `revoked_at`) phase-18.md:85-101; `casework.cases.tier` (phase 17, as phase-24.md:5 cites it); the 7.11 count definitions phase-24.md:1322-1326 | NEW: `audit.control_grant_counts` (no definer function serves the case counts; `audit.resource_tier` answers one resource). Reading of 3.2: "manual grants ... made and expired" is taken as the two counts of 7.11, both on suspicion-tier cases; lead to confirm.
+
+@@ REP 24
+of the access-request register of phase 18 section 7+.
+@@ WITH
+of the time-boxed manual grants of phase 18 section 7.10.
+@@ END
+# V-24-10-b | LOW | grep -c -F gave 1 | names used and where they exist: `7.10 Time-boxed manual grants on suspicion-tier cases` phase-18.md:1323; no phase 18 text uses the phrase "access-request" (grep) | NEW: none
+
+@@ BLOCK 24
+### 7.N Export rows: the Cedar action (V-24-11-a, MEDIUM; DR-413)
+The two GET rows of section 7.12 (status and file) take the Cedar action of the list route, as the POST row does. Step 1 applies that check to all three rows.
+@@ END
+# V-24-11-a | MEDIUM | names used and where they exist: the POST row phase-24.md:1335 ("the list route's Cedar action"); the GET rows phase-24.md:1336-1337; step 1 phase-24.md:1339-1341; the route-table rule phase-03.md:485-486 | NEW: none
+
+@@ BLOCK 24
+### 7.N Export service and the screens' list methods (V-24-11-b, MEDIUM; DR-413)
+`ExportService` holds `POST /exports`, the two GET rows and the job `register_export`. The job rebuilds the requester's context
+from `requested_by` and calls the list method of the screen: `GovernanceRegisterService::list` (G4, route 9) or
+`TrainingRegisterService::list` (G9, route 29). G6 is never exported (section 3.1 step 9), and G5 holds counts only (section 3.2), so it has no export.
+@@ END
+# V-24-11-b | MEDIUM | names used and where they exist: the route rows phase-24.md:1335-1337; the job steps phase-24.md:1342-1344; `TrainingRegisterService::list` phase-24.md:790; the G6 export ban phase-24.md:599 and 1525; the G4 and G9 screens phase-24.md:1191 and 1207 | NEW: `ExportService` (no export service exists in docs/plan); `GovernanceRegisterService::list` is the new method of the entry for V-24-08-a
+
+@@ REP 24
+= the export id, and is served only once clean.
+@@ WITH
+= the export id, retention class `R6` for the `decisions` register and `R9` for the other four (both have an `evidence.lock_days` entry in phase 02), classification `internal` (ids, codes and dates only), and served only once clean: while the scan is pending or the file is not clean, the file route answers 404 `E_NOT_FOUND`.
+@@ END
+# V-24-11-c, V-24-11-g | MEDIUM | grep -c -F gave 1 | names used and where they exist: `evidence.lock_days` phase-02.md:510 (R6 and R9 have entries); `NewEvidence` fields phase-02.md:611-612; `NotClean` reaches callers as 404, phase-02.md:882 (the `open` step 1); `classification` NOT NULL phase-02.md:366; `casework.decisions` is R6 phase-18.md:530; `admin.exclusions` is R9 phase-12.md:383 | NEW: none
+
+@@ BLOCK 24
+### 7.N Job `register_export` in the job table (V-24-11-d, MEDIUM; DR-413)
+Section 4.1 table gains the row `register_export` | worker | `{ register, filters, format, requested_by }` [`register_export:<export id>`] | 1, 3 | enqueued in the request transaction of `POST /exports` (section 7.12); the export id is the job id.
+@@ END
+# V-24-11-d | MEDIUM | names used and where they exist: the table columns phase-24.md:1139; the `audit_verify_run` enqueue pattern phase-24.md:1141; the register jobs phase-24.md:1142-1143 (concurrency 1, attempts 3) | NEW: none
+
+@@ BLOCK 24
+### 7.N Owner kind `register_export` (V-24-11-f, MEDIUM; DR-413)
+Section 4.5 item 1 and Open doubts 29 gain `register_export` (section 7.12) beside `validation_pack` and `training_record`: an owner kind of phase 02's evidence registry, with its `EvidenceResolver` in this phase.
+@@ END
+# V-24-11-f | MEDIUM | names used and where they exist: the registry rule phase-02.md:847 ("every owning phase adds its kind"); the registry table phase-02.md:1185 (this phase's row); section 4.5 item 1 phase-24.md:1167; Open doubts 29 phase-24.md:1505 | NEW: `register_export` (the owner kind of the export file; phase 02's table lists only this phase's two kinds)
+
+@@ BLOCK 24
+### 7.N Explanation: the service method and its write (V-24-12-a, MEDIUM; DR-413)
+`ParallelRunService::explain(ctx, row_id, code, note)` (the route row of this section, `parallel_run.write`) runs step 3 of this section. Its write is `ParallelRunRepository::explain(tx, row_id, code, note, by, at) -> u64` (NEW repository for `alert.parallel_run_rows`): the guarded UPDATE of step 3, where zero rows updated is 409 `E_NOT_ALLOWED_IN_STATE`.
+@@ END
+# V-24-12-a | MEDIUM | names used and where they exist: the route row phase-24.md:1402; `ParallelRunService` phase-24.md:1408; step 3 phase-24.md:1421-1423; the table DDL phase-24.md:1368-1391 | NEW: `ParallelRunRepository`, `explain` (no repository of `alert.parallel_run_rows` exists; section 2 names none)
+
+@@ REP 24
+and not yet explained (else 409
+@@ WITH
+and not yet explained, checked by the same guarded write (`WHERE explanation_code IS NULL AND outcome IN ('akr_only', 'incumbent_only')`; zero rows updated is 409
+@@ END
+# V-24-12-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `explanation_code` and `outcome` phase-24.md:1372-1379; the 409 `E_NOT_ALLOWED_IN_STATE` named in step 3 phase-24.md:1421; no `FOR UPDATE` or `ON CONFLICT` anywhere in 7.13 | NEW: none. The second explainer gets the same 409 as the first check.
+
+@@ REP 24
+Set the code, note, `explained_by` and
+@@ WITH
+Scan the note first (`PolicyPackService::scan`, phase 09, scope `reason_text`, as section 3.4 step 3; a forbidden term is 422 `E_VALIDATION`). Set the code, note, `explained_by` and
+@@ END
+# V-24-12-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: `PolicyPackService::scan(scope, text)` phase-09.md:797; the scope `reason_text` phase-24.md:646; section 3.4 step 3 phase-24.md:646; the DDL comment phase-24.md:1380 | NEW: none
+
+@@ BLOCK 24
+### 7.N Parallel-run policies in `C0_governance.cedar` (V-24-12-e, LOW; DR-413)
+Section 3.12 schema gains `entity ParallelRunRow = { outcome: String, explained: Bool };`, the explanation's resource. One role per policy:
+```cedar
+@id("parallel_run.read.m") @role("M")
+permit (principal, action == Akr::Action::"parallel_run.read", resource) when { principal.roles.contains("M") };
+@id("parallel_run.read.ch") @role("CH")
+permit (principal, action == Akr::Action::"parallel_run.read", resource) when { principal.roles.contains("CH") };
+@id("parallel_run.write.m") @role("M")
+permit (principal, action == Akr::Action::"parallel_run.write", resource) when { principal.roles.contains("M") };
+```
+@@ END
+# V-24-12-e | LOW | names used and where they exist: the 7.13 Cedar line phase-24.md:1405-1406; the schema additions phase-24.md:839-847; the policy style phase-24.md:855-889 and 898-914; the route scope `case.decide` (A2, M) API.md:86 | NEW: `ParallelRunRow` (entity) and the three policy ids (no parallel-run policy exists)
+
+# REFUTED V-24-01-b | no fix written (the search input's fields are stated in steps 2 to 6 of section 3.1, so no struct is needed).
+# NOTE for the lead | the refute file cites "DBS decision 226", "DBS decision 227" and "DBS decision 388"; in this phase these are DR-226 and DR-227 (phase-24.md:1461 and 1463) and DR-388 (research.md:399). The drafts cite DR numbers.
+# NOTE for the lead | when V-24-11-f is applied, phase 02's registry table (phase-02.md:1185, `validation_pack`, `training_record` | 24) needs `register_export` in the same row.
+
+# SUMMARY: fixes written 27 (REP 9, BLOCK 18: 17 in phase 24 and 1 in phase 17); DECIDE 2; DROP 0; claims covered: V-24-01-a, V-24-02-a, V-24-02-b, V-24-02-c, V-24-03-a, V-24-03-b, V-24-03-c, V-24-04-a, V-24-04-b, V-24-05-a, V-24-05-b, V-24-06-a, V-24-07-a, V-24-07-b, V-24-08-a, V-24-08-b, V-24-08-c, V-24-09-a, V-24-09-b, V-24-10-a, V-24-10-b, V-24-11-a, V-24-11-b, V-24-11-c, V-24-11-d, V-24-11-e, V-24-11-f, V-24-11-g, V-24-12-a, V-24-12-b, V-24-12-c, V-24-12-d, V-24-12-e (33 of 33 STANDS and PARTLY)

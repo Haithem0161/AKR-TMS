@@ -1,0 +1,19 @@
+Replacements made in docs/plan/phase-01.md by the third re-check (DR-413). 2 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [T-01-1a]
+WHY: T-01-1 | CONFIRMED MEDIUM (raised HIGH) | a fault of the S-01-1 fix: step 1 of section 7.9 now lets `disable` find the principal among active ones only, while step 3 commits `status = 'disabled'` before the Hydra delete and says the command can be run again after a failed Hydra call. The rerun finds no active principal, so the Hydra client could never be removed by the command. No stated check fails | step 3 says what the rerun does (no active principal of the name: it repeats only the Hydra delete for the `hydra_client_id` of each disabled service principal that carries it; no row changes and no second audit event), and step 1 names that one other use of the name (two replacements)
+OLD:    `display_name ->> 'en'`), so a disabled principal that still carries the name is never the one found.
+NEW:    `display_name ->> 'en'`), so a disabled principal that still carries the name is never the one rotated or disabled
+   (the rerun of `disable` in step 3 is the one read of disabled principals by name: it only deletes their Hydra
+   clients).
+
+=== F2 [T-01-1b]
+WHY: T-01-1 | CONFIRMED MEDIUM (raised HIGH) | a fault of the S-01-1 fix: step 1 of section 7.9 now lets `disable` find the principal among active ones only, while step 3 commits `status = 'disabled'` before the Hydra delete and says the command can be run again after a failed Hydra call. The rerun finds no active principal, so the Hydra client could never be removed by the command. No stated check fails | step 3 says what the rerun does (no active principal of the name: it repeats only the Hydra delete for the `hydra_client_id` of each disabled service principal that carries it; no row changes and no second audit event), and step 1 names that one other use of the name (two replacements)
+OLD:    active, so a failed Hydra call leaves no access and the command can be run again.
+NEW:    active, so a failed Hydra call leaves no access and the command can be run again: when no active principal carries
+   the name, `disable` reads the disabled service principals that carry it and repeats only the Hydra delete, for the
+   `hydra_client_id` of each (a client that Hydra no longer has counts as deleted). The rerun changes no row and writes
+   no second audit event.

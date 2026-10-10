@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-08.md by the second re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-03-4]
+WHY: S-03-4 | CONFIRMED MEDIUM | block 7.12 (the R-03-2 text) prints `roles` as the `RoleActions` list of 7.16 and cites phase 08 section 2, which still gives the map `{<role>: [<action>, ...]}`: two shapes for the one file `policy-matrix.json` that phase 08 reads | phase 08 section 2 gives the list
+OLD:   database): `{bundle_hash, roles: {<role>: [<action>, ...]}}` from the permits' `@role` annotations evaluated against
+NEW:   database): `{bundle_hash, roles: [{role, actions}]}` (the `RoleActions` list of phase 03 section 7.16) from the permits' `@role` annotations evaluated against

@@ -1,0 +1,39 @@
+Replacements made in docs/plan/phase-18.md by the first re-check (DR-413). 7 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-18-1]
+WHY: R-18-1 | CONFIRMED LOW (raised MEDIUM) | section 5.4 still says each opening posts `opened-views`; the route takes panels only (7.x block: an evidence item's row comes from the content read) | the dialog line says so
+OLD: (each opening posts `opened-views`)
+NEW: (a panel opening posts `opened-views`; opening an evidence item writes its own row through the content read, section 3.4 step 6)
+
+=== F2 [R-18-2]
+WHY: R-18-2 | CONFIRMED LOW (raised MEDIUM) | section 3.7 step 3 calls `GenericTextGuard::check` with two arguments, without `conn` | call gains `conn`
+OLD: `GenericTextGuard::check(text, casework.decision_text_min_chars)` (section 3.3).
+NEW: `GenericTextGuard::check(conn, text, casework.decision_text_min_chars)` (section 3.3).
+
+=== F3 [R-18-3]
+WHY: R-18-3 | CONFIRMED LOW (raised MEDIUM) | section 3.3 step 4 gives the note of a manual grant a higher minimum, but `post` takes `CreateNote` only, so nothing says how it learns the minimum | step 4 says the minimum is an internal argument of `post`
+OLD: for the note of a manual grant (section 3.2 `grant` step 5).
+NEW: for the note of a manual grant (section 3.2 `grant` step 5). The minimum is an internal argument of `post`, not a field of `CreateNote`: the note route passes 1, and `grant` step 5 passes the setting.
+
+=== F4 [R-18-4]
+WHY: R-18-4 | CONFIRMED LOW | block 7.25 says section 4.5 item 13 covers the grant-expiry timer kind and setting; item 13 names only the work-item ones | item 13 names both
+OLD: 13. **Phase 00**: the timer kind `work_item_due`, the job kinds of section 4.1 and the setting `schedule.work_item_due_scan`.
+NEW: 13. **Phase 00**: the timer kinds `work_item_due` and `case_acl_expiry`, the job kinds of section 4.1 (with the two rows of 7.25) and the settings `schedule.work_item_due_scan` and `schedule.case_acl_expiry_scan`.
+
+=== F5 [L-18-1a]
+WHY: L-18-1 | CONFIRMED LOW (lead, second look) | the header, the Count sentence, check 7 and status.md count 25 routes; sections 7.11, 7.12 and 7.13 add one each | the header and status.md say 28; the Count sentence and check 7 name the three sections
+OLD: XL (25 product routes, of which 9 are rows of API.md 3.12 owned here and 16 are added rows;
+NEW: XL (28 product routes: the 25 of section 2, of which 9 are rows of API.md 3.12 owned here and 16 are added rows, and the three of sections 7.11 to 7.13;
+
+=== F6 [L-18-1b]
+WHY: L-18-1 | CONFIRMED LOW (lead, second look) | the header, the Count sentence, check 7 and status.md count 25 routes; sections 7.11, 7.12 and 7.13 add one each | the header and status.md say 28; the Count sentence and check 7 name the three sections
+OLD: Count: 25 product routes (9 owned rows of API.md 3.12, 16 added rows); no dev route.
+NEW: Count: 25 product routes in this table (9 owned rows of API.md 3.12, 16 added rows); sections 7.11, 7.12 and 7.13 add one route each, so the phase has 28; no dev route.
+
+=== F7 [L-18-1c]
+WHY: L-18-1 | CONFIRMED LOW (lead, second look) | the header, the Count sentence, check 7 and status.md count 25 routes; sections 7.11, 7.12 and 7.13 add one each | the header and status.md say 28; the Count sentence and check 7 name the three sections
+OLD: 7. Swagger UI shows the 25 routes of section 2 and the extended `GET /cases/{id}`;
+NEW: 7. Swagger UI shows the 25 routes of section 2, the three routes of sections 7.11 to 7.13 and the extended `GET /cases/{id}`;

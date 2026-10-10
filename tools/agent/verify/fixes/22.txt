@@ -1,0 +1,161 @@
+Phase 22 fixes (lead review of tools/agent/verify/draft/22.txt against docs/plan/phase-22.md, 2026-10-10).
+21 claims stood at the refuter. Lead result: 21 confirmed (0 HIGH, 8 MEDIUM, 13 LOW), 0 rejected.
+Lead decisions on the three open points: a return after the due timer has fired raises the overdue alarm at once
+(V-22-04-b); `desk.approval_waiting` stays seeded as a code the `notify` effect may name (V-22-05-c); an RFI closes
+with its case (V-22-10-a, block in phase 19, the owner). The five HIGH of the refuter are down-rated: each is a wrong
+name, a stale base line under a 7.x block or a missing step with a clear meaning.
+
+@@ REP 22
+until the object is `scanned` it cannot be used in an answer
+@@ WITH
+until its `av_status` is `clean` it cannot be used in an answer
+@@ END
+
+@@ REP 22
+and status scanned (`version_id` set)
+@@ WITH
+and `av_status = 'clean'` (`version_id` set)
+@@ END
+
+@@ REP 22
+classification: personal, lang: none, bytes }
+@@ WITH
+classification: personal, lang: und, bytes }
+@@ END
+
+@@ REP 22
+when it corrects a current claim through `corroborates`, phase 19 section 3.3 step 2
+@@ WITH
+when it corrects a current claim through `supersedes`, phase 19 section 3.3 step 2; `supersedes` must name a current claim of this RFI whose `source_kind` is `branch_officer`, else 422 `E_VALIDATION` at `/answers/{i}/supersedes`
+@@ END
+
+@@ REP 22
+evidence_ids: Vec<Uuid> (0 to 5), corroborates: Option<Uuid> }` (the phase 19 `AnswerInput` with the branch's source kind fixed to `branch_officer`).
+@@ WITH
+evidence_ids: Vec<Uuid> (0 to 5), supersedes: Option<Uuid> }` (the phase 19 `AnswerInput` with `question_key` in place of `question_id`, the source kind fixed to `branch_officer`, corroboration `none` and no `corroborates`, which is the desk's (section 3.2 step 5); the route finds `question_id` through `casework.rfi_questions`, unique on `(rfi_id, question_key)`; the 500-character cap of `value` is this route's own, narrower than the 2000 of phase 19).
+@@ END
+
+@@ REP 22
+InternalReportService::receive(tx, ReceiveCommand {
+@@ WITH
+InternalReportService::receive(tx, CreateInternalReport {
+@@ END
+
+@@ REP 22
+through the register detail (Open doubts 9)
+@@ WITH
+through the rows that section 7.2 extends (Open doubts 9)
+@@ END
+
+@@ REP 22
+through the phase 19 register detail, which has no observation fields today; the register detail gains them for M only (a read extension, not built here)
+@@ WITH
+in the rows of phase 19's `GET /internal-reports`, which section 7.2 of this phase extends with the observation fields for M only
+@@ END
+
+@@ REP 22
+3. The due timer of a returned report still fires; a report returned and not re-signed by the due day raises the overdue alarm.
+@@ WITH
+3. The due timer of a returned report still fires; a report returned and not re-signed by the due day raises the overdue alarm. A return made after the timer has fired (the due day has passed) raises the same alarm in the return transaction, with the `AlarmService::raise` call of section 3.6 timer step 2; the live-alarm index keeps one alarm.
+@@ END
+
+@@ REP 22
+`get(conn, code)`, `all(conn)`, `put_version(tx, NewVersion)`
+@@ WITH
+`get(conn, code)`, `get_version(conn, code, version) -> Option<NotificationTemplate>` (one stored version of `admin.notification_template_versions`, for the render of `NotificationService::list`), `all(conn)`, `put_version(tx, NewVersion)`
+@@ END
+
+@@ REP 22
+both languages present; placeholders from the template's `params` only;
+@@ WITH
+both languages present (`E_MISSING_I18N`); placeholders from the template's `params` only (`unknown_key`);
+@@ END
+
+@@ REP 22
+on both languages; the code exists.
+@@ WITH
+on both languages (`forbidden_term`, span only); the code exists (`unknown_key`).
+@@ END
+
+@@ REP 22
+and the link `serve.public.base_url` (phase 01).
+@@ WITH
+and the link built from `AKR_PUBLIC_ORIGIN` (phase 01 environment variable).
+@@ END
+
+@@ REP 22
+`serve.public.base_url` (phase 01), `bank.timezone` (phase 00).
+@@ WITH
+`AKR_PUBLIC_ORIGIN` (phase 01 environment variable, not a settings row), `bank.timezone` (phase 00).
+@@ END
+
+@@ REP 22
+the producer names the code; the code is one of the two |
+@@ WITH
+the producer names the code; this row is the task shape, and the topic has two more shapes (section 7+) |
+@@ END
+
+@@ REP 22
+`ObservationView` (for M and the desk only) carries the decrypted notes through the phase 02 sealing service.
+@@ WITH
+`ObservationView` (for M only, 7.2) carries the decrypted notes through the phase 02 personal seal (AAD = the observation id, as section 3.3 step 5 applies it).
+@@ END
+
+@@ REP 22
+`closed` (the word of a withdrawn request), with no `due_at`
+@@ WITH
+`closed` (the word of any closed request), with no `due_at`
+@@ END
+
+@@ REP 22
+19 closes or withdraws it, for
+@@ WITH
+19 closes it with its case (phase 19 section 7+), for
+@@ END
+
+@@ REP 22
+`closed`, which a withdrawn
+@@ WITH
+`closed`, which a closed
+@@ END
+
+@@ REP 22
+(phase 19 section 3.14, Cedar `followup.a2.report`)
+@@ WITH
+(phase 19 section 3.13, Cedar `followup.a2.report`)
+@@ END
+
+@@ REP 22
+`set_email_state(tx, id, state, attempts, sent_at, error_code)`; `sweep_read_older_than(tx, days, limit)`
+@@ WITH
+`set_email_state(tx, id, state, attempts, sent_at, error_code)`; `get_for_update(tx, id) -> Option<Notice>` (the notice row `FOR UPDATE`, read by the job `notification_email`); `sweep_read_older_than(tx, days, limit)`
+@@ END
+
+@@ BLOCK 22
+### 7.N Alarm row of the liaison report (V-22-04-a, MEDIUM; DR-413)
+Phase 19 section 7.3 has each owner add its row to the table of phase 19 section 3.10. This phase's row: `liaison_report_overdue` (no stage) | raised by the handler `timer_liaison_due` (section 3.6) and by a late return (section 3.7 step 3) | subject `liaison_report` | supervisor M | read by M.
+@@ END
+
+@@ BLOCK 22
+### 7.N The three payload shapes of `notify.request` (V-22-06-a, V-22-06-b, MEDIUM; DR-413)
+The mapping row of section 3.8 describes one shape. The dispatcher tells the shapes apart by the keys of the payload.
+1. `{task_id, template_code, to}` (phase 04 remind and escalate): the row as written. The code is `task.overdue` or `task.waiting`; `to` is `holders` or `escalation_target`.
+2. `{workflow_instance_id, template_code, to}` (the `notify` effect, section 4.5 item 5 a): the source row is the instance and its resource, and the tier of step 3 is the resource's. `to: initiator` is the instance's initiator. `to: subject_team` is the case team (`casework.case_acl`, `revoked_at IS NULL`) when the resource kind is `case`, and the initiator alone for every other resource kind. The code is any closed code of section 1.2; steps 4 to 6 run as written, with `count` 1.
+3. `{template_code, count}` (phase 25 section 3.3: `security.break_glass_waiting`, `security.break_glass_opened`): the notice names no resource, so steps 2 and 3 do not run and step 5 never swaps the template. The recipients are the active holders of the roles of 7.1 with no visibility filter, and `count` is the payload's value (step 6 does not run).
+A payload of any other shape, or a code outside the closed list, is an error and the row stays undispatched (step 1).
+@@ END
+
+@@ BLOCK 22
+### 7.N `desk.approval_waiting` has no fixed producer (V-22-05-c, LOW; DR-413)
+The seeded code `desk.approval_waiting` is sent by no step of this phase. It stays in the closed list as a code that a workflow definition's `notify` effect may name (payload shape 2 of the block above). An approver learns of an open deciding task through `task.waiting`.
+@@ END
+
+@@ BLOCK 22
+### 7.N Observation read for the register list (V-22-07-c, LOW; DR-413)
+Section 2 `ObservationRepository` gains `by_internal_report(conn, internal_report_ids: &[Uuid]) -> Vec<Observation>`: one read of the observations whose `internal_report_id` is in the page of phase 19's register list, for the `observation` key of 7.2 (three fields: `indicator_groups`, `escalation_criteria`, `notes`). The key is set for M only.
+@@ END
+
+@@ BLOCK 19
+### 7.N An RFI closes with its case (V-22-10-a, MEDIUM; DR-413)
+No step set an RFI to `closed` or wrote `closed_at`, and phase 22 lists a closed item for `branch.item_closed_days` from `closed_at`. `CaseService::close` (the extension of section 4.5 item 5), after the closure gate and in the same transaction, sets every `released` or `answered` RFI of the case to `closed` with `closed_at = now()` (`RfiRepository::set_status`; the guard of section 1.2 allows both moves), cancels the RFI's timers and writes audit `rfi.closed {rfi_id}` for each (new; no chain event, because the case is closing). The rows are locked in ascending id order after the case row. A closed RFI is final: a reopened case drafts a new RFI.
+@@ END

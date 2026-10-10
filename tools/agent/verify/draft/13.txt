@@ -1,0 +1,179 @@
+@@ BLOCK 13
+### 7.N Segment activation writes the segment row (V-13-01-a, HIGH; DR-413)
+Section 2, `SegmentRepository` gains one write method: `async fn activate_version(&self, tx: &mut Tx, s: &Segment, cr: Uuid) -> Result<(), RepoError>;`. It inserts the key as `active`, or updates the key's row to the next `version` with `change_request_id` and `updated_at` (the columns of the section 1 grant). The `segment` change target of section 3.7 calls it from `ChangeTarget::activate` (phase 04) inside the approval transaction, before it enqueues `segment_assign`.
+@@ END
+# V-13-01-a | HIGH | names used and where they exist: `Tx`, `RepoError`, `Segment` phase-13.md:440 (domain entities) and phase-13.md:472-478 (the trait); `FeatureRepository::activate_version` phase-13.md:463 (the analogue); `ChangeTarget::activate` phase-04.md:652; `segment` row of section 3.7 phase-13.md:771; grant of `change_request_id`, `version`, `updated_at` phase-13.md:323-324 | NEW: `activate_version` on `SegmentRepository` (the feature method has the same name in another trait; the lead may rename it)
+
+@@ BLOCK 13
+### 7.N Refusal codes of a segment proposal (V-13-01-b, MEDIUM; DR-413)
+Section 3.3, `SegmentService::propose` step 1, names a code for each of its refusals. A key that breaks the key pattern, and a level other than `static` or `risk_overlay` (`cluster` included), return 422 `E_VALIDATION` with the `errors[]` code `E_SCHEMA`, as the closed enumerations of section 3.1 step 1 do (section 6 expects `E_SCHEMA` for an unknown expression kind). A `sort_order` already used by another static segment returns 422 `E_VALIDATION` with the `errors[]` code `E_SEGMENT_SORT_ORDER`, a new code listed in section 3.9 beside `E_SEGMENT_MIN_SIZE`.
+@@ END
+# V-13-01-b | MEDIUM | names used and where they exist: `E_SCHEMA` DSL.md:1096 (DSL s.7); `E_VALIDATION` API.md:985; `E_SEGMENT_MIN_SIZE` phase-13.md:643 (step 1) and phase-13.md:799 (3.9 row), DSL.md:1131; closed enumerations under `E_SCHEMA` phase-13.md:533 (section 3.1 step 1); the expression-kind test phase-13.md:1001 | NEW: `E_SEGMENT_SORT_ORDER` (no DSL s.7 or API s.6 code covers a repeated sort order; the key pattern and the level reuse `E_SCHEMA`)
+
+# DECIDE V-13-02-a | option A: the payroll and pension batch tags (employer, batch ID, payment code; research/27 line 1193) become canonical fields read from the CBS and mapped in phase 10 (canon.account and canon.txn are phase 10's; the account `type` column is docs/plan/phase-10.md:636 with no value list); the government-source flag stays out of this phase, because research/27 line 1195 puts it on counterparties and cheque drawers as governed reference data (S-15), which docs/plan/phase-09.md:11 keeps not carried | option B: the S-17 tags and flag are not carried in this phase (header line 27 moves them to the not-carried list), and the payroll pool stays the account type value `government_payroll_pool` of docs/DSL.md:374, which the phase 10 `type` column does not check. Option A needs the CBS field names, which the plan does not hold.
+# DECIDE V-13-02-b | option A: the header's S-17 is the peer-segment reading (tags and a flag, research/27 line 2366; see V-13-02-c), so the exclusion claim of header line 27 is dropped and no exclusion step is added | option B: one numbered exclusion step in the default `where` of section 3.1 (phase-13.md:573-574): accounts whose `type` is `government_payroll_pool` produce no feature row, as docs/DSL.md:374 gives for scenarios (reason `EXCL_POOL_ACCOUNT`); the scenario side already exists as a static exclusion (docs/plan/phase-16.md:963) and needs no change here
+# DECIDE V-13-02-c | option A: header line 27 reads S-17 as the requirement does (research/27 line 2366: payroll and pension batch tags and a government-source flag so public-salary accounts form peer segments) and marks the flag as not carried (see V-13-02-a) | option B: header line 27 keeps the exclusion reading of docs/DSL.md:374 (a scenario exclusion, phase 16), and the peer-segment tags move to the not-carried list; the two sources disagree and no DR in docs/plan/research.md decides S-17 (grep finds none)
+
+@@ BLOCK 13
+### 7.N Cluster segment rows: the columns the insert needs (V-13-03-a, MEDIUM; DR-413)
+Section 3.5 step 13: each `segments` row of a cluster also sets `name` (`{"ar": "المجموعة السلوكية <n>", "en": "Behavioural cluster <n>"}`), `definition` (`{"scope": "customer", "cluster": <n>}`; the build is `peer_group_id` and the centroids are in `peer_groups.centroids`), `currency` (the build's currency, which the section 1 CHECK requires) and `created_by` (the build's `requested_by`).
+@@ END
+# V-13-03-a | MEDIUM | names used and where they exist: `name`, `definition`, `created_by`, `currency` phase-13.md:113, 115, 125 and the CHECK at 130; `peer_group_id` phase-13.md:121; `requested_by` phase-13.md:95; `centroids` phase-13.md:89; the label wording "المجموعات السلوكية" of `peer.k` phase-13.md:399 | NEW: the cluster `name` and `definition` shapes (no plan text gives them; the Arabic label follows the `peer.k` label)
+
+@@ BLOCK 13
+### 7.N Loads of active segments by level and by build (V-13-03-b, MEDIUM; DR-413)
+Section 2, `SegmentRepository` gains `async fn active_by_level(&self, conn: &mut PgConnection, level: Level, build_id: Option<Uuid>) -> Result<Vec<Segment>, RepoError>;`, which returns the segments of the level with status `active`, ordered by `sort_order`; with `build_id` it returns only the cluster segments of that peer build. `active_static` is its `static` case. Section 3.3 step 1 (static and risk overlay), the cluster steps of section 3.3 added by this phase, and section 3.4 step 2 (cluster segments of the active build) use it.
+@@ END
+# V-13-03-b | MEDIUM | names used and where they exist: `active_static` phase-13.md:475; `Level` phase-13.md:477 (`membership_at` signature); `PeerRepository::active` phase-13.md:481 (returns the build row only); section 3.3 step 1 phase-13.md:654; section 3.4 step 2 phase-13.md:674; `peer_group_id` phase-13.md:121 | NEW: `active_by_level` (one method for the two loads the claim lists; `active_static` is its static case)
+
+@@ BLOCK 13
+### 7.N Fields of MembershipSnapshot (V-13-03-c, LOW; DR-413)
+Section 2, `SegmentRepository::membership_at`: `MembershipSnapshot` is the list of `feat.segment_memberships` rows of the level that hold at `as_of`, with the fields `customer_id`, `segment_id`, `valid_from` and `valid_to` (the section 1 columns).
+@@ END
+# V-13-03-c | LOW | names used and where they exist: `membership_at` phase-13.md:477; `feat.segment_memberships` columns phase-13.md:138-147; the hold rule of section 3.4 step 2 phase-13.md:674-675 | NEW: none (the `MembershipChange` half is refuted: its fields are in section 3.3 step 4, phase-13.md:661-662)
+
+@@ BLOCK 13
+### 7.N Cluster membership steps and the completion test (V-13-03-d, HIGH; DR-413)
+Section 3.3 gains, for `segment_assign {level: cluster, build_id}`, three steps after step 7:
+1. Load the build `build_id` with its `centroids` and the scaling in `definition` (section 3.5 steps 3 and 11), and its cluster segments through `active_by_level` (the method of this phase's gap block for section 2).
+2. Keyset pages of 5,000 customers of the build's population (the vectors of section 3.5 step 1 at its `as_of`), one transaction per page: transform and scale each vector as section 3.5 steps 2 and 3 do with the build's scaling, take the nearest centroid (ties to the lower index), and write the membership rows through `set_membership_batch`, closing a customer's open cluster row first when its segment differs (section 3.3 step 4).
+3. The build is set `active` through `PeerRepository::set_state` (section 3.7) when the cluster membership rows opened for its segments (`valid_from` = `as_of`) equal `peer_groups.members_count`.
+@@ END
+# V-13-03-d | HIGH | names used and where they exist: `centroids`, `definition`, `members_count` phase-13.md:88-90 (peer_groups DDL); `set_membership_batch` phase-13.md:476; `PeerRepository::set_state` phase-13.md:482; section 3.5 steps 1 to 3, 9 and 11 phase-13.md:686-718 (step 9 at 707); section 3.3 step 4 phase-13.md:661; `segment_assign` row of section 3.7 phase-13.md:771 | NEW: none. The completion test (row count equal to `members_count`) is chosen here because the plan names none; the alternative, a flag per batch, is not chosen.
+
+@@ BLOCK 13
+### 7.N Expression of cash_share_1m (V-13-04-a, MEDIUM; DR-413)
+The seed row `cash_share_1m` of section 3.1 is `value_kind` `ratio`, `window_spec` `{"kind": "calendar", "period": "month"}` and `currency_mode` `per_currency`, with the expression `{"kind": "ratio", "num": "cash", "den": "all", "measures": {"cash": {"kind": "count", "where": "txn.cash_flag = true AND txn.status = 'posted' AND txn.system_generated IS NOT TRUE"}, "all": {"kind": "count", "where": "txn.status = 'posted' AND txn.system_generated IS NOT TRUE"}}}`. It is the share of cash-flagged posted rows among all posted rows, inflows and outflows together (research file 21: "cash share of inflows and outflows"). A zero denominator gives `no_history` (section 3.1 step 7).
+@@ END
+# V-13-04-a | MEDIUM | names used and where they exist: `txn.cash_flag` phase-10.md:983 (canon.txn, BOOLEAN NOT NULL); `txn.status`, `txn.system_generated` and the posted-row filter of the credit example phase-13.md:565; the `num` and `den` alias form of a ratio docs/DSL.md:313; the same-definition rule and `no_history` phase-13.md:548 | NEW: the `measures` key of a ratio expression (docs/DSL.md:313 names a ratio's measures by alias in the same way; the lead may name it differently); one share over both directions is chosen (the other reading, one share per direction, would need two seed rows). The other eight seed expressions and the catalogue file are not written here
+# NOTE V-13-04-a: the other eight seed expressions (the rest of this claim) are not in this fix; the lead decides whether to write them as eight more blocks or to cite the signed catalogue file as their only source.
+
+@@ BLOCK 13
+### 7.N Repository of the segment statistics (V-13-04-b, HIGH; DR-413)
+Section 2 gains `SegmentStatsRepository`, the trait behind the `PgSegmentStatsRepository` of the crate placement, with two methods. `async fn for_segment(&self, conn: &mut PgConnection, segment_id: Uuid, page: Keyset) -> Result<Page<SegmentStat>, RepoError>;` is the read of the statistics route of section 2, ordered by `feature_id`, `currency` and `period`. `async fn replace_period(&self, tx: &mut Tx, period: NaiveDate, rows: &[SegmentStat]) -> Result<u64, RepoError>;` deletes the period's rows of the keys the run computes and inserts `rows`, in the caller's transaction (section 3.4 step 5).
+@@ END
+# V-13-04-b | HIGH | names used and where they exist: `PgSegmentStatsRepository` phase-13.md:431 (crate list); `SegmentStat` phase-13.md:440 (domain entities); `Keyset`, `Page` phase-13.md:473; the statistics route phase-13.md:508; section 3.4 step 5 phase-13.md:679 | NEW: `SegmentStatsRepository` (the trait behind the crate's `PgSegmentStatsRepository`, named like `SegmentRepository`)
+
+@@ BLOCK 13
+### 7.N Statistics read in steps (V-13-04-c, MEDIUM; DR-413)
+The read `GET /ref/segments/{id}/stats` of section 2 runs in this order:
+1. Cedar `segment.stats.read` on the segment (`config.author`, section 3.11). An unknown id is 404 `E_NOT_FOUND` (section 3.9).
+2. `SegmentStatsRepository::for_segment` (the trait of this phase's gap block for section 2) reads one keyset page of the segment's rows, with `Keyset` in and `Page` out, as `SegmentRepository::list` does.
+3. The response is `SegmentStatsView` with those rows. No value of a suppressed population is returned (section 3.4, last paragraph).
+@@ END
+# V-13-04-c | MEDIUM | names used and where they exist: `E_NOT_FOUND` phase-13.md:800 (3.9 row, also for an unknown id); `segment.stats.read` phase-13.md:831 (3.11) and `config.author` phase-13.md:508; section 3.4 last paragraph phase-13.md:683-684; `SegmentStatsView` phase-13.md:495-496 | NEW: none. The open part, the source of the count `suppressed_periods`, is the DECIDE below.
+# DECIDE V-13-04-c (the count only; the read steps are in the block above) | option A: drop `suppressed_periods` from `SegmentStatsView` (phase-13.md:495-496) and from the check of section 6 item 5 (phase-13.md:1003-1004); the route row then says that suppressed populations have no row and are not shown, and the V-13-04-d fix is void | option B: keep the count as the number of populations suppressed by the latest run, stored on the segment in a new column `suppressed_periods INT NOT NULL DEFAULT 0 CHECK (suppressed_periods >= 0)` of migration 0040 (section 1), added to the `feat.segments` grant (phase-13.md:323-324) and written by section 3.4 step 6 from the audit count (phase-13.md:681); no new table. The gap: the job writes no row (phase-13.md:677) and the read sentence is one line (phase-13.md:683-684)
+
+@@ REP 13
+suppressed periods counted, never shown
+@@ WITH
+suppressed periods counted, and the response carries only their count, never their values
+@@ END
+# V-13-04-d | LOW | grep -c -F gave 1 | names used and where they exist: route row phase-13.md:508; `SegmentStatsView` count field phase-13.md:495-496; section 6 item 5 phase-13.md:1003-1004 | NEW: none. Conditional: void if the DECIDE of V-13-04-c picks option A.
+
+@@ REP 13
+reads write access events
+@@ WITH
+a sensitive read writes an access event, and only the profile read is one in this phase
+@@ END
+# V-13-04-e | LOW | grep -c -F gave 1 | names used and where they exist: 3.10 heading phase-13.md:807; the profile read is the only route with `x-akr-access` in this phase, phase-13.md:924; the sensitive-route rule of phase 02, phase-02.md:735 | NEW: none
+
+# DECIDE V-13-05-a | option A: counterparty profiles are rows of `feat.profiles` with an `entity` column in its primary key (migration 0041 of section 1, with a classification row for the column), built by a counterparty step of section 3.6; no new table; today the table is keyed by customer (phase-13.md:207-218) and the header claims VB-05 at phase-13.md:28 | option B: VB-05 is delivered as counterparty features only, in `feat.feature_values` with entity `counterparty` (the DDL already allows it, phase-13.md:173), and no counterparty profile is built; header line 28 says so | option C: a new table `feat.counterparty_profiles`, which this pass does not write (the lead decides). The requirement is research/12-vendor-ai-native-detection.md:702 (VB-05) and :419 (rolling profiles per customer, account and counterparty)
+# DECIDE V-13-05-b | option A: seed one counterparty feature, for example a sum of credits, grouped by `(t.counterparty_id, t.currency)` with entity `counterparty` (phase-13.md:173; `txn.counterparty_id` at docs/plan/phase-10.md:975); the seed then holds ten features, so the count in section 3.1 (phase-13.md:578 "nine features", :595 `feature.seeded`) and in section 6 items 3 and 5 (phase-13.md:971-972 and :1002 "nine active rows") change | option B: no counterparty feature is seeded; VB-05 counterparty features are then P2, and header line 28 says so. The nine seed rows are phase-13.md:582-590 and the month-end grouping is by customer only (phase-13.md:565-566)
+# DECIDE V-13-05-c | depends on V-13-05-a: under option A the refresh and read of section 3.6 gain a `counterparty` entity step (section 3.6 step 2 covers current `canon.customer` rows only, phase-13.md:728); under option B there is no profile step to add; under option C a separate job is named, which the lead chooses
+# DECIDE V-13-05-d | depends on V-13-05-a: under option A `ProfileRepository` (phase-13.md:485-489) takes an entity key and `PartyProfilesView` (phase-13.md:498) keeps its customer form; under option C a new trait and DTO are named; under option B none is needed
+# DECIDE V-13-05-e | depends on V-13-05-a: under option A `profile.refreshed` (phase-13.md:749 and the 3.10 row at phase-13.md:821) widens its `excluded_customers` field to a form for counterparties; under option C it gets its own event kind, which the lead names; under option B nothing is added
+
+@@ BLOCK 13
+### 7.N Protected attributes of features and segments (V-13-06-a, MEDIUM; DR-11, DR-413)
+Section 3.1 step 2 and the segment predicates of section 3.3 apply the list of DR-11 (docs/plan/research.md) to features and segments: names, tribe, religion, sect, region of origin and gender are refused, and nationality is refused too, because scenarios never use it (S-38). The ethnicity of docs/DSL.md A.5 stays in the list, since DR-11 does not remove it. The phase 24 register does not govern this step: its nationality row allows the `segmentation` use, which a detection segment or feature may not take.
+@@ END
+# V-13-06-a | MEDIUM | names used and where they exist: `E_PROTECTED_ATTRIBUTE` and the six-attribute list of section 3.1 step 2 phase-13.md:535-536; `E_PROTECTED_ATTRIBUTE` docs/DSL.md:1104; DR-11 docs/plan/research.md:22 ("forbidden in both"; scenarios never use nationality); the segment predicates phase-13.md:633; the register's nationality row docs/plan/phase-24.md:441 (`allowed_uses` includes `segmentation`; the register has no gender or religion code) | NEW: none. A DR wins over both lists (the lead's order). The register lacking gender and religion is a phase 24 gap, not fixed here.
+
+@@ REP 13
+short-history fallback. Degraded rows never enter any history.
+@@ WITH
+short-history fallback: the own-history summary and the own z are absent, so `expected` holds the declared figure and the peer statistic, and `deviation` holds the declared and peer ratios only, where they exist (DSL.md A.6.3 `min_history`: the peer fallback applies). Degraded rows never enter any history.
+@@ END
+# V-13-07-a | LOW | grep -c -F gave 1 | names used and where they exist: `expected` and `deviation` columns phase-13.md:214-216 (DDL); comparators of step 7 phase-13.md:742; the `min_history` rule docs/DSL.md:366; `profile.min_history_months` phase-13.md:393 | NEW: none
+
+@@ REP 13
+Range: `from` and `to` are periods; the default is the last twelve months and the maximum is twenty-four.
+@@ WITH
+Range: `from` and `to` are periods; the default is the last twelve months and the maximum is twenty-four. A longer range is 422 `E_VALIDATION` with the sub-code `range_too_long`, and `from` after `to` is 422 `E_VALIDATION` with the sub-code `range_inverted` (the two sub-codes phase 11 lists under `E_VALIDATION`).
+@@ END
+# V-13-07-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `range_too_long` and `range_inverted` phase-11.md:1173 (the `E_VALIDATION` row; phase 11 scopes them to POST routes, this read reuses them); `E_VALIDATION` API.md:985; read step 4 phase-13.md:758 | NEW: none
+
+@@ REP 13
+VB-14 (the robust per-segment baseline on closed days)
+@@ WITH
+VB-14 (the per-customer baseline store, offline and at month-end, from the segment statistics of section 3.4 and the profiles of section 3.6; the online use that the requirement places in its Phase 2 is not built here)
+@@ END
+# V-13-08-b, V-13-08-c, V-13-08-d | LOW (b), LOW (c), LOW (d) | grep -c -F gave 1 | names used and where they exist: header line phase-13.md:27; the VB-14 requirement research/12-vendor-ai-native-detection.md:711 (offline in Phase 1, online in Phase 2); section 3.4 phase-13.md:670; section 3.6 phase-13.md:724; "Features are month-end snapshots" phase-13.md:1180 | NEW: none. The event-time daily measures of phase 16 (the refuted part of V-13-08-b) stay in phase 16 and are not restated here.
+
+# DECIDE V-13-09-a | option A: one access event per customer record shown, as the access scope of phase 02 records each loaded record (docs/plan/phase-02.md:720): `resource_type` `customer`, `resource_id` the record's id, `subject_party` the party; section 3.6 read step 3 (phase-13.md:756-757) and section 6 item 7 (phase-13.md:1018) then say one event per record, and the per-resource filter of phase 24 (docs/plan/phase-24.md:612) finds the record | option B: one event per response, with `resource_id` the party's id; `resource_id` is required and holds a pseudonymous id (docs/plan/phase-02.md:149), no resource type for a party is named in the plan, and 7.1 (phase-13.md:1031-1032) would change too, since `resource_type` `customer` cannot carry a party id
+
+@@ REP 13
+and section 4.5's
+@@ WITH
+and the "Phase 02" bullet of the existing-updates list in section 4, which says
+@@ END
+# V-13-09-b | LOW | grep -c -F gave 1 | names used and where they exist: 7.1 phase-13.md:1034; the "Phase 02" bullet phase-13.md:937; section 4 has no numbered subsections (heading phase-13.md:897) | NEW: none
+
+# DECIDE V-13-10-a | option A: phase 13 section 7.2 gives the four signatures and the type. `compile_measure` and `compile_filter` take the arguments that phase 16 passes (docs/plan/phase-16.md:995-996) and return `CompiledFeature`, as `compile` does (phase-13.md:555); `ProfileComparator` is a struct in `domain::profiles` whose `plan` takes `expected`, `combine` (`any` or `all`, phase-16.md:958) and `min_history` (phase-16.md:1014-1015), and whose `evaluate` takes the plan and the period's actuals (phase-16.md:1162); `Combine` and the plan type are new names | option B: phase 16 section 3.2 gives the signatures, as phase 13 section 7.2 already says the owner is phase 16 (phase-13.md:1040-1041; phase-16.md:2115-2116), and phase 13 names the type only (its one mention is phase-13.md:429)
+
+@@ REP 16
+**Consumed ports** (not defined here):
+@@ WITH
+**Consumed ports** (not defined here, except that this phase adds the four methods of section 3.2 to phase 13's module, as phase 13 section 7.2 says):
+@@ END
+# V-13-10-b | LOW | grep -c -F gave 1 (docs/plan/phase-16.md:864) | names used and where they exist: section 3.2 of phase 16 (heading phase-16.md:982); phase 16 gap block phase-16.md:2115-2116 ("additions to phase 13's module ... not redefinitions"); phase 13 section 7.2 phase-13.md:1039-1041 | NEW: none. The refuted part (ownership is decided) stands as written in phase 13.
+
+@@ REP 13
+`ReaderCatalogue::readers(object) -> Vec<ReaderRef>` and `measure(object, proposal) -> Option<VolumeEffect>`.
+@@ WITH
+`ReaderCatalogue::readers(conn, object) -> Result<Vec<ReaderRef>, CatalogueError>` and `measure(conn, object, proposal) -> Result<Option<VolumeEffect>, CatalogueError>`, the signatures phase 16 implements (`conn` is `&mut PgConnection`; `CatalogueError` is the port's error type).
+@@ END
+# V-13-11-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: phase 16 trait phase-16.md:843-846 (`readers`, `measure`, `conn`, `CatalogueError`); `PgConnection` in the other traits phase-13.md:472; `ReaderRef`, `VolumeEffect` phase-13.md:790 | NEW: `CatalogueError` (named at phase-16.md:844 and :846 and defined in no phase; the lead may instead use `FeatError` and change phase 16 to match)
+
+@@ REP 13
+calls `ReaderCatalogue::measure` again on the proposed change.
+@@ WITH
+calls `ReaderCatalogue::measure` again on the proposed change, under the section 3.7 volume-effect rule (no reader: `neutral`; not measurable: `unknown`).
+@@ END
+# V-13-11-b | LOW | grep -c -F gave 1 | names used and where they exist: the volume-effect rule of section 3.7 phase-13.md:780-782; section 7.3 phase-13.md:1044-1045; `None` as `unknown` in phase 16 phase-16.md:1446-1447
+
+@@ REP 13
+and `measure` returns `None`.
+@@ WITH
+and `measure` returns `Some(Neutral)`, the true effect before phase 16 (`None` means the effect cannot be measured, which is `unknown`).
+@@ END
+# V-13-11-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: `Some(Neutral)` phase-16.md:1445 (the other side, "phase 13's null rule"); the rule of section 3.7 phase-13.md:780-782 (no reader gives `neutral`; not measurable gives `unknown`); "neutral is the true effect" phase-13.md:793 | NEW: none. Chosen: the phase 13 text changes, because `None` means `unknown` in phase 16 too (phase-16.md:1446-1447), and a null port that answers `unknown` would block every change before phase 16. The lead may take the other side and change phase-16.md:1445 instead.
+
+@@ REP 13
+'R2', 'age', 'created_at', 'Counterparty links: kept as long as the counterparty'
+@@ WITH
+'R2', 'owner', NULL, 'Counterparty links: deleted in the same transaction as their counterparty (owner clock)'
+@@ END
+# V-13-12-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: owner clock docs/plan/phase-23.md:576 (deleted in the same transaction as its owner, never before it) and phase-23.md:605 (a child never outlives its owner); NULL clock column for `owner` (tools/agent/b3-conventions.md, retention rule); the counterparty's own clock `age` on `last_seen` docs/plan/phase-10.md:1186 | NEW: none
+
+@@ BLOCK 13
+### 7.N Analyst decisions on counterparty links (V-13-12-b, MEDIUM; DR-398, DR-413)
+Section 7.5: the words "written by akr-worker only" are replaced by "written by akr-worker, and, for the analyst rows only, by phase 18 through `CounterpartyLinkRepository::record_analyst_decision` (DR-398)". Section 2 gains the repository of the table this phase owns: `async fn record_analyst_decision(&self, tx: &mut Tx, counterparty_id: Uuid, party_id: Uuid, confirmed: bool, decided_by: Uuid) -> Result<(), RepoError>;` in the trait `CounterpartyLinkRepository`. In the caller's transaction it closes the counterparty's open row, if there is one (`valid_to = now()`), and inserts an `analyst_confirmed` row (when `confirmed`) or an `analyst_rejected` row, each with `party_id` and `decided_by`. The phase 18 route `POST /cases/{id}/counterparty-links` calls it inside the case lock.
+@@ END
+# V-13-12-b | MEDIUM | names used and where they exist: `feat.counterparty_links` phase-13.md:1065 (this phase's migration 0044); `party_id` and the analyst CHECK phase-13.md:1075-1076; `uq_counterparty_link_open` phase-13.md:1079; the phase 18 decide route, body `counterparty_id`, `party_id`, `decision` phase-18.md:1359-1361, and its close of the open row phase-18.md:1365 (its chain event `case.counterparty_decided` and audit `counterparty.link_decided` stay with that route, phase-18.md:1366); DR-398 docs/plan/research.md:409 | NEW: `CounterpartyLinkRepository` and `record_analyst_decision` (the owner is this phase, as the table is; the trait name follows `SegmentRepository`)
+
+@@ REP 13
+the `crates/names` function behind `canon.party_name.key`
+@@ WITH
+the function `names::party_key` of `crates/names` (NEW name: phase 10 section 7.9 creates the crate and names no key function) behind `canon.party_name.key`
+@@ END
+# V-13-12-c | LOW | grep -c -F gave 1 | names used and where they exist: crate `crates/names` docs/plan/phase-10.md:2378-2380 (section 7.9: the fold and key tables and the functions behind `FoldArabic` and `SplitArabicName`); `canon.party_name.key` docs/plan/phase-10.md:757 (index) and :805 (column list); DR-371 docs/plan/research.md:382 | NEW: `names::party_key`. Phase 10 section 7.9 is the owner of the crate and should name the function too; that block is not written here.
+
+@@ BLOCK 13
+### 7.N Resolver chunks re-read the open row (V-13-12-d, MEDIUM; DR-413)
+Section 7.5 step 6 runs per candidate inside the chunk transaction. The job re-reads the candidate's open row by `id` with `FOR UPDATE`. It skips the candidate when that row is now `own_account`, `confirmed_account`, `analyst_confirmed` or `analyst_rejected` (the rule of step 1), and otherwise closes that row by its `id` (`valid_to = now()`) and inserts the new row. A unique-index refusal (`uq_counterparty_link_open`) rolls back the whole chunk; the attempt fails and the job retries under phase 00 (`max_attempts`), which re-reads the rows, so an analyst row written in the meantime is skipped.
+@@ END
+# V-13-12-d | MEDIUM | names used and where they exist: `uq_counterparty_link_open` phase-13.md:1079; the never-replaced rule of step 1 phase-13.md:1114-1116; step 6 phase-13.md:1126-1127; the retry of failed jobs, `max_attempts` docs/plan/phase-00.md:107; the analyst route's close of the open row docs/plan/phase-18.md:1365 | NEW: none. The `FOR UPDATE` lock is chosen here (the claim asks for a re-read; a plain read would not stop a concurrent analyst close). Lock order: the analyst route takes the case lock, the job takes only the row lock, so there is no cycle.
+
+# SUMMARY: fixes written 24 (REP 12, BLOCK 12); DECIDE 11; DROP 0; claims covered: V-13-01-a, V-13-01-b, V-13-02-a, V-13-02-b, V-13-02-c, V-13-03-a, V-13-03-b, V-13-03-c, V-13-03-d, V-13-04-a, V-13-04-b, V-13-04-c, V-13-04-d, V-13-04-e, V-13-05-a, V-13-05-b, V-13-05-c, V-13-05-d, V-13-05-e, V-13-06-a, V-13-07-a, V-13-07-b, V-13-08-b, V-13-08-c, V-13-08-d, V-13-09-a, V-13-09-b, V-13-10-a, V-13-10-b, V-13-11-a, V-13-11-b, V-13-11-c, V-13-12-a, V-13-12-b, V-13-12-c, V-13-12-d (all 26 STANDS and all 10 PARTLY; REFUTED V-13-07-c and V-13-08-a not covered)

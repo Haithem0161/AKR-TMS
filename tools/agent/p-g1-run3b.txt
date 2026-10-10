@@ -1,0 +1,92 @@
+You are drafting part of GAP PASS 1 for the AKR-TMS implementation plan (an AML/KYC transaction-monitoring product
+for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Read first: .claude/rules/planning.md (section
+"Gap Analysis Methodology"), tools/agent/b3-conventions.md, tools/agent/gap1-plan.md.
+
+YOUR RUN: run 3b = backward amendments whose TARGET is phase 11, 12, 13, 14, 15 or 16
+(docs/plan/phase-11.md to phase-16.md), plus PART B below (the 15 API.md rows that no phase owns).
+
+Background. Later phases say that an earlier phase "gains" something: an ingestion job, freshness class or halt
+reason (11), a coverage ledger entry or control total (12), a customer feature, segment or profile field (13), a list,
+name form or screening rule (14), a rating factor, override or KYC review rule (15), a scenario field, run mode or
+harness rule (16), a column, a route, a job, a port, a setting, and so on. Those obligations may never have been written into the target
+phases. Your job is to find every such obligation on phases 11 to 16, check whether the target phase already has it,
+and draft the exact Section 7 text for the ones that are missing. Work one target phase at a time (11, then 12, ...),
+and append the findings of each target before you start the next. Do PART B after the six targets.
+
+Runs 1, 2 and 3a (targets 00 to 10) are applied; read section "## 7+. Gap Additions" of docs/plan/phase-00.md to
+phase-10.md, the section 7 of each of your targets (some already hold correction blocks, for example phase 13 and
+phase 14: do not repeat them), and DR-356 to DR-374 in docs/plan/research.md first, and do not contradict them (one KV mount `akr/` with
+relative paths; the signing key inventory; the access event action is the verb, never a Cedar action name; no new
+step-up class: each phase declares StepUpAction { name, class } with a class from phase 01's closed list).
+
+Lessons from run 1 (follow them):
+- Before proposing a DDL or migration change to the target, check whether the later phase itself creates the object
+  (its own migration, ALTER statement or provisioning step). If it does, the target only needs a text note (MEDIUM),
+  not a second CREATE or ALTER.
+- Never propose a new value for a closed list (step-up class, access verb, role code, problem code) when an existing
+  value fits; say which existing value fits.
+- Do not put line numbers inside the Proposed 7.x text (they change). Cite sections instead. Line numbers belong only
+  in the Sources and Check lines.
+- Verify every name you write by grep in the source phase. Do not invent names.
+
+Lessons from run 3a (follow them):
+- Before calling a name "undefined", grep the whole source phase, not only its section 4.5 (a rule code was defined in
+  section 3.3 of its phase and the draft missed it).
+- When the later phase owns the extension (its own job, route row, migration, enum value), the target gets a short
+  text note naming the owner; do not move the extension into the target.
+- Merge findings that touch the same table, enum or route list into one.
+- Prefer a concrete proposal with a one-line reason over UNCLEAR; use UNCLEAR only when two sources truly disagree.
+
+Where to look for obligations (do all four):
+1. In every docs/plan/phase-NN.md for NN = 12..31: section 4.5 (titled like "Existing entity, schema, route and code
+   updates") and section 4.4, plus any line that names "Phase NN" or "phase NN" for NN = 11 to 16 together with a verb such as
+   gains, adds, extends, extended, widened, new, "gap pass 1". Use grep, e.g.
+   grep -n -i -E "phase 1[1-6]\b" docs/plan/phase-*.md. (Each target is also a source for the earlier targets.)
+2. tools/agent/gap-items.md (items (a) to (aa)): every part that names phase 11 to 16 (items marked DONE are skipped).
+3. docs/plan/research.md: DR rows that mention "gap pass 1" and one of phases 11 to 16.
+4. docs/plan/status.md: the "Tables ~" column of the phase table (the 7th column) for phases 12-31.
+
+For each obligation:
+- grep the target phase file for it (the exact name: kind, key, role, path). If the target already has it, do not
+  write a finding (only count it).
+- If it is missing, write a finding. Merge obligations that change the same thing in the target into ONE finding (for
+  example, all new phase 02 evidence owner kinds from all phases go in one finding with a table: kind, owning phase,
+  source line). Keep one finding per target phase and subject.
+
+PART B: the 15 API.md rows that no phase route table owns (tools/agent/gap1-routes.txt, section "API.md rows with no
+phase route row"; read docs/API.md at each line). For each row:
+- find the phase that should own it (grep the path pieces, the resource and the feature in docs/plan/phase-*.md; the
+  API.md section and the feature usually name it). Known hint: phase 11 owns backfills, phase 18 or 17 case ACLs,
+  phase 02 evidence, phase 09 reference registers, phase 16 scenarios, phase 15 exits, phase 26 Islamic deals; verify.
+- if a phase already has the same operation under another path or name, say which (then API.md is the one to fix:
+  propose the API.md row change, not a new phase route).
+- otherwise draft the route row for that phase's route table, in that phase's own table format (Method | Path | Scope
+  | Description with the Cedar action in brackets), plus the handler steps in 3 to 6 lines, using only names that
+  exist in that phase (tables, services, actions). If no phase has the data the route needs, say so (UNCLEAR).
+Write each as a finding with id G1-API-NN, Target = the owning phase file (or docs/API.md), same format as above.
+
+Finding format (markdown, exactly):
+
+### G1-PP-NN Short title   (PP = the target phase number, e.g. G1-07-03)
+- Severity: HIGH | MEDIUM | LOW   (HIGH: a later phase cannot build or run without it, e.g. a missing CHECK value,
+  role, zone edge, timer kind, owner kind, AppRole path; MEDIUM: a rule or document of the target contradicts a later
+  phase; LOW: wording or a list that is only informative)
+- Category: one of Missing Table, Missing Fields, Missing Endpoint, Missing Logic, Missing Integration, Missing Event,
+  Missing Audit Event, Missing Policy, Incomplete Coverage
+- Target: phase-PP.md section X.Y (the section of the target that must change)
+- Sources: phase-NN.md:LINE (and more), each with a short quote of at most 15 words
+- Check: the grep you ran on the target and its result (for example: grep -n "ops_drill" docs/plan/phase-02.md -> none)
+- Proposed 7.x text: the exact text to append to the target phase's "## 7+. Gap Additions" section, as a subsection
+  "### 7.N <title>" with the change stated concretely (SQL for a CHECK or a seed row, using the column names of the
+  target's own DDL, which you must read; a list of kinds; the zone row; the steps). Do not invent names: use the names
+  exactly as the source phase writes them. If two sources disagree, say so and propose nothing (mark UNCLEAR).
+
+Rules:
+- Write ONLY tools/agent/gap1-run3b.md. Do not edit any other file. Create it at the start with a header line
+  "# Gap pass 1, run 3b (targets 11 to 16 and the unowned API rows; Haiku draft for lead review)" and append each finding as soon as you have
+  it (the machine may crash; nothing may be held only in memory).
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Do not read cbs-discovery/ or test-poc/ (not needed).
+- At the end append a "## Summary" with: findings by severity, the number of obligations already present (skipped),
+  and a list of anything UNCLEAR.
+- Your final reply: the counts by severity and the file path, nothing else.

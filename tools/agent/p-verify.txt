@@ -1,0 +1,84 @@
+You are doing part of the VERIFICATION PASS for the AKR-TMS implementation plan (an AML/KYC transaction-monitoring
+product for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Your message names one phase, PHASE = NN.
+You audit that one phase file: docs/plan/phase-NN.md. Read first: .claude/rules/planning.md (sections "Phase File
+Template" and "Verification Pass (Final)") and tools/agent/b3-conventions.md.
+
+What the pass is for. The plan has been through a coverage pass and an adversarial pass. This pass samples items and
+checks that each one is COMPLETE in the phase file: a developer could build it from the text without guessing. You do
+not look for new requirements or new attacks. You check that what the phase says it delivers is fully written.
+
+How the phase file is laid out: header (Goal, Dependencies, Requirements carried, "Implemented here" lists), section 1
+SQL migrations, section 2 DDD (entities, repository traits, route table, router), section 3 business logic (numbered
+steps, errors, audit events, Cedar actions, tipping-off review, settings), section 4 infrastructure (jobs, outbox
+topics, timers, AppState), section 5 frontend, section 6 verification, "## 7+. Gap Additions" (blocks added by the gap
+pass and by adversarial runs 1 to 6; a 7.x block overrides or extends the base text it names), Decisions, Open doubts,
+"What This Phase Does NOT Touch". Lines can be very long; read whole lines.
+
+STEP 1. Pick 12 items of this phase, spread over the file, and list them before you check them:
+- 5 items from the header's "Implemented here" or "Requirements carried" list. Take them from the start, the middle
+  and the end of the list, not five neighbours. Prefer items that mutate data or have a route.
+- 4 items from different "### 7.x" blocks of the gap pass (blocks not headed "Adversarial pass"). If the phase has
+  fewer, take what exists and take more header items instead.
+- 3 items from blocks under an "Adversarial pass (2026-10-10), run N" header, if the phase has any (grep it). If it
+  has none, take 3 more header items.
+An item is one concrete deliverable: a route, a job, a timer handler, a table, a rule with its service method.
+
+STEP 2. For each item check these truths. Each truth is PASS, GAP or N/A (N/A only when the item really has no such
+part, for example a job has no route; say why in five words):
+- T1 SQL: every table, column, index, CHECK, enum value and setting key the item's logic uses exists in section 1 of
+  this phase, or in a 7.x block of this phase as exact DDL or as a stated column change, or in the phase that owns the
+  table (grep that phase file and cite the line). A name used in the logic that no migration defines is a GAP.
+- T2 Route: the route is in a route table (`| Method | Path | Scope | Description |`) with its scope and its Cedar
+  action named. A route used in the logic or the curl tests but absent from every route table is a GAP.
+- T3 Repository and types: the repository trait method, the service method and the request/response types the item
+  needs are named with their parameters. A service step that calls a method no section defines is a GAP.
+- T4 Logic: the business logic is numbered steps with the error for each refusal (HTTP status and problem code), the
+  lock or transaction where two writers can meet, and the order of checks. Prose such as "the service validates the
+  request" with no steps is a GAP.
+- T5 Audit: every mutation of the item names its audit event (kind), and the event appears in the phase's audit event
+  list or is named in the step. A mutation with no audit event is a GAP.
+- T6 Cross-references: every name the item takes from ANOTHER phase (a table, a function, a setting, a Cedar action, an
+  outbox topic, a timer kind, a problem code) exists in that phase's file. Grep the other phase file and cite the
+  line. A name the other phase does not define is a GAP. Check at least three cross-references per item when it has
+  them.
+- T7 Consistency: when a 7.x block changes the item, the base text and the block do not contradict each other in a way
+  the block does not resolve (the block wins when it says what it replaces), and two 7.x blocks do not give two
+  different rules for the same thing. A real contradiction is a GAP.
+
+Rules for honesty (the lead checks every GAP by grep; a wrong GAP wastes the lead's time, and a missed gap is worse):
+- Quote the evidence: phase-NN.md:LINE and at most 20 words of the text, for every PASS and every GAP.
+- Before you write GAP for a missing name, grep the whole phase file AND the owning phase's file AND
+  docs/plan/research.md for it. Section 7.x blocks often add what the base text lacks. Say which greps found nothing.
+- A thing listed in "Open doubts" or in "What This Phase Does NOT Touch", or stated as "left to phase NN", is not a
+  gap when that other phase really carries it (grep it). Say "deferred to phase NN, found at phase-NN.md:LINE".
+- A designed choice stated in "Decisions" or a DR (docs/plan/research.md) is not a gap.
+- Do not invent names. Do not report style or wording. Do not propose new features.
+- Severity for a GAP: HIGH (a developer cannot build the item: a table, route, method or step is missing), MEDIUM (a
+  part is missing but can be inferred from nearby text: an audit event not named, an error code not given), LOW (a
+  cross-reference names the wrong section or a slightly different name).
+
+Tools: use the Read tool, and Grep or `grep -n` for searches. Lines are long: `cut -c1-300` helps. Do not read
+cbs-discovery/ or test-poc/. Do not read research/01-33 unless an item cites a requirement you must look up.
+
+Output file: tools/agent/verify/phase-NN.md (NN = your phase, two digits). Create it at the start with the header
+line "# Verification pass, phase NN (Haiku draft for lead review)" and append each item as soon as it is checked (the
+machine may crash), in this format:
+
+### V-NN-KK <short item name>   (source: header ID or 7.x block; result: PASS | GAPS n)
+- T1 SQL: PASS | GAP | N/A - evidence
+- T2 Route: ...
+- T3 Repository and types: ...
+- T4 Logic: ...
+- T5 Audit: ...
+- T6 Cross-references: ...
+- T7 Consistency: ...
+- Gaps (only if any), one per line: `GAP V-NN-KK-a | severity | truth | what is missing | where it should be (section) |
+  the greps that found nothing`
+
+At the end append "## Summary" with: items checked; items fully PASS; the number of GAP lines by severity; and a table
+of all GAP lines (`| Gap ID | Severity | Truth | Missing | Where |`).
+
+Other rules:
+- Write ONLY tools/agent/verify/phase-NN.md. Do not edit any other file. Do not launch agents.
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Your final reply: items checked, items fully PASS, GAP lines by severity, and the file path. Nothing else.

@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-28.md by the first re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-28-1]
+WHY: R-28-1 | CONFIRMED MEDIUM (raised HIGH) | the JSON escape of `<` in the data-block rule of section 3 is printed as a bare `<` (the escape was lost when the fixes file was generated), so the rule replaces the character by itself | the escape is written out as backslash u003c
+OLD: written as the JSON escape `<`, so the block text holds no `<`
+NEW: written as the JSON escape `\u003c` (the six characters backslash, u, 0, 0, 3, c), so the block text holds no `<`

@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-19.md by the second re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-19-1]
+WHY: S-19-1 | CONFIRMED LOW | section 5.5 (the R-19-4b text) words the exception as covering "party name, account or contact"; section 3.14 and section 2 allow only the parties of the case to be named. Phase 28 lets no account or contact reach the output, so this is wording | section 5.5 uses the wording of section 3.14
+OLD: no party name, account or contact, except inside the verified output of an `assistant_draft` item, section 7+).
+NEW: no party name, account or contact, except that the verified output of an `assistant_draft` item may name parties of its case, section 7+).

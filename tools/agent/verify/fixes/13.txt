@@ -1,0 +1,225 @@
+Phase 13 fixes (verification pass, lead-reviewed 2026-10-10). Source: tools/agent/verify/draft/13.txt, refute-13.md.
+Lead decisions: VB-05 is carried as counterparty-keyed features only (counterparty profiles P2); S-17 header says what
+is carried (tags and the government-source flag P2); `suppressed_periods` dropped (no source, no new column); cluster
+memberships get a currency in their key (one live build per currency); access event per customer record.
+
+@@ REP 13
+S-17 (the exclusion of government payroll pool accounts)
+@@ WITH
+S-17 (public-salary accounts can form a static peer segment on `account.type`; the exclusion of the payroll pool account is the phase 16 static exclusion `EXCL_POOL_ACCOUNT`, and the payroll and pension batch tags and the government-source flag are P2, because the plan holds no CBS field for them)
+@@ END
+
+@@ REP 13
+VB-14 (the robust per-segment baseline on closed days)
+@@ WITH
+VB-14 (the per-customer baseline store, offline: month-end feature values, monthly profiles and segment statistics, sections 3.2, 3.4 and 3.6; the online use within a latency budget is the requirement's Phase 2 and is not built)
+@@ END
+
+@@ REP 13
+- Gap pass 1 (coverage), implemented here: VB-05 (features and profiles for counterparties seen only in transactions).
+@@ WITH
+- Gap pass 1 (coverage), partly implemented here: VB-05 (features keyed by counterparty for counterparties seen only in transactions, section 7+; counterparty profiles are P2).
+@@ END
+
+@@ BLOCK 13
+### 7.N Counterparty-keyed features; no counterparty profile (V-13-05-a, V-13-05-b, MEDIUM; DR-413)
+VB-05 is carried as features only. A definition with entity `counterparty` is compiled with the grouping `(t.counterparty_id, t.currency)` and no join to `canon.account`; rows whose `counterparty_id` is null are left out, and the values are `feat.feature_values` rows with `entity = 'counterparty'`. The shipped catalogue of section 3.1 holds no counterparty feature; a bank adds one by change request (section 3.7). Profiles stay per customer record: `feat.profiles`, `profile_refresh`, `ProfileRepository`, the profile read and `profile.refreshed` have no counterparty form, and a counterparty profile is P2.
+@@ END
+
+@@ BLOCK 13
+### 7.N SegmentRepository: the missing methods and types (V-13-01-a, V-13-03-b, V-13-03-c, MEDIUM; DR-413)
+Section 2, `SegmentRepository` gains three methods:
+- `async fn apply_version(&self, tx: &mut Tx, s: &Segment, cr: Uuid) -> Result<Segment, RepoError>;` inserts the key as `active` with version 1, or updates the key's row (`name`, `definition`, `sort_order`, `min_size`, `version` + 1, `change_request_id`, `updated_at`). The `segment` target of section 3.7 calls it inside the approval transaction.
+- `async fn active_by_level(&self, conn: &mut PgConnection, level: Level, peer_group_id: Option<Uuid>) -> Result<Vec<Segment>, RepoError>;` returns the `active` segments of a level in `sort_order`, and only the cluster segments of one build when the id is given. `active_static` is its `static` case; section 3.3 step 1 uses it for `risk_overlay`.
+- `async fn set_counts(&self, tx: &mut Tx, rows: &[SegmentCount]) -> Result<(), RepoError>;` writes `members_count` and the effective `merged_into` (section 3.3 step 6); `SegmentCount` is `{ segment_id, members_count, merged_into }`.
+`Level` is `Static`, `Cluster` or `RiskOverlay`. `MembershipChange { customer_id, segment_id }` names a customer's new effective segment (section 3.3 step 4). `MembershipSnapshot` is the list of the level's `feat.segment_memberships` rows that hold at `as_of`, with `customer_id`, `segment_id`, `currency`, `valid_from` and `valid_to`.
+@@ END
+
+@@ BLOCK 13
+### 7.N Refusal codes of a segment proposal (V-13-01-b, MEDIUM; DR-413)
+Section 3.3, `SegmentService::propose` step 1: a key outside the key pattern, a level other than `static` or `risk_overlay`, and a `sort_order` that another static segment already holds are each 422 `E_VALIDATION` with the `errors[]` code `E_SCHEMA` and the pointer `/key`, `/level` or `/sort_order`. No new code is added.
+@@ END
+
+@@ REP 13
+`peer_group_id`, `min_size`, `members_count`). Audit
+@@ WITH
+`peer_group_id`, `min_size`, `members_count`, `currency` (the build's), `name` (`{"ar": "المجموعة السلوكية <n>", "en": "Behavioural cluster <n>"}`), `definition` (`{"scope": "customer", "cluster": <n>}`) and `created_by` (the build's `requested_by`)). Audit
+@@ END
+
+@@ BLOCK 13
+### 7.N Cluster membership: one open row per currency, and the activation steps (V-13-03-d, HIGH; DR-413)
+Peer builds are per currency, so a customer active in IQD and in USD belongs to one cluster of each live build. Migration 0040 (section 1): `feat.segment_memberships` gains `currency CHAR(3) NOT NULL DEFAULT 'XXX' CHECK (currency ~ '^[A-Z]{3}$')` (the segment's `currency`; `XXX` for static and risk-overlay rows), its primary key becomes `(customer_id, level, currency, valid_from)`, and `uq_membership_open` becomes `(customer_id, level, currency) WHERE valid_to IS NULL`. Migration 0042: the classification row of the table lists `currency` as `internal`. `set_membership_batch` sets the column from the segment.
+
+Section 2, `PeerRepository` gains `async fn get(&self, conn: &mut PgConnection, id: Uuid) -> Result<Option<PeerGroup>, RepoError>;` and `async fn insert_candidate(&self, tx: &mut Tx, g: &PeerGroup, clusters: &[Segment]) -> Result<(), RepoError>;` (section 3.5 step 13). `set_state` moves the build's cluster segments in the same statement group: `active` with `activating`, `superseded` with `superseded`, `retired` with `rejected`.
+
+`segment_assign {level: cluster, build_id}` (enqueued by the `peer_build` target of section 3.7) runs these steps in place of section 3.3 steps 1 to 7:
+1. Load the build through `PeerRepository::get`. If its state is not `activating`, the job ends and writes nothing. Load its `centroids`, the features and the scaling parameters of its `definition` (section 3.5 steps 2, 3 and 11), and its cluster segments through `active_by_level(Cluster, Some(build_id))`.
+2. Keyset pages of 5,000 customers by `id`, one transaction per page. The population is the customers with a vector at the build's `as_of` (section 3.5 step 1). Each vector is transformed, scaled and clipped with the stored parameters and takes the nearest centroid (ties to the lower index).
+3. Each page is written through `set_membership_batch` with the build's `as_of`: a customer whose open cluster row of the build's currency names another segment has that row closed (`valid_to = as_of`) and a new row opened (`valid_from = as_of`); an unchanged customer writes nothing.
+4. After the last page, in one transaction: close the open cluster rows of the currency whose segment belongs to another build (customers outside the new population); write the `members_count` of the build's segments through `set_counts`; `PeerRepository::set_state` from `activating` to `active`; audit `peer_group.activated {currency, build_no, members}`; enqueue `segment_stats_refresh` for the current period.
+A retried job repeats the pages and writes nothing for rows that are already open. The `peer_build` target refuses, at `prepare` and at `check_before_decision`, a candidate whose `as_of` is not later than the `as_of` of the live build of its currency (409 `E_NOT_ALLOWED_IN_STATE`), so a closed row always ends after it starts.
+@@ END
+
+@@ BLOCK 13
+### 7.N Expressions of the nine seed features (V-13-04-a, MEDIUM; DR-413)
+Section 3.1, seed table. `P` stands for the default filter `txn.status = 'posted' AND txn.system_generated IS NOT TRUE`. `credit_turnover_1m` is the example of section 3.1; the other eight are:
+
+| Key | `expression` |
+|-|-|
+| `debit_turnover_1m` | `{"kind": "sum", "field": "txn.amount", "where": "txn.dr_cr = 'D' AND P"}` |
+| `txn_count_1m` | `{"kind": "count", "where": "P"}` |
+| `cash_share_1m` | `{"kind": "ratio", "num": {"kind": "count", "where": "txn.cash_flag = true AND P"}, "den": {"kind": "count", "where": "P"}}` |
+| `distinct_counterparties_3m` | `{"kind": "distinct_count", "field": "txn.counterparty_id", "where": "P"}` |
+| `avg_credit_size_3m` | `{"kind": "avg", "field": "txn.amount", "where": "txn.dr_cr = 'C' AND P"}` |
+| `max_single_credit_usd_1m` | `{"kind": "max", "field": "txn.amount_usd", "where": "txn.dr_cr = 'C' AND P"}` |
+| `p99_single_credit_usd_segment` | `{"kind": "segment_stat", "source": "max_single_credit_usd_1m", "stat": "p99", "lag_months": 1}` |
+| `dormant_days` | `{"kind": "days_since", "where": "P"}` |
+
+A `ratio` holds its two measures inline as `num` and `den` (section 3.1 step 7). `cash_share_1m` is the share of cash-flagged rows among all posted rows, credits and debits together. `distinct_count` does not count a null `counterparty_id`. `dormant_days` with no posting inside its 400 days has status `beyond_window`.
+@@ END
+
+@@ BLOCK 13
+### 7.N Segment statistics and feature runs: the repositories and the read (V-13-04-b, V-13-04-c, MEDIUM; DR-413)
+Section 2 gains the traits behind `PgSegmentStatsRepository` and `PgFeatureRunRepository`.
+- `SegmentStatsRepository`: `async fn replace_period(&self, tx: &mut Tx, period: NaiveDate, segment_ids: &[Uuid], feature_ids: &[Uuid], rows: &[SegmentStat]) -> Result<u64, RepoError>;` deletes the period's rows of the given segments and features and inserts `rows` (section 3.4 step 5). `async fn get(&self, conn: &mut PgConnection, segment_id: Uuid, feature_id: Uuid, currency: Currency, period: NaiveDate) -> Result<Option<SegmentStat>, RepoError>;` serves section 3.6 step 6 and the `segment_stat` kind. `async fn for_segment(&self, conn: &mut PgConnection, segment_id: Uuid, page: Keyset) -> Result<Page<SegmentStat>, RepoError>;` serves the read, newest `period` first, then `feature_id` and `currency`.
+- `FeatureRunRepository`: `async fn upsert(&self, tx: &mut Tx, run: &FeatureRun) -> Result<(), RepoError>;` (section 3.2 step 3) and `async fn at(&self, conn: &mut PgConnection, as_of: NaiveDate) -> Result<Vec<FeatureRun>, RepoError>;` (the gates of sections 3.4 to 3.6).
+
+The read `GET /ref/segments/{id}/stats` runs in this order:
+1. Cedar `segment.stats.read` on the segment (section 3.11). An unknown id is 404 `E_NOT_FOUND`.
+2. `SegmentStatsRepository::for_segment` returns one keyset page.
+3. The response is `SegmentStatsView` with those rows and nothing else. A suppressed population has no row (section 3.4 step 3), so the response says nothing about it; the count of suppressed populations is in the audit event `segment_stats.refreshed` only, and `suppressed_periods` is not a field.
+@@ END
+
+@@ REP 13
+(rows with `n`, `p50`, `p95`, `p99`, `mad`, and
+@@ WITH
+(rows with `period`, `feature_id`, `currency`, `n`, `p50`, `p95`, `p99` and `mad`;
+@@ END
+
+@@ REP 13
+`suppressed_periods`), `SegmentProposal`
+@@ WITH
+a suppressed population has no row and no count), `SegmentProposal`
+@@ END
+
+@@ REP 13
+suppressed periods counted, never shown
+@@ WITH
+a suppressed population has no row and is never shown
+@@ END
+
+@@ REP 13
+(`suppressed_periods` is an integer).
+@@ WITH
+(the response holds no count of them).
+@@ END
+
+@@ REP 13
+reads write access events
+@@ WITH
+the profile read writes an access event
+@@ END
+
+@@ BLOCK 13
+### 7.N One protected-attribute list for features and segments (V-13-06-a, MEDIUM; DR-11, DR-413)
+Section 3.1 step 2 and the segment predicates of section 3.3 use one fixed list, held in code: the six attributes of DSL.md A.5 (gender, religion, ethnicity, nationality, tribe and sect). The names and the region of origin that DR-11 also forbids are refused by the same step, as class `personal` columns (`canon.party_name`, `canon.party.birth_place`). From phase 24 on, the register `admin.protected_attributes` does not widen or narrow this check: its `allowed_uses` govern the fairness metrics and the reports of phase 24, and the `segmentation` use of its nationality, residence and governorate rows is a breakdown of those reports, never a detection segment or a feature input.
+@@ END
+
+@@ REP 13
+short-history fallback. Degraded rows never enter any history.
+@@ WITH
+short-history fallback: no own-history summary and no own z are stored, the peer comparator of step 6 applies (DSL.md A.6.3 `min_history`), and the row is `degraded` (step 8). Degraded rows never enter any history.
+@@ END
+
+@@ REP 13
+4. Range: `from` and `to` are periods; the default is the last twelve months and the maximum is twenty-four.
+@@ WITH
+4. Range: `from` and `to` are periods; the default is the last twelve months and the maximum is twenty-four. A longer range is 422 `E_VALIDATION` at `/from` with the sub-code `too_long`, and a `from` after `to` is 422 `E_VALIDATION` with `range_inverted` (the sub-codes of the phase 11 `E_VALIDATION` row).
+@@ END
+
+@@ REP 13
+`investigation` for M. One access event per response, tier `restricted`, `subject_party` = the party, written before
+@@ WITH
+`investigation` for M. One access event per customer record in the response (`resource_type` `customer`, `resource_id` = the record's id), tier `restricted`, `subject_party` = the party, written before
+@@ END
+
+@@ REP 13
+`audit.access_event` holds one `profile.read` row per profile response with tier `restricted` and the purpose code;
+@@ WITH
+`audit.access_event` holds one `view` row per customer record of each profile response, with tier `restricted` and the purpose code;
+@@ END
+
+@@ REP 13
+and section 4.5's
+@@ WITH
+and the "Phase 02" bullet of the existing-updates list in section 4, which says
+@@ END
+
+@@ BLOCK 13
+### 7.N Forms of the four extension points (V-13-10-a, LOW; DR-413)
+Section 7.2: phase 16 owns the two compiler entry points and gives their arguments (phase 16 section 3.2 step 2). Both return `CompiledFeature`, as `compile` does, and take no `as_of`: the window binds come from the caller. `ProfileComparator` is the pure type of `domain::profiles` behind section 3.6 steps 5 to 8. `plan(expected: &[Comparator], combine, min_history) -> ComparatorPlan` fixes the comparators in order with their fallbacks. `evaluate(plan: &ComparatorPlan, actual, declared, history, peer_stat) -> ComparatorResult` returns the ratios and the z of step 7 and the `ProfileStatus` of step 8. `profile_refresh` calls both with the fixed plan of section 3.6: declared, own history, peer, with `min_history` = `profile.min_history_months`.
+@@ END
+
+@@ REP 16
+**Consumed ports** (not defined here):
+@@ WITH
+**Consumed ports** (not defined here, except that this phase adds the four entry points of section 3.2 to phase 13's module, as phase 13 section 7.2 says):
+@@ END
+
+@@ REP 13
+`ReaderCatalogue::readers(object) -> Vec<ReaderRef>` and `measure(object, proposal) -> Option<VolumeEffect>`.
+@@ WITH
+`ReaderCatalogue::readers(conn, object: &ObjectRef) -> Result<Vec<ReaderRef>, RepoError>` and `measure(conn, object: &ObjectRef, proposal: &serde_json::Value) -> Result<Option<VolumeEffect>, RepoError>` (`conn` is `&mut PgConnection`; `ObjectRef { kind, key }` holds the change-request kind and the `object_key`).
+@@ END
+
+@@ REP 16
+-> Result<Vec<ReaderRef>, CatalogueError>;
+@@ WITH
+-> Result<Vec<ReaderRef>, RepoError>;
+@@ END
+
+@@ REP 16
+-> Result<Option<VolumeEffect>, CatalogueError>;
+@@ WITH
+-> Result<Option<VolumeEffect>, RepoError>;
+@@ END
+
+@@ REP 13
+calls `ReaderCatalogue::measure` again on the proposed change.
+@@ WITH
+calls `ReaderCatalogue::measure` again on the proposed change, under the volume-effect rule of section 3.7 (no reader: `neutral`; not measurable: `unknown`).
+@@ END
+
+@@ REP 13
+and `measure` returns `None`.
+@@ WITH
+and `measure` returns `Some(Neutral)` (`None` means that the effect cannot be measured, which is `unknown`).
+@@ END
+
+@@ REP 13
+'R2', 'age', 'created_at', 'Counterparty links: kept as long as the counterparty'
+@@ WITH
+'R2', 'owner', NULL, 'Counterparty links: deleted with their counterparty (owner clock)'
+@@ END
+
+@@ BLOCK 23
+### 7.N Counterparty links follow their counterparty (V-13-12-a, MEDIUM; DR-413)
+Section 3.2: `feat.counterparty_links` (phase 13 section 7.5) is an R2 row with clock `owner`. Its handler's `parent_key` is `canon.counterparty` by `counterparty_id`, so the table is `report_only` while its parent is (the R2 row of section 3.2, Open doubts 22), and its rows are deleted in the counterparty's transaction once that purge opens.
+@@ END
+
+@@ REP 13
+written by akr-worker only.
+@@ WITH
+written by akr-worker, and by the phase 18 decide route for the two analyst methods (phase 18 section 7+).
+@@ END
+
+@@ BLOCK 13
+### 7.N Counterparty link writes: one method, one lock (V-13-12-b, V-13-12-d, MEDIUM; DR-398, DR-413)
+Section 7.5: the table has one repository, `CounterpartyLinkRepository` (`PgCounterpartyLinkRepository` in `db`), with one write method: `async fn replace_open(&self, tx: &mut Tx, counterparty_id: Uuid, party_id: Option<Uuid>, method: LinkMethod, decided_by: Option<Uuid>) -> Result<bool, RepoError>;`. `LinkMethod` has the six values of the `method` CHECK. The method reads the counterparty's open row `FOR UPDATE`. For a job method (`own_account`, `confirmed_account`, `name_key`, `none`) it writes nothing and returns `false` when the open row is `own_account`, `confirmed_account`, `analyst_confirmed` or `analyst_rejected` (step 1), or has the same method and party (step 6). Otherwise it closes the open row (`valid_to = now()`) and inserts the new row with `ON CONFLICT (counterparty_id) WHERE valid_to IS NULL DO NOTHING`; when nothing was inserted, because another writer opened the counterparty's first row at the same moment, it reads the open row again and applies the same rule once more. Step 6 of the job and the phase 18 decide route (`POST /cases/{id}/counterparty-links`) both write through it, so an analyst row written while a chunk runs is seen by the chunk and kept.
+@@ END
+
+@@ REP 13
+the `crates/names` function behind `canon.party_name.key`
+@@ WITH
+the key function of `crates/names` that fills `canon.party_name.key` (phase 10 section 7.9)
+@@ END

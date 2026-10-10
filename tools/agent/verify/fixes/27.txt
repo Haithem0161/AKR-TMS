@@ -1,0 +1,295 @@
+Fixes for phase 27 (verification pass, lead review of tools/agent/verify/draft/27.txt; DR-413).
+34 confirmed: 2 HIGH, 12 MEDIUM, 20 LOW; 1 duplicate (V-27-10-a, of V-27-07-a); 5 rejected (V-27-01-b, V-27-03-d,
+V-27-08-c, V-27-08-e, V-27-12-a).
+V-27-12-a is rejected: phase 23 section 7.2 takes the rows of later phases by class and clock, so an R11 row is
+`report_only` and its `retirement` clock is never due; the class table lists phase 23's own tables.
+Lead decisions: the inventory item is created before its row and the resolver runs at the use gate; no per-row count of
+missing features (no new column); the score bins are ten equal-width bins and each feature carries its edges; a card
+still unscanned at the last attempt refuses the import (10 attempts); `scored_count` is also written for shadow and
+challenger versions; pinnable statuses are registered, shadow, challenger and live; SEC is admitted by the scope and
+refused by Cedar on the six read routes.
+Down-rated to LOW: V-27-06-c, V-27-08-a, V-27-08-d (wording and field lists).
+
+@@ BLOCK 13
+### 7.N Feature values read for the model sweep (V-27-01-a, MEDIUM; DR-413)
+From phase 27 on, `FeatureValueWriter` has a read partner in the same module: `FeatureValueReader::read(conn, entity, entity_ids, features, as_of) -> Result<Vec<FeatureValueRow>, RepoError>`. `features` is a list of `(feature_id, currency)` pairs and `as_of` is a closed month-end. It reads `feat.feature_values` by its primary key columns and returns `FeatureValueRow { entity_id, feature_id, currency, value: Option<Decimal>, status }`; a pair with no row is not returned. The grant `SELECT, INSERT ON feat.feature_values TO akr_app` covers it. Phase 27 calls it in its sweep (section 3.4 step 3, alerts grouped by month-end) and for `feature_psi` (section 3.8); a pair with no row, or a row whose `status` is not `value`, is passed as missing.
+@@ END
+
+@@ REP 27
+the count of missing features is stored in `shap` for live rows only.
+@@ WITH
+no per-row count is stored: `shap` holds only the contributions of step 5, and the batch total of values passed as missing is the `skipped_missing` count of step 6.
+@@ END
+
+@@ BLOCK 27
+### 7.N The inventory item is created before its object row (V-27-02-a, HIGH; V-27-02-d, LOW; DR-413)
+`inventory_item_id` is `NOT NULL` with a foreign key that is not deferrable, on `admin.models` and on `admin.model_versions`, so the row cannot be inserted before its item. Section 3.1 step 2, the version item paragraph and section 3.3 step 5 run in this order, in the one transaction they already use:
+1. Generate the family id (or the version id) app-side.
+2. Call phase 04 `InventoryService::create` with `kind = model`, `object_id` = that id and the fields of section 3.1. The family item's `name` is the family's bilingual `name`; a version item's `name` is the family's name with ` v<version_no>` appended in both languages.
+3. Insert `admin.models` (or `admin.model_versions`) with that id and `inventory_item_id` = the new item's id. For a family, its `admin.model_kill_state` row follows in the same transaction.
+Phase 04 allows an item before its object (phase 04 section 3.9) and calls no resolver at create. The resolver of kind `model` that this phase registers is called by the use gate of section 3.1, and it finds the id in `admin.models` or `admin.model_versions`. The transaction commits both or neither, so no item is left without its row.
+@@ END
+
+@@ REP 27
+`closure_code_not_allowed` | sections 3.1, 3.3, 3.6, 3.8 |
+@@ WITH
+`closure_code_not_allowed`, `name_not_bilingual` (a `name` or `purpose` without `ar` or `en`), `recalibration_due_required` (a starter without the date); the owner check is phase 04's own 422 | sections 3.1, 3.3, 3.6, 3.8 |
+@@ END
+
+@@ BLOCK 27
+### 7.N Reads of the daily monitor, and its audit (V-27-03-a, V-27-03-c, MEDIUM; DR-413)
+Section 2 gains the reads behind the metrics of section 3.8:
+- `ScoreRepository::score_window(conn, version_id, role, from, to) -> ScoreWindow { scored, top_band, bins }`: the `alert.model_scores` rows of the version in that role and window; `bins` are the ten score counts of the 7.x block on bins.
+- `ScoreRepository::entered_window(conn, from, to, not_before) -> i64`: the alerts of `alert.alerts` created in the window and on or after `not_before` (the denominator of `scored_count`).
+- `MonitorRepository::override_window(conn, from, to) -> (i64, i64)`: the decisions of the window on cases with live-scored alerts and, of those, the overrides by the two rules of section 3.8. It reads `casework.decisions` (`type`, `decided_at`), `casework.case_alerts` and the live `top_band` flags.
+- The feature values of `feature_psi` come from phase 13's `FeatureValueReader::read`, as in section 3.4 step 3.
+After its last insert, the daily run writes one audit `model.monitored {day, points, suppressed, red}` (counts only; resource System; SIEM flag false), and section 3.13 gains that row. A day whose points all exist already writes none.
+@@ END
+
+@@ REP 27
+and a `body` with the metric, value, band, threshold and the five permitted decisions.
+@@ WITH
+the fixed bilingual `title` {"ar": "تجاوز الحد الأحمر في مراقبة النموذج", "en": "Model monitor: red breach"}, and a `body` with the metric, value, band, threshold and the five permitted decisions. The job calls phase 24's `RegisterRepository::find_by_source_key` first and `insert` only when no row has the key.
+@@ END
+
+@@ REP 27
+live-scored alerts over alerts that entered the queue in the window |
+@@ WITH
+alerts the version scored in its role over alerts that entered the queue in the window; a live version counts alerts created on or after its `live_from`, a shadow or challenger version those created on or after its `shadow_started_at` |
+@@ END
+
+@@ REP 27
+the family's `model_monitor` findings must be closed (else `breach_open`).
+@@ WITH
+the family's `model_monitor` findings must be closed (else `breach_open`): the check reads phase 24's `RegisterRepository::list` with source `model_monitor` and a status other than `closed`, and keeps the rows whose `source_key` names a version of the family.
+@@ END
+
+@@ BLOCK 27
+### 7.N Reference bins and the provisional top-band cut (V-27-05-b, MEDIUM; DR-413)
+`reference_bins` has one shape: `{"score": [ten counts], "features": {"<key>@<version>": {"edges": [nine ascending numbers], "counts": [ten counts]}}}`. The score uses ten equal-width bins on 0 to 1 (bin k covers from (k-1)/10 up to, not including, k/10; the last bin includes 1), so it carries no edges. Each feature of `feature_keys` carries its nine inner edges and ten counts; a missing value is not binned. A manifest without the score counts or without a feature of its list, or with arrays of another length, is `manifest_invalid` (section 3.3 step 4). `score_psi` and `feature_psi` of section 3.8 count the stored values in the same bins.
+Provisional cut (section 3.6 step 4): scanning the score bins from the top, the cut is the lower edge of the first bin at which the cumulative share of the reference counts reaches `model.top_band_percent`. Nothing is interpolated. The promotion replaces it with the percentile of the version's own shadow rows (section 3.7 step 4).
+@@ END
+
+@@ BLOCK 27
+### 7.N Shadow start checks If-Match (V-27-05-c, LOW; DR-413)
+Section 6 check 8 gains item q: `POST /models/{id}/shadow` without `If-Match` answers 428 `E_PRECONDITION_REQUIRED`, and with a stale version it answers 409 `E_VERSION_CONFLICT`.
+@@ END
+
+@@ REP 27
+step-up `approval`, `ModelPin` constant):
+@@ WITH
+step-up `approval` with the constant `ModelPin` = `{name: "model.pin", class: approval}` and the resource ref `model_pin:<family id>`; 401 `E_STEPUP_REQUIRED` without it):
+@@ END
+
+@@ BLOCK 27
+### 7.N Pin targets are checked (V-27-06-b, MEDIUM; DR-413)
+Section 3.10 Pin, before `pinned_version_id` is set: a `version_id` that is not a version of this family is 422 `E_VALIDATION` at `/version_id`; a version whose status is not `registered`, `shadow`, `challenger` or `live` is 409 `E_NOT_ALLOWED_IN_STATE` with sub-code `not_pinnable`. A null `version_id` unpins and needs neither check.
+@@ END
+
+@@ REP 27
+`role_taken`, `no_champion`, `other_family_live` |
+@@ WITH
+`role_taken`, `no_champion`, `other_family_live`, `not_pinnable` |
+@@ END
+
+@@ REP 27
+Wait for the card's evidence to be `clean` (`av_status`), else retry (attempts 3, phase 00 back-off). An infected card: refusal `manifest_invalid`.
+@@ WITH
+Wait for the card's evidence to be `clean` (`av_status`): while it is `pending` the job returns `JobError::Retryable` (`max_attempts` 10 with the phase 00 back-off, about half an hour in all). An `infected` or `rejected` card is refusal `manifest_invalid`. A card still `pending` at the last attempt (`JobContext.attempt`) is refused with `manifest_invalid` too, so a version never stays in `importing` and the family's `import_pending` refusal always ends. Step 8 writes the refusal in each case; the artifact of a refused version is not imported again (`uq_model_artifact`), so the supplier issues a new one.
+@@ END
+
+@@ REP 27
+1, 3 | enqueued in the request transaction of
+@@ WITH
+1, 10 | enqueued in the request transaction of
+@@ END
+
+@@ REP 27
+Section 6 adds route 16
+@@ WITH
+This phase adds route 16
+@@ END
+
+@@ REP 27
+2. Batch (`model.sweep_batch`):
+@@ WITH
+2. Batch (`model.sweep_batch`, scored in chunks of 50 alerts; step 1 is applied again before each chunk, so an engaged scope stops the batch):
+@@ END
+
+@@ REP 27
+forced low-score sample reused as the unbiased set, section 3.4)
+@@ WITH
+forced low-score sample reused as the unbiased set, section 3.6)
+@@ END
+
+@@ REP 27
+with the family's tier, owner, developer and committee.
+@@ WITH
+with the family's tier, `tier_basis`, owner, developer and committee.
+@@ END
+
+@@ REP 27
+override monitors with green, amber and red bands, section 3.7)
+@@ WITH
+override monitors with green, amber and red bands, section 3.8)
+@@ END
+
+@@ REP 27
+`casework.decisions` with `type` and `decided_at`, `casework.case_alerts`)
+@@ WITH
+`casework.decisions` with `type` and `decided_at`; `casework.case_alerts` is phase 17's table)
+@@ END
+
+@@ REP 27
+and the model-ladder read of route 15)
+@@ WITH
+and the model-ladder read of route 4)
+@@ END
+
+@@ REP 27
+Record an evaluation (route 6, `model.validation.record`, MRO).
+@@ WITH
+Record an evaluation (route 8, `model.validation.record`, MRO).
+@@ END
+
+@@ REP 27
+The model-ladder read (route 15) shows the gate of each family
+@@ WITH
+The model-ladder read (route 4) shows the gate of each family
+@@ END
+
+@@ REP 27
+**`prepare` (route 8, the change request is created and submitted in the request;
+@@ WITH
+**`prepare` (route 10, the change request is created and submitted in the request;
+@@ END
+
+@@ REP 27
+**Engage (route 10; Cedar `model.kill.engage`
+@@ WITH
+**Engage (route 12; Cedar `model.kill.engage`
+@@ END
+
+@@ REP 27
+**Release request (route 11; Cedar `model.kill.release_request`)
+@@ WITH
+**Release request (route 13; Cedar `model.kill.release_request`)
+@@ END
+
+@@ REP 27
+**Drill (route 13; `model.kill.drill`, MRO)
+@@ WITH
+**Drill (route 14; `model.kill.drill`, MRO)
+@@ END
+
+@@ REP 27
+**Pin (route 9;
+@@ WITH
+**Pin (route 11;
+@@ END
+
+@@ REP 27
+The drill is recorded by a person's statement (route 13)
+@@ WITH
+The drill is recorded by a person's statement (route 14)
+@@ END
+
+@@ REP 27
+No route admits a role that its permits do not name.
+@@ WITH
+A route scope may admit a role that no permit names: SEC is admitted by `audit.read` on the six GET routes that carry it, and Cedar refuses it with `E_FORBIDDEN` (403).
+@@ END
+
+@@ BLOCK 27
+### 7.N ModelSwitch: the other ChangeTarget methods (V-27-04-c, LOW; DR-413)
+`ModelSwitch` implements phase 04 `ChangeTarget` with: `kind() = model_switch`; `reason_families() = ["change"]`; `generic_create() = false` (the only entry is the release route of section 3.9 step 3); `emergency_allowed() = false`; `inventory_kind() = None` (the GV-01 gate applies to promotion only, section 3.7); `revert` is not implemented. `current_version(conn, cr)` returns the `version` of the `admin.model_kill_state` row named by the change's `object_key` (`kill:<scope>`), which is the base version of the release, so phase 04's `E_STALE_BASE` applies when it has moved. `on_submitted` writes nothing. `diff(cr)` shows `engaged` going from `true` to `false`; the scope and its `reason_code` do not change. `on_closed` changes nothing: a rejected, withdrawn or failed release leaves the scope engaged.
+@@ END
+
+@@ BLOCK 27
+### 7.N The shadow start is one repository call (V-27-05-a, MEDIUM; DR-413)
+`VersionRepository` (section 2) gains `begin_shadow(tx, id, role, shadow_criteria, top_band_cut, expected_version)`. It runs one `UPDATE` of `admin.model_versions` with `WHERE id = $1 AND version = $expected_version`, which sets `status` to the role, `shadow_started_at = now()`, `shadow_criteria`, `top_band_cut`, `retired_at = NULL` and `version = version + 1`. Section 3.6 step 4 is this one call; `set_status` is not used for it. Every column it sets is in the `UPDATE` grant of section 1.3, and the version guard admits the edges it uses (`registered` to `shadow`, and the rollback `retired` to `shadow` with new criteria).
+@@ END
+
+@@ REP 27
+with the success criteria frozen; `Idempotency-Key`
+@@ WITH
+with the success criteria frozen; `If-Match` on the version; `Idempotency-Key`
+@@ END
+
+@@ REP 27
+Start a shadow or challenger run (route 7, `ModelRegistry::start_shadow`
+@@ WITH
+Start a shadow or challenger run (route 9, `ModelRegistry::start_shadow`
+@@ END
+
+@@ REP 27
+frozen at start (route 7)
+@@ WITH
+frozen at start (route 9)
+@@ END
+
+@@ REP 27
+through `retired -> shadow` (route 7)
+@@ WITH
+through `retired -> shadow` (route 9)
+@@ END
+
+@@ REP 27
+Pin or unpin the live version;
+@@ WITH
+Pin or unpin a version of the family (section 3.10);
+@@ END
+
+@@ REP 27
+A row not visible, or a suspicion-tier row for a caller without `record_open` step-up, answers the masked 404 `E_NOT_FOUND`; the step-up check runs before the tier answer (phase 17 rule).
+@@ WITH
+A suspicion-tier row for a caller without `record_open` step-up answers 401 `E_STEPUP_REQUIRED` first (the step-up check runs before the tier answer, phase 17 section 3.10); any other row not visible to the caller answers the masked 404 `E_NOT_FOUND`.
+@@ END
+
+@@ REP 27
+| none | kill engage, pin |
+@@ WITH
+| none | kill engage, pin, route 16 for a suspicion-tier alert without step-up |
+@@ END
+
+@@ REP 27
+`for_alert_live(conn, alert_id, alert_created_at, live_id)`
+@@ WITH
+`for_alert_live(conn, alert_id, alert_created_at)`: the latest `live` row of the alert, of any live version (section 3.4 "Single read", step 2)
+@@ END
+
+@@ REP 27
+Insert `admin.model_versions` with `status = importing`
+@@ WITH
+Insert `admin.model_versions` with `model_id` (the family of the path), `artifact_key` and `manifest_sha256` (from the request), `created_by` (the caller) and `status = importing`
+@@ END
+
+@@ REP 27
+The inventory item is created in `registered` (phase 04 default).
+@@ WITH
+The version's inventory item, created at import (section 3.1), keeps its phase 04 default status `registered`.
+@@ END
+
+@@ REP 27
+Import, synchronous (route 4, akr-api
+@@ WITH
+Import, synchronous (route 6, akr-api
+@@ END
+
+@@ REP 27
+1. Lock order 1:
+@@ WITH
+1. Lock order 2:
+@@ END
+
+@@ REP 27
+`InventoryService::update` on the inventory item to set
+@@ WITH
+`InventoryService::update` on the inventory item (`if_match` = the item's `version`, read in the same transaction) to set
+@@ END
+
+@@ REP 27
+the body carries no score, band or reason code.
+@@ WITH
+the body carries no score, band or reason code. A suspicion-tier alert answers 401 `E_STEPUP_REQUIRED` first to a caller without `record_open` step-up (phase 17 section 3.10), and the masked 404 applies only after step-up.
+@@ END

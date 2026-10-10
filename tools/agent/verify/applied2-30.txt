@@ -1,0 +1,64 @@
+Replacements made in docs/plan/phase-30.md by the first re-check (DR-413). 12 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-30-1a]
+WHY: R-30-1 | CONFIRMED MEDIUM (raised HIGH) | the decision rule names two defaults when both candidates qualify | CloudNativePG becomes the default only when Patroni does not qualify; when both qualify Patroni stays
+OLD: CloudNativePG becomes the default only when it meets criteria 1 to 4 and 6 to 10 and the bank accepts a backup tool other than pgBackRest;
+NEW: CloudNativePG becomes the default only when Patroni does not qualify, CloudNativePG meets criteria 1 to 4 and 6 to 10, and the bank accepts a backup tool other than pgBackRest;
+
+=== F2 [R-30-1b]
+WHY: R-30-1 | CONFIRMED MEDIUM (raised HIGH) | the decision rule names two defaults when both candidates qualify | CloudNativePG becomes the default only when Patroni does not qualify; when both qualify Patroni stays
+OLD: When both candidates qualify, the bank's acceptance of another backup tool decides: without it Patroni stays the default.
+NEW: When both candidates qualify, Patroni stays the default, because it keeps the pgBackRest backups of phase 00 unchanged (research 32 section 16.5: backup consistency decides).
+
+=== F3 [R-30-2a]
+WHY: R-30-2 | CONFIRMED LOW (raised MEDIUM) | `record_system` returns `None` on an overlap, yet both callers print the id of the row found | return `(BlindPeriod, bool)`: the row and whether this call wrote it
+OLD: statement) -> Result<Option<BlindPeriod>, AppError>`. Its two callers
+NEW: statement) -> Result<(BlindPeriod, bool), AppError>` (the row, and whether this call wrote it). Its two callers
+
+=== F4 [R-30-2b]
+WHY: R-30-2 | CONFIRMED LOW (raised MEDIUM) | `record_system` returns `None` on an overlap, yet both callers print the id of the row found | return `(BlindPeriod, bool)`: the row and whether this call wrote it
+OLD: When one exists it writes nothing and returns `None`:
+NEW: When one exists it writes nothing and returns that row with `false`:
+
+=== F5 [R-30-3]
+WHY: R-30-3 | CONFIRMED LOW (raised MEDIUM) | section 2 says the command writes through "the `akr-ctl` database role of phase 00", which does not exist; block 7.6 says `akr_app` | section 2 says `akr_app`
+OLD: through the `akr-ctl` database role of phase 00; no new repository
+NEW: connecting as `akr_app`, section 7.6; no new repository
+
+=== F6 [R-30-4]
+WHY: R-30-4 | CONFIRMED LOW | pointer: phase 11 section 1.1 defines the table, section 3.6 the anchor rule | pointer
+OLD: phase 11 section 3.6 owns the table and the anchor rule
+NEW: phase 11 section 1.1 defines the table and its section 3.6 owns the anchor rule
+
+=== F7 [R-30-5]
+WHY: R-30-5 | CONFIRMED MEDIUM (raised MEDIUM) | the rotation runbook names `akr-ctl assess keys rotate`, a command no phase defines | `akr-ctl assess keys generate --purpose decision` (phase 29)
+OLD: a new decision key (`akr-ctl assess keys rotate`)
+NEW: a new decision key (`akr-ctl assess keys generate --purpose decision`, phase 29)
+
+=== F8 [R-30-6]
+WHY: R-30-6 | CONFIRMED LOW (raised LOW) | "the signed release bundle is already on offline media (section 3.11)"; section 3.11 says no such thing | the operators add the bundle of the running release to the same media
+OLD: The signed release bundle is already on offline media (section 3.11).
+NEW: The operators add the signed bundle of the running release to the same media.
+
+=== F9 [R-30-8]
+WHY: R-30-8 | CONFIRMED LOW (raised LOW) | "the key ceremony of phase 00" rotates nothing: the ceremony runbook creates the transit keys | the transit keys are rotated in OpenBao by the operators of that runbook
+OLD: The transit keys are rotated by the key ceremony of phase 00 when the bank's security officer finds that OpenBao itself was exposed.
+NEW: The transit keys are rotated in OpenBao (a new key version; the older versions stay for reading) by the operators of the OpenBao ceremony runbook (SP-12, phase 00), when the bank's security officer finds that OpenBao itself was exposed.
+
+=== F10 [R-30-9]
+WHY: R-30-9 | CONFIRMED LOW (raised MEDIUM) | section 3.9 still says "the immutable or offline copy" | "the offline copy (section 7.7)"
+OLD: run on a clean environment from the immutable or offline copy,
+NEW: run on a clean environment from the offline copy (section 7.7),
+
+=== F11 [R-30-10a]
+WHY: R-30-10 | CONFIRMED MEDIUM (raised MEDIUM) | the restore pods' egress to the pgBackRest repository has no address in `zones.yaml`, and the rule names no pod selector | `zones.yaml` gains the entry `backup.repository`; the allows select every pod of `akr-restore`
+OLD: on the ports `zones.yaml` names for those destinations.
+NEW: on the ports `zones.yaml` names for those destinations (the repository is its entry `backup.repository`). The allows select every pod of the namespace `akr-restore` (the Job and the scratch pod are its only pods), so no membership label is needed.
+
+=== F12 [R-30-10b]
+WHY: R-30-10 | CONFIRMED MEDIUM (raised MEDIUM) | the restore pods' egress to the pgBackRest repository has no address in `zones.yaml`, and the rule names no pod selector | `zones.yaml` gains the entry `backup.repository`; the allows select every pod of `akr-restore`
+OLD: (CBS listeners, bank SMTP, SIEM, the proxy of phase 07, the payment hub CIDRs of section 3.3)
+NEW: (CBS listeners, bank SMTP, SIEM, the proxy of phase 07, the payment hub CIDRs of section 3.3, and the entry `backup.repository`: the host and port of the pgBackRest repository on the backup server, which section 7.5 reads)

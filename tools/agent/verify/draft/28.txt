@@ -1,0 +1,90 @@
+Fixes for the claims of tools/agent/verify/refute-28.md (phase 28; drafted for lead review).
+@@ REP 28
+`visibility`, `model`, `output`, `grounding`)
+@@ WITH
+`visibility`, `model` (with `input_too_large`), `output`, `grounding`)
+@@ END
+# V-28-02-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `input_too_large` phase-28.md:140 (refusal CHECK, section 1.2) and phase-28.md:468 (section 3.1 step 6); `model_unavailable` phase-28.md:140 (already in the `model` group by its name) | NEW: none (the group `model` already exists; a sixth group would be a new name, which reuse before add rules out)
+
+@@ BLOCK 19
+### 7.N Assistant golden items in the QA draw (V-28-02-b, V-28-02-c, MEDIUM; DR-413)
+From phase 28 on (migration `0089`), `DrawQaSample` (section 2) gains `eval_run_id: Option<Uuid>`. It is required for
+population `assistant_golden` and refused with 422 `E_VALIDATION` for any other population. The population is the
+`casework.assistant_drafts` rows whose `eval_run_id` is that input. Each row becomes an item with `source_kind`
+`assistant_draft`, `source_id` the draft id, `case_id` the draft's case and `source_at` the draft's `requested_at`.
+Migration `0089` (phase 28 section 1.2) adds `ALTER TABLE casework.qa_samples ADD COLUMN IF NOT EXISTS eval_run_id UUID;`,
+so each sample keeps its run. The table grant on `casework.qa_samples` already covers the column. Step 7 of the draw
+(section 3.8) also applies to an `assistant_draft` item: a time-boxed read grant on the draft's case, reason
+`qa_review`, revoked at review or expiry. So `GET /qa/samples/{id}/item` can show the verified output and the records
+it cites.
+@@ END
+# V-28-02-b, V-28-02-c | MEDIUM | names used and where they exist: `DrawQaSample` phase-19.md:989; `POST /qa/samples` phase-19.md:1043; the draw steps phase-19.md:1254-1261 (step 7 is the grant, reason `qa_review`); `casework.qa_samples` phase-19.md:365-392 (no run column; table grant at phase-19.md:772); `casework.assistant_drafts.eval_run_id` phase-28.md:136 (the run tie already exists on the draft); `qa_samples_assistant_draft_case` phase-28.md:191-192; coalesce key of `POST /assistant/evaluations` phase-28.md:534 | NEW: column `casework.qa_samples.eval_run_id` (the claim is that no migration defines the run tie; b3-conventions, phase 28 review, asks for "tie samples to their run with a column"). Notes for the lead: (1) migration 0089 in phase 28 section 1.2 needs the same ALTER line; (2) phase 28 section 3.6 step 4 needs no change, its words "the drafts whose eval_run_id is the run" hold once this block is in; (3) the other option (a window and mode rule, no route change) is not drafted: a window cannot separate two runs that overlap, since the coalesce key of phase-28.md:534 is per (task, model, template), so two models of one task can run at once.
+
+@@ REP 28
+(requirement on phase 19, section 4.5)
+@@ WITH
+(requirement on phase 19, section 3.8 step 7 and its section 7+ block)
+@@ END
+# V-28-02-c (pointer part; the grant itself is in the BLOCK 19 entry above) | MEDIUM | grep -c -F gave 1 | names used and where they exist: phase 19 section 3.8 step 7 (phase-19.md:1261); its section 7+ block (the BLOCK 19 entry above; number to be filled) | NEW: none. Section 4.5 of phase 19 (phase-19.md:1695-1726) names no grant, so the pointer was wrong.
+@@ REP 28
+`EngageKillRequest`, `ReleaseKillAccepted`
+@@ WITH
+`EngageAssistantKill`, `ReleaseAssistantKillRequest`, `ReleaseKillAccepted`
+@@ END
+# V-28-03-a | LOW | grep -c -F gave 1 | names used and where they exist: `EngageAssistantKill` phase-28.md:409 (engage body DTO); `ReleaseAssistantKillRequest` phase-28.md:409 (release body DTO) | NEW: none. The utoipa list names the declared types. Phase 27 has the same split (`EngageKill` at phase-27.md:389, utoipa `EngageKillRequest` at phase-27.md:425); a fix there is outside this file.
+
+@@ BLOCK 28
+### 7.N Provenance on the draft view (V-28-04-a, MEDIUM; DR-413)
+`GET /assistant/drafts/{id}` (the route row of section 2) and `DraftView` gain a `provenance` object. It is for the
+case team only. It holds `requested_by`, `requested_at`, `model_version_id` and `template_version_id` (each with its
+`version_no` from `admin.assistant_versions`), and `source_ids`, the records the draft cites. The object is null
+unless the draft carries its text (section 3.4). These are the DR-277 provenance fields that the draft row keeps. The
+case, the output and the edits are left out, because the draft already shows them.
+@@ END
+# V-28-04-a | MEDIUM | names used and where they exist: `requested_by`, `requested_at` phase-28.md:156-157 and `source_ids` phase-28.md:144 (columns of `casework.assistant_drafts`, 0089); `model_version_id`, `template_version_id` phase-28.md:141-142; `version_no` of `admin.assistant_versions` phase-28.md:38; DR-277 (the provenance list) phase-28.md:890; the text rule of section 3.4 phase-28.md:502; `DraftView` phase-28.md:438; route row phase-28.md:424 | NEW: field `provenance` on `DraftView` (a field name only; the word is the plan's own for the store, M-71). Basis for the choice: research/31-analyst-ux.md:429 lists model and exact version, template version and retrieved record IDs as the one-click provenance; the block keeps those and adds the requester and time that DR-277 names. If the bank wants only the research list, drop `requested_by` and `requested_at`.
+
+@@ REP 28
+Draft `FOR UPDATE` (lock 4): status must be `ready`;
+@@ WITH
+For `report_narrative`, `rpt.reports` `FOR UPDATE` first (lock 3, section 3.15); then draft `FOR UPDATE` (lock 4): status must be `ready`;
+@@ END
+# V-28-05-a | HIGH | grep -c -F gave 1 | names used and where they exist: the lock ranks of section 3.15 phase-28.md:713-725 (3 = `rpt.reports`, 4 = `casework.assistant_drafts`); the phase 21 order phase-21.md:1199-1209 ("No path takes a lower step and then a higher one"); step 10 of the accept (phase-28.md:525) already takes the report row under lock 3 and needs no change, since the report row is now held from step 6 | NEW: none. Fixing the accept (not 3.15) keeps one order for every path; section 3.15 says "in every path that takes more than one".
+
+@@ REP 28
+The engine deletes a case's drafts in its own `record_purge` before a case row is removed;
+@@ WITH
+No handler deletes a case's drafts in this release (section 7.2: `report_only` with their case);
+@@ END
+# V-28-07-a (section 4.5 phase 23 bullet) | HIGH | grep -c -F gave 1 | names used and where they exist: section 7.2 phase-28.md:875-876 (no handler deletes the drafts; R6 drafts are `report_only`); the child rule of phase 23 phase-23.md:1013 ("any child of a `report_only` owner is `report_only` too"); `akr_retention` holds SELECT only on the new tables phase-28.md:317; DELETE is granted only where a handler deletes rows phase-23.md:1022 | NEW: none. The 7.2 block wins over base text (lead rule), so the base sentence is replaced; the FK clause stays and is still true.
+
+@@ REP 28
+The engine must delete a case's drafts before its case row; the foreign key is `RESTRICT`.
+@@ WITH
+No handler deletes a case's drafts in this release (section 7.2), so no purge order applies; the foreign key is `RESTRICT`.
+@@ END
+# V-28-07-a (Open doubts 24) | HIGH | grep -c -F gave 1 | names used and where they exist: as above (section 7.2 phase-28.md:875-876; phase-23.md:1013) | NEW: none. Not changed here (not claimed): the next sentence of Open doubts 24 ("Phase 23 has no rule for a child of a case that holds a sealed text yet") is contradicted by phase-23.md:1013, so the lead may want to drop it as well.
+
+# DECIDE V-28-07-b | option A: phase 23 section 3.2 class table gains clock `retirement` for R11 (its row at phase-23.md:601 lists `age` only; phase-23.md:599 gives R9 two clocks), as phase 27 (phase-27.md:359-360, `admin.models` and `admin.model_versions`) and phase 28 (phase-28.md:382) already use it; the rows then are never due in this phase (phase-23.md:577 "retirement: never due in this phase"; phase-23.md:1013 "a `retirement` clock is never due") | option B: phase-28.md:382 and phase-27.md:359-360 move to clock `age` on `created_at`, as the R11 row of phase 23 has it (phase-23.md:601); the rows then become due ten years after creation and reach the due report only (`report_only`, phase-23.md:601). The refute cites section 1.2 for this table; the class table is in section 3.2 (phase-23.md:564-606)
+
+@@ REP 28
+`llama` | `akr/llama-server` (pinned, signed) | `z2_model` | internal only, no egress.
+@@ WITH
+`llama` | `akr/llama-server` (pinned, signed) | `z2_model` | internal only, no egress; `llama-eval` | `akr/llama-server` (same image, profile `assistant-eval`) | `z2_model` | internal only, no egress.
+@@ END
+# V-28-09-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `llama-eval` phase-28.md:760 (same image, profile `assistant-eval`, on `z2_model`); the zone membership phase-28.md:756 and phase-00.md:933 (members `akr-worker`, `llama`, `llama-eval`); the image phase-00.md:948 | NEW: none. The zone rules of the two rows are already in phase 00 section 7.7 (phase-00.md:933 and :940), so only the matrix row is drafted; the pinning and signing of the row follow the same image.
+
+@@ REP 28
+The manifest's canonical bytes hash to `manifest_sha256`
+@@ WITH
+The manifest's canonical bytes (phase 27 section 3.3 step 2: RFC 8785 style, sorted keys, no floats in identity fields) hash to `manifest_sha256`
+@@ END
+# V-28-11-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: the canonical form phase-27.md:470 (section 3.3 step 2) and the signature over the canonical bytes phase-27.md:471; `manifest_sha256` phase-28.md:581 (existing name) | NEW: none. Step 3 (phase-28.md:582, "over the canonical manifest") names the same form and needs no change.
+
+@@ REP 28
+every `<` replaced by `<` before serialisation
+@@ WITH
+every `<` replaced by `&lt;` before serialisation
+@@ END
+# V-28-12-a | HIGH | grep -c -F gave 1 | names used and where they exist: the fixture phase-28.md:831 (section 6, check 4) is the test this rule must pass; no escape sequence exists elsewhere in the plan (grep -w escape finds only phase-28.md:831) | NEW: `&lt;` (the HTML entity for `<`, applied before serialisation, so the JSON serialiser leaves it as it is and an escaped record holds no `<`). `\u003c` is not used: inserted before serialisation, the serialiser would escape its backslash and the model would read six literal characters. Byte check: both backticked characters of phase-28.md:479 are 0x3C (od), so the rule was a no-op as written.
+
+# SUMMARY: fixes written 11 (REP 9, BLOCK 2); DECIDE 1; DROP 0; claims covered: V-28-02-a, V-28-02-b, V-28-02-c, V-28-03-a, V-28-04-a, V-28-05-a, V-28-07-a, V-28-07-b, V-28-09-a, V-28-11-a, V-28-12-a

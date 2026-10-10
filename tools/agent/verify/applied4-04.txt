@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-04.md by the third re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [T-04-1]
+WHY: T-04-1 | CONFIRMED LOW (raised MEDIUM) | the OpenAPI bullet (the S-04-1 text) calls the evidence route "a ninth operation of the tag `change-control`" while the same bullet still counts that tag as 8, so its tag counts still sum to 31 against the stated 32 | the tag count reads 9 and says of what
+OLD: - **OpenAPI registration:** tags `change-control` (8), `inbox` (10),
+NEW: - **OpenAPI registration:** tags `change-control` (9: the eight of section 2 and the evidence route of section 7.2), `inbox` (10),

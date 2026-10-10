@@ -1,0 +1,76 @@
+Fixes for the claims of tools/agent/verify/phase-04.md (Haiku draft tools/agent/verify/draft/04.txt, lead-reviewed).
+@@ REP 04
+reverted_at, updated_at, version)
+@@ WITH
+reverted_at, updated_at, version, evidence)
+@@ END
+@@ REP 04
+(`escalated` event)
+@@ WITH
+(`task_escalated` event)
+@@ END
+@@ REP 04
+`review_recorded`, `effect_ran`, `effect_deferred`.
+@@ WITH
+`review_recorded`, `post_review_recorded`, `effect_ran`, `effect_deferred`.
+@@ END
+@@ REP 04
+with no `approve` or `reject` event in
+@@ WITH
+with no task of the request's instance whose `outcome` is `approved` or `rejected` in
+@@ END
+@@ REP 08
+polled every 30 s while visible
+@@ WITH
+polled every 60 s while visible
+@@ END
+@@ BLOCK 04
+### 7.N Names in the change-request signatures (V-04-01-a, LOW; DR-413)
+`StepUpAssertionId` is the `id` (a UUID) of a phase 01 `StepUpAssertion`; the request and its task store it in
+`stepup_id`. `ActorRef` in sections 2 and 3 is the phase 02 `Actor` enum (`User`, `System` or `Anonymous`). The `d`
+argument of `decide` is the `TaskAction` of section 3.4 with the value Approve or Reject, not the phase 03 `Decision`
+struct. `Activated` is a unit marker with no field; no step reads a value from it.
+@@ END
+@@ BLOCK 04
+### 7.N Inventory Create: order of checks and the owner refusal (V-04-02-a, MEDIUM; DR-413)
+Section 3.9 Create runs its checks in this order, after the authorize layer:
+1. The owner is an active human user, else 422 `E_VALIDATION` at `/owner_id`, reason `owner_not_active` (the reason
+   phase 12 uses for the same check). The validator, when one is given, is an active human user, else 422
+   `E_VALIDATION` at `/validator_id`, reason `validator_not_active`.
+2. The validator is not the owner (422 `E_VALIDATION`, `validator_is_owner`); `user_roles` are role codes (422
+   `E_VALIDATION` at `/user_roles`).
+3. Insert with status `registered`; a second item for the same `(kind, object_id)` is 409 `E_NOT_ALLOWED_IN_STATE`,
+   `already_registered`.
+4. Audit `inventory_item.created`, as section 3.9 names it.
+@@ END
+@@ BLOCK 04
+### 7.N The change subject returns the target's refusal as a WorkflowError (V-04-07-a, LOW; DR-413)
+The change subject's `check_before_decision` (7.1) returns a refusal of `ChangeTarget::check_before_decision` as
+`WorkflowError::Change(ChangeError)`, a variant of the `thiserror` enum `WorkflowError` converted with `#[from]`.
+`api::error` maps `Change` to the codes of section 3.2: 409 `E_STALE_BASE`, 422 `E_EVIDENCE_STALE` or 422
+`E_VALIDATION`.
+@@ END
+@@ BLOCK 04
+### 7.N Evidence route: Cedar action and repository method (V-04-08-b, V-04-08-c, MEDIUM; DR-413)
+The route `POST /change-requests/{id}/evidence` (7.2) is authorized by the Cedar action `change_request.evidence_add`
+on ChangeRequest: `principal == resource.maker` and status `draft` or `submitted`; the action table of section 3.10
+gains this row. The decided-task test of 7.2 stays a service check (409 `E_NOT_ALLOWED_IN_STATE`, `evidence_closed`).
+`ChangeRequestRepository` gains `append_evidence(tx, id, item: EvidenceRef, expected_version)`: one UPDATE that
+appends the item to `evidence` and sets `version = expected_version + 1` where `version = expected_version`; no row
+matched is 409 `E_VERSION_CONFLICT`. The append step of 7.2 calls it. Migration 0014 (section 1): the column grant on
+`admin.change_requests` includes `evidence` (V-04-08-a, HIGH).
+@@ END
+@@ BLOCK 04
+### 7.N Where a rework returns to (V-04-12-a, LOW; DR-413)
+A reject with `mode: rework` (section 3.4 delta 8; 7.14) names its return step: the reject object carries `to`, the id
+of an earlier step of the same definition, and the definition validator refuses `mode: rework` without it. The engine
+writes `rework_returned {from_step, to_step, pass}` and creates the tasks of the `to` step with `pass + 1`. The words
+"returns the instance to the maker" in 7.14 mean that step. Every shipped definition uses `mode: end`, so none ships a
+return step.
+@@ END
+@@ BLOCK 08
+### 7.N Risk or capacity tag on the change-request screens (V-04-06-a, LOW; DR-413)
+Screen G10 shows the tag of the reason (`ReasonTag`, phase 04; `ref.reason_codes.tag`: `risk` or `capacity`) beside
+the reason code, on the list and on the detail, as a badge with words (UX-60). A capacity tag carries the
+capacity-wording flag of DESIGN-SYSTEM section 7.17.
+@@ END

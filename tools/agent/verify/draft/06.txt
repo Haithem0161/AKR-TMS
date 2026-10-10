@@ -1,0 +1,189 @@
+Fixes for the claims of tools/agent/verify/refute-06.md (phase 06; drafts for lead review, nothing applied).
+@@ BLOCK 06
+### 7.N CatalogueQuery and RegisterSnapshot (V-06-01-a, MEDIUM; DR-413)
+`CatalogueQuery` (AppState, section 4) has one method, `list(&self, conn: &mut PgConnection) -> Result<Vec<CatalogueItemView>, RepoError>`, which serves `GET /cbi-catalogue`. It returns each item of `CatalogueRepository::active` with its `scenarios` codes (the `full` and `partial` links whose scenario has `visibility = 'normal'`, as `CatalogueItemView` defines them), ordered by `ref`. It reads no grade, coverage kind or restricted code.
+`RegisterSnapshot { scenarios: Vec<Scenario>, links: Vec<ScenarioLink> }` is what `ScenarioRepository::all_with_links` returns: the 161 scenarios and their links, the `register` input of the grader (section 3.2).
+@@ END
+# V-06-01-a | MEDIUM | names used and where they exist: `CatalogueQuery` phase-06.md:851 (AppState; no methods in the plan); `CatalogueRepository::active` phase-06.md:396; `CatalogueItemView` phase-06.md:463; `scn.scenario_catalogue_links` phase-06.md:104; `visibility` phase-06.md:90; `ScenarioRepository::all_with_links` phase-06.md:409; `Scenario`, `ScenarioLink` phase-06.md:375; `register` grader input phase-06.md:544 | NEW: `CatalogueQuery::list` (the type is named, its method is not); `RegisterSnapshot` is defined here (named at phase-06.md:409 only). Caveat: the refuter's V-06-04-a finds the RegisterSnapshot content in prose (phase-06.md:366-370, :443) and its V-06-01-a evidence says only the query part stands; the second sentence can be dropped if the lead agrees.
+
+@@ REP 06
+principal.kind == "human" && principal.active };
+@@ WITH
+principal.kind == "human" && principal.status == "active" };
+@@ END
+# V-06-01-b | LOW | grep -c -F gave 1 (site 1 of 2, section 3.8 Cedar excerpt) | names used and where they exist: `status` phase-03.md:565 (User entity, "active | disabled"); `kind` phase-03.md:564 | NEW: none | same wrong name also at phase-09.md:992 and phase-12.md:1040 (not written here)
+
+@@ REP 06
+`delegated_roles`, `kind`, `active`;
+@@ WITH
+`delegated_roles`, `kind`, `status`;
+@@ END
+# V-06-01-b | LOW | grep -c -F gave 1 (site 2 of 2, section 3.8 attribute list) | names used and where they exist: `status` phase-03.md:565; `delegated_roles` phase-03.md:567 | NEW: none
+
+@@ BLOCK 06
+### 7.N Required and optional fields of cbi-gap-report.v1.json (V-06-03-b, MEDIUM; DR-413)
+Section 3.5 step 4 names the keys of the document. This block gives the schema's required flags and value types.
+Required: the six top-level keys `cover`, `summary`, `items`, `bank_request`, `vendor_annex` and `outcomes`, and every key that step 4 names inside them, except the optional keys below.
+Optional: an item's `declaration` (present only when its blocking scenarios carry one; its `detail` is null when no `interim_detail` was given), and the `code` and `name` of a `linked` entry (absent for a restricted scenario, which carries `restricted: true`).
+Value types: ids are UUID strings; timestamps are RFC 3339 strings; counts are integers of 0 or more; shares are numbers from 0 to 1; `title`, `text` and labels are `{ar, en}` objects of strings; `items`, `linked`, `bank_request` and `vendor_annex` are arrays.
+The values of `outcomes` are null until phases 17 to 21 fill them, so they are nullable.
+@@ END
+# V-06-03-b | MEDIUM | names used and where they exist: `cbi-gap-report.v1.json` phase-06.md:338; section 3.5 step 4 phase-06.md:637-654; `interim_detail?` (optional) phase-06.md:387; `linked`, `restricted: true`, `outcomes` phase-06.md:644-654 | NEW: none
+
+@@ BLOCK 06
+### 7.N The start of a gap report run is audited (V-06-03-c, LOW; DR-413)
+Section 3.5 step 1: `GapReportRepository::start` moves a `queued` run to `running` (`status` and `started_at`) in the step's transaction. In that same transaction the step writes audit `gap_report.started {run_id}` (resource `gap_report_run`), and only when it moved the run. A run that is not `queued` writes nothing.
+The audit table of section 3.8 gains a row for `gap_report.started`, on the same terms as the lifecycle row.
+@@ END
+# V-06-03-c | LOW | names used and where they exist: `GapReportRepository::start` phase-06.md:430; `status` with value `running` phase-06.md:227 and :232; `started_at` phase-06.md:245; resource `gap_report_run` and lifecycle row phase-06.md:737 | NEW: `gap_report.started` (the start has no event today; name follows the `<domain>.<verb>` of the lifecycle row). Alternative for the lead: treat `start` as job bookkeeping, which phase-00.md:654 leaves unaudited (only `job.dead`). This draft follows the planning rule that every mutation names its event (.claude/rules/planning.md, section 3, "Audit events emitted").
+
+# DECIDE V-06-03-d | option A: a setting key `bank.name` (value type `json`, `{"ar": ..., "en": ...}`), seeded in migration 0022 (phase 06 section 1) and read by the cover through the settings service; the installation sets it through settings | option B: the cover reads the installation file `deploy/branding.json` that phase 08 describes (written at installation, served by Caddy, no API), with a read-only mount of that file in the worker's compose service (evidence: docs/plan/phase-08.md:516-518; docs/plan/phase-00.md:970 Caddy serves `/branding.json`)
+# V-06-03-d evidence: docs/plan/phase-06.md:638 "`cover`: bank name (phase 01 settings)"; no phase 00 to 13 setting names the bank (the only bank key is `bank.timezone`, docs/plan/phase-00.md:238). The cross-reference "phase 01 settings" is wrong under either option; once the lead picks a source, the cross-reference at docs/plan/phase-06.md:638 is rewritten to match.
+
+@@ REP 06
+`E_STEPUP_REQUIRED` (declaration, download); `E_IDEMPOTENCY_REPLAY`
+@@ WITH
+`E_STEPUP_REQUIRED` (declaration, download); the replay answer of a POST (header `x-idempotent-replay: true`, no code) is
+@@ END
+# V-06-03-e | LOW | grep -c -F gave 1 (the next line, "behaviour of phase 00 on the two POSTs;", completes the sentence) | names used and where they exist: `x-idempotent-replay` docs/API.md:39 and docs/plan/phase-00.md:783; `E_STEPUP_REQUIRED` phase-06.md:721 | NEW: none
+
+@@ BLOCK 06
+### 7.N The fields of Grading (V-06-04-a, LOW; DR-413)
+`Grading` has two parts. `scenarios: Vec<GradeUpsert>` holds one row per scenario and scope: the bank scope and each source scope that has a completed profile run (the rows that section 3.3 step 3 writes).
+`items: Vec<ItemGrade>` holds one row per catalogue item for the bank scope, where `ItemGrade { catalogue_item_id: Uuid, grade: Grade, reasons: Vec<Reason>, missing_fields: Vec<AttributeKey> }`. `reasons` carries `no_scenario` when item rule 1 gives D, and `missing_fields` follows item rule 3. The term follows from the grade (`Term`).
+@@ END
+# V-06-04-a | LOW | names used and where they exist: `Grading` phase-06.md:545; `GradeUpsert` phase-06.md:386; `Grade`, `Term`, `Reason`, `AttributeKey`, `Uuid` phase-06.md:377-381 (value objects); item rules 1 and 3 with `no_scenario` phase-06.md:572 and :577; section 3.3 step 3 phase-06.md:596 | NEW: `ItemGrade` (no type in the plan holds an item grade; section 3.5 reads them from `Grading`)
+
+# DECIDE V-06-04-b | option A: `SettingsService::apply` runs `SettingChangeHook`s in its own transaction after the write, as `FlagsService::update` runs `FlagChangeHook`; phase 06 registers the hook that enqueues `coverage_grade {reason: "setting"}` when `coverage.maintained_fields` changes; the block goes to phase 00 (section 3, `SettingsService`) | option B: `SettingsService::apply` writes an outbox row for the change, and phase 06 registers a `TopicHandler` for that topic (phase 00 section 7.1 already allows a list of handlers per topic) that enqueues the job after commit | evidence: docs/plan/phase-03.md:1304 (`FlagChangeHook`, registered by the consuming phase); docs/plan/phase-04.md:956 (the setting target activates only through `SettingsService::apply(..., ChangeSource::ChangeRequest(id))`); docs/plan/phase-00.md:571-578 (apply; `settings.changed` is a cache message published after commit); docs/plan/phase-00.md:836 (handler lists); docs/plan/phase-06.md:590-592 and :875 (the enqueue the plan states)
+
+@@ REP 06
+"state": "missing" | "unpopulated"
+@@ WITH
+"state": "absent" | "unpopulated"
+@@ END
+# V-06-04-c | LOW | grep -c -F gave 1 (site 1 of 2, section 1 comment) | names used and where they exist: `absent` phase-06.md:550-551 (grader: "An attribute with no row anywhere is `absent`") and phase-06.md:559 (rule 2 grades D for `absent`); `absent` in the quality CHECK docs/plan/phase-05.md:331 | NEW: none
+
+@@ REP 06
+grades D, as `missing` does.
+@@ WITH
+grades D, as `absent` does.
+@@ END
+# V-06-04-c | LOW | grep -c -F gave 1 (site 2 of 2, section 7.6) | names used and where they exist: `absent` as above | NEW: none
+
+@@ REP 10
+phase 06's `missing`, `unpopulated`
+@@ WITH
+phase 06's `absent`, `unpopulated`
+@@ END
+# V-06-04-c | LOW | grep -c -F gave 1 (phase 10 site 1 of 2, a cross-reference to the state name of phase 06) | names used and where they exist: `absent` phase-06.md:550-551 | NEW: none | a wrong cross-reference is fixed in the file that holds it, so this is written here
+
+@@ REP 10
+it grades D as `missing` does.
+@@ WITH
+it grades D as `absent` does.
+@@ END
+# V-06-04-c | LOW | grep -c -F gave 1 (phase 10 site 2 of 2) | names used and where they exist: `absent` phase-06.md:550-551 | NEW: none
+
+@@ REP 06
+`scenario: {code, family, name}` or the masked form of section 3.8)
+@@ WITH
+`scenario: {code, family, name}`)
+@@ END
+# V-06-06-a | LOW | grep -c -F gave 1 | names used and where they exist: `ReadinessView` phase-06.md:466; restricted rows are returned only to CFG and MRO, so no masked form is produced (`readiness.read` forbid) phase-06.md:771-775; list rule phase-03.md:794-795 | NEW: none | the list leak itself depends on the BLOCK for V-06-06-b (lists filter only a masked kind)
+
+@@ BLOCK 06
+### 7.N Scenario and ReadinessGrade are masked kinds (V-06-06-b, MEDIUM; DR-413)
+This phase first serves these two records, so it registers them in `MASKED_KINDS` (phase 03 section 3.6; the rule of phase 03 section 7.1): kind `scenario` (Cedar `Akr::Scenario`) and kind `readiness_grade` (`Akr::ReadinessGrade`), each with the complete probe set of phase 03 section 3.6 (get, list count, search, export, error body, notification text, SSE event, audit viewer, latency).
+The `scenario.restricted` forbid of section 3.8 is annotated `@deny("tier")`, not `@deny("masked")`. `tier` is the phase 03 tag for a tier test, so a refusal is classified `Tier` and answered with the 404 of section 6 item 5. An untagged forbid, or one tagged `masked`, is classified `Forbidden` and answered 403.
+The two list routes filter restricted rows in SQL by the same rule (phase 03 section 3.6, lists).
+@@ END
+# V-06-06-b | MEDIUM | names used and where they exist: `MASKED_KINDS` phase-03.md:800; masked-kind rule phase-03.md:1264-1265 ("in the phase that first serves the record"); probe set phase-03.md:800-803; `Akr::Scenario`, `Akr::ReadinessGrade` phase-06.md:744-745; `scenario.restricted` phase-06.md:772; `@deny("tier")` tag phase-03.md:704; `DenyReason::Tier` and `masks` phase-03.md:385-389; list rule phase-03.md:794-797 | NEW: `scenario` and `readiness_grade` (registry keys, the snake_case of the two existing Cedar entities, as phase 03 section 7.1 names kinds). The block sits in phase 06, not in phase 06 section 4 as the refuter suggested, because phase 03 section 7.1 gives the registration to the phase that first serves the record. The phase 03 section 7.1 table ("Registered so far") does not list the two kinds; the lead may add them there.
+
+@@ BLOCK 00
+### 7.N Keyset cursor and Page<T> (V-06-06-c, LOW; DR-413)
+The cursor of the `common` module (section 2) is the type `Keyset`: an opaque position on a list's sort columns, sent as the `cursor` query parameter and returned as `next_cursor`, as the pagination rule of docs/API.md states.
+`Page<T> { items: Vec<T>, next: Option<Keyset> }` is what every keyset list method returns; `next` is `None` on the last page. `Cursor` in the repository signatures of phase 03 is the same type.
+@@ END
+# V-06-06-c | LOW | names used and where they exist: `common` module with `cursor` phase-00.md:377; `Keyset` and `Page<...>` phase-06.md:406 and :416; `Cursor` and `Page<UserRow>` phase-03.md:436; `Keyset` in phase-05.md:513 | NEW: none (`Keyset` and `Page<T>` are names the plan already uses; this block defines them) | the lead may prefer `Cursor` as the one name; then phase-05.md and phase-06.md need a rename of `Keyset`
+
+@@ BLOCK 06
+### 7.N Who runs steps 1 to 5 of section 3.4 (V-06-08-a, LOW; DR-413)
+The authz layer has already allowed `readiness.declare` (step 1, Cedar), and the handler has checked that `If-Match` is present (step 1; otherwise 428 `E_PRECONDITION_REQUIRED`) and passes the path id, the body and the `If-Match` version.
+`DeclarationService::declare(&self, ctx: &AuthContext, id: Uuid, input: DeclarationInput, expected_version: i32) -> Result<ReadinessGrade, AppError>`, the service's only method, consumes the step-up assertion (step 1) and does steps 2 to 5 in one transaction.
+The `coverage_sweep` job calls `ReadinessRepository::expire_due` itself, as section 3.4 says; it does not go through the service.
+@@ END
+# V-06-08-a | LOW | names used and where they exist: `DeclarationService` phase-06.md:603; `AuthContext` phase-03.md:685; `DeclarationInput` phase-06.md:387; `ReadinessGrade` phase-06.md:375; `AppError` phase-00.md:377; `ReadinessRepository::declare` phase-06.md:419 and `expire_due` phase-06.md:424; `StepUpService::consume` in one transaction phase-01.md:690 | NEW: `DeclarationService::declare` (the service has no method in the plan; the handler is not chosen because the step-up consume shares the transaction, phase-01.md:690)
+
+@@ REP 06
+as DS -> 403 `E_FORBIDDEN`
+@@ WITH
+as DS -> 403 `E_SCOPE`
+@@ END
+# V-06-08-c | LOW | grep -c -F gave 1 (section 6 item 5) | names used and where they exist: `E_SCOPE` phase-03.md:685 (gate 1 on every route, before the Cedar deny); DS does not hold `config.approve` (docs/API.md:96 lists CHK, M, CH, MRO) | NEW: none | the "no scope step" part of the claim is refuted (gate 1 covers the route); the refuter's citation docs/API.md:113 is about personal access tokens, not DS
+
+# DECIDE V-06-08-d | option A: keep the sentence and add a key `previous_hash` (SHA-256 of the replaced declaration's values, phase 02 canonical encoding) to the step 5 payload and to the audit row, and list it in the kind's `detail_keys` (phase 02 refuses any other key) | option B: delete "the audit event keeps the previous values' hash, and" from step 4; the replaced values stay in the sealed report of each run (the same sentence says so), and the audit stream is already hash-chained (phase 02 chain model) | evidence: docs/plan/phase-06.md:617 (step 4 sentence), :618 (step 5 payload has no hash key), :734 (audit row); docs/plan/phase-02.md:556 (refuses keys outside `kind.detail_keys`); docs/plan/phase-02.md:648 (chain model)
+
+@@ REP 06
+section 4.5's "Phase 01: two step-up action classes"
+@@ WITH
+section 4's "Phase 01: two step-up action classes"
+@@ END
+# V-06-09-a | LOW | grep -c -F gave 1 | names used and where they exist: the bullet "Phase 01: two step-up action classes" phase-06.md:870 (section 4; heading phase-06.md:839) | NEW: none
+
+@@ BLOCK 06
+### 7.N The grader's mapping input (V-06-11-a, MEDIUM; DR-413)
+Section 3.2: `grade` takes one more parameter after `catalogue_attrs`, `mapping: &[MappingCompleteness]`, with one row per source and monitored attribute, as phase 10 section 3.8 defines `MappingCompleteness { source_id, entity, column, published_version }`. The sentence "this phase reads availability only" in section 3.2 is void for this input (section 7.6 gives its rule).
+Section 3.3 step 1 loads these rows with the register, `AvailabilitySource::latest`, the setting, the flags and the attribute catalogue.
+@@ END
+# V-06-11-a | MEDIUM | names used and where they exist: `grade` phase-06.md:544; `catalogue_attrs` phase-06.md:545; "this phase reads availability only" phase-06.md:569; section 3.3 step 1 phase-06.md:593; section 7.6 phase-06.md:1012; `MappingCompleteness` phase-10.md:2021 (phase 10 section 3.8; a later phase's type, already named by 7.6) | NEW: none
+
+@@ REP 06
+API.md 3.6
+@@ WITH
+API.md 3.8
+@@ END
+# V-06-12-a | LOW | grep -c -F gave 1 (refuted; written under the pointer exception: the row exists under section 3.8 of docs/API.md) | names used and where they exist: `GET /ref/typologies` docs/API.md:365 under docs/API.md:338 ("### 3.8 Reference data and calendars") | NEW: none
+
+@@ REP 06
+**Complexity:** M (13 routes;
+@@ WITH
+**Complexity:** M (14 routes;
+@@ END
+# V-06-12-b | LOW | grep -c -F gave 1 (site 1 of 5, header) | names used and where they exist: the 13 route rows phase-06.md:479-491 and the added row `GET /ref/typologies` phase-06.md:1034 | NEW: none
+
+@@ REP 06
+`catalogue::router()` (3 routes)
+@@ WITH
+`catalogue::router()` (4 routes)
+@@ END
+# V-06-12-b | LOW | grep -c -F gave 1 (site 2 of 5, section 2 router functions) | names used: `GET /ref/typologies` phase-06.md:1034 | NEW: none
+
+@@ REP 06
+tags `catalogue` (3 operations)
+@@ WITH
+tags `catalogue` (4 operations)
+@@ END
+# V-06-12-b | LOW | grep -c -F gave 1 (site 3 of 5, section 4 OpenAPI registration) | NEW: none
+
+@@ REP 06
+13 in all, each with `x-akr-action`
+@@ WITH
+14 in all, each with `x-akr-action`
+@@ END
+# V-06-12-b | LOW | grep -c -F gave 1 (site 4 of 5, section 4) | NEW: none
+
+@@ REP 06
+Swagger UI lists 13 new operations
+@@ WITH
+Swagger UI lists 14 new operations
+@@ END
+# V-06-12-b | LOW | grep -c -F gave 1 (site 5 of 5, section 6 item 6) | NEW: none | the cumulative figure in the same item, "(119 with phases 01, 03, 04 and 05)", is not changed here. It may or may not count this phase's operations, and the other phases' totals do not add up: docs/plan/phase-04.md:1627 gives 31 new and 85 for phases 01 and 03; docs/plan/phase-05.md:1465 gives 21 new and 106 for phases 01, 03 and 04. The lead should recount before the figure is edited.
+
+# DROP V-06-03-a | docs/plan/phase-06.md:628 "insert a `queued` run with `requested_by`" names the insert values, and docs/plan/phase-06.md:664 "`complete` with `document_object_id`, `pack_ids`, `summary`, `source_ids`, `profile_run_ids`, versions and" names the completion values; the run id is app-generated (docs/plan/phase-00.md:26, "UUIDv7 generated in the application")
+# DROP V-06-08-b | docs/plan/phase-06.md:832-833 "(registry bounds: `coverage.declaration_review_max_days` 30-365, governed" states registry bounds, not a floor; docs/plan/research.md:45 (DR-34) keeps `floor` for regulatory minima only, so the proposed floor would contradict DR-34; docs/plan/phase-00.md:208 is the floor shape ("regulatory limit")
+# NOTE multi-site claims: V-06-01-b (2 REP entries, sites 1 and 2), V-06-04-c (4 entries: 2 in phase 06, 2 in phase 10), V-06-12-b (5 REP entries, one per site); each entry names its site.
+# NOTE other phases, not written here: `@deny("masked")` also tags a masked forbid at docs/plan/phase-07.md:758 and docs/plan/phase-09.md:979; under the tag rule of docs/plan/phase-03.md:704 those forbids would be answered 403, not 404 (inference from that rule; not tested). `principal.active` also at docs/plan/phase-09.md:992 and docs/plan/phase-12.md:1040.
+# NOTE phase 06 7.8 (docs/plan/phase-06.md:1030) says "this row of the section 3.8 route table", but the route table is in section 2 (docs/plan/phase-06.md:474-491). Not a refute claim; not written.
+# NOTE V-06-11-a: the block voids the sentence "this phase reads availability only" (docs/plan/phase-06.md:569) rather than rewriting it; section 7.x blocks win over base text by the lead's rule.
+# NOTE V-06-06-b: the refuter suggested phase 06 section 4; the block sits in phase 06 because phase 03 section 7.1 (docs/plan/phase-03.md:1264-1265) gives the registration to the phase that first serves the record. The phase 03 section 7.1 table does not list these two kinds yet.
+# SUMMARY: fixes written 24 (REP 16, BLOCK 8); DECIDE 3; DROP 2; claims covered: V-06-01-a, V-06-01-b, V-06-03-b, V-06-03-c, V-06-03-d, V-06-03-e, V-06-04-a, V-06-04-b, V-06-04-c, V-06-06-a, V-06-06-b, V-06-06-c, V-06-08-a, V-06-08-c, V-06-08-d, V-06-11-a, V-06-12-b (all 11 STANDS and all 6 PARTLY); pointer fixes on the refuted V-06-09-a and V-06-12-a; DROP on the refuted V-06-03-a and V-06-08-b

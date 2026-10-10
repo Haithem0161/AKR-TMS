@@ -1,0 +1,49 @@
+Replacements made in docs/plan/phase-24.md by the first re-check (DR-413). 9 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-24-1]
+WHY: R-24-1 | CONFIRMED HIGH (raised HIGH) | the export file gets classification `restricted`, which is not a value of the enum `admin.data_classification`; the insert of every export file would fail | classification `personal`
+OLD: classification `restricted` (a file holds whatever rows the requester may read)
+NEW: classification `personal` (a file holds whatever rows the requester may read; the enum `admin.data_classification` of phase 00 has no value `restricted`)
+
+=== F2 [R-24-2]
+WHY: R-24-2 | CONFIRMED MEDIUM (raised MEDIUM) | scenario rows of the review calendar keep a second state rule (amber at one interval, red at two) | a scenario row gets `due_on` = activation plus one interval, and the one state rule applies
+OLD: against amber at one interval and red at two intervals of `review.rules_months`.
+NEW: plus one interval of `review.rules_months` is its `due_on`, and the state follows the one rule above (amber in the 30 days before, red on and after).
+
+=== F3 [R-24-3]
+WHY: R-24-3 | CONFIRMED MEDIUM (raised MEDIUM) | nothing in the export request carries the register kind that the G4 export needs | `filters` carry `kind`; a missing or unknown kind is 422
+OLD: G4 is `GovernanceRegisterService::list` (one export per kind) and G9
+NEW: G4 is `GovernanceRegisterService::list` (one export per kind: the request's `filters` carry `kind`, one of the five register kinds that route 9 takes from its path; a missing or unknown kind is 422 at `/filters/kind`) and G9
+
+=== F4 [R-24-4]
+WHY: R-24-4 | CONFIRMED LOW (raised MEDIUM) | "G5 holds counts only" is the wrong reason: G5 also shows the access history of one record | the true reason is written: the history is read per record and is not exported
+OLD: G5 holds counts only and G6 is never exported (section 3.1 step 9), so neither has an entry.
+NEW: G5 has no entry: its control report is counts only, and its access history is read per record and is not exported. G6 is never exported (section 3.1 step 9).
+
+=== F5 [R-24-5]
+WHY: R-24-5 | CONFIRMED MEDIUM (raised MEDIUM) | the explain UPDATE has no visibility test, so the stated 404 cannot happen and a hidden row can be written | a visibility read runs first in the same transaction and answers 404
+OLD: Zero rows updated is 409 `E_NOT_ALLOWED_IN_STATE` (404 `E_NOT_FOUND` when the row is absent or outside the caller's party visibility), so the second
+NEW: Before the UPDATE, in the same transaction, `ParallelRunRepository::visible(tx, row_id, predicate) -> Result<bool, RepoError>` reads the row under the caller's party visibility (the predicate of section 7.13 item 4); a row that is absent or not visible is 404 `E_NOT_FOUND`, and nothing is written. Zero rows updated is then 409 `E_NOT_ALLOWED_IN_STATE`, so the second
+
+=== F6 [R-24-6]
+WHY: R-24-6 | CONFIRMED LOW (raised LOW) | "section 7.1" points at the wrong phase 04 section | "phase 04 section 7.10"
+OLD: (phase 04's key, section 7.1)
+NEW: (phase 04's key, phase 04 section 7.10)
+
+=== F7 [L-24-1a]
+WHY: L-24-1 | CONFIRMED LOW (lead, second look) | the header, the Route count bullet, check 6 and status.md count 31 routes (28 new and 3 extended); sections 7.12 and 7.13 add eight | the header says 39, status.md 36 new and 3 extended, and the bullet and check 6 name the two sections. The Routes total of status.md becomes 581, the sum of the column and the number of API.md rows
+OLD: XL (31 routes: 19 rows of API.md 3.3, 3.4, 3.15 and 3.16 owned or extended here,
+NEW: XL (39 routes: the eight of sections 7.12 and 7.13, and the 31 of section 2, which are 19 rows of API.md 3.3, 3.4, 3.15 and 3.16 owned or extended here,
+
+=== F8 [L-24-1b]
+WHY: L-24-1 | CONFIRMED LOW (lead, second look) | the header, the Route count bullet, check 6 and status.md count 31 routes (28 new and 3 extended); sections 7.12 and 7.13 add eight | the header says 39, status.md 36 new and 3 extended, and the bullet and check 6 name the two sections. The Routes total of status.md becomes 581, the sum of the column and the number of API.md rows
+OLD: - **Route count:** 31 rows (XL): 19 are rows
+NEW: - **Route count:** 31 rows in this table (XL; sections 7.12 and 7.13 add eight more, three export routes and five parallel-run routes): 19 are rows
+
+=== F9 [L-24-1c]
+WHY: L-24-1 | CONFIRMED LOW (lead, second look) | the header, the Route count bullet, check 6 and status.md count 31 routes (28 new and 3 extended); sections 7.12 and 7.13 add eight | the header says 39, status.md 36 new and 3 extended, and the bullet and check 6 name the two sections. The Routes total of status.md becomes 581, the sum of the column and the number of API.md rows
+OLD: 6. Swagger UI lists the 31 routes of section 2 with their scopes;
+NEW: 6. Swagger UI lists the 31 routes of section 2 and the eight routes of sections 7.12 and 7.13 with their scopes;

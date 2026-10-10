@@ -1,0 +1,40 @@
+@@ REP 05
+stores it through `EvidenceStore::stage` with owner kind `source`,
+@@ WITH
+stores it through `EvidenceStore::put_generated` (the worker's path for generated output; `stage` is for untrusted uploads from akr-api) with kind `render` and owner kind `source`,
+@@ END
+# V-05-06-b | HIGH | grep -c -F gave 1 | names used and where they exist: `EvidenceStore::put_generated` phase-02.md:876 (akr-worker, render output); `EvidenceStore::stage` phase-02.md:839 (akr-api, untrusted bytes); kind `render` phase-02.md:355 (CHECK on admin.evidence_objects); owner kind `source` phase-02.md:1170 (registry row, R9); `report_object_id` phase-05.md:276 | NEW: none
+
+@@ BLOCK 05
+### 7.N Permits in use at a listener reload (V-05-08-a, MEDIUM; DR-413)
+A rebuild of a `LoadGovernor` (the reload of section 7.8 and the rebuilds on NOTIFY in section 3.5) does not release a permit
+already out. The permit's session still counts against `max_sessions` in the rebuilt governor (section 3.5 step 3), and the
+rebuilt rate bucket keeps the level it has (section 3.5 step 4). A rebuild therefore grants no session and no rows per minute
+that the budget does not allow.
+@@ END
+# V-05-08-a | MEDIUM | names used and where they exist: `LoadGovernor` phase-05.md:937 (section 3.5 heading); `max_sessions` phase-05.md:954 (session gate, step 3); rate bucket phase-05.md:956 (rate gate, step 4); section 7.8 phase-05.md:1562; rebuild on NOTIFY phase-05.md:941 | NEW: none
+# NOTE V-05-08-a: the rule follows from section 3.5 step 3 ("a check never adds a session the budget does not allow"). The plan does not say whether a rebuild should wait for the permits to return instead; the lead can choose that if preferred. The full read and the per-source rebuild of 7.8 are already stated at phase-05.md:1563-1564, so only the permits part is drafted.
+
+@@ REP 05
+VD-02 (each mapping from the bank's own dictionary, comments and samples, under change control)
+@@ WITH
+VD-02 (phase 05 reads the inputs to each mapping: the bank's dictionary, column comments, value lists and the candidate columns from the hints)
+@@ END
+# V-05-02-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `ALL_TAB_COMMENTS` phase-05.md:1045 (catalogue input); value lists phase-05.md:1113 (input for the mapping author); candidate columns from the hints phase-05.md:1158; `VD-02` phase-05.md:36 | NEW: none | the change-control part is refuted (`change_request_id` CHECK phase-10.md:116); the derivation part is the DECIDE below
+# DECIDE V-05-02-a | A: the product writes a draft mapping from the comments, value lists and candidate columns, as a new step of phase 10 section 3.1 that the author then edits and approves under `cr_mapping` (new behaviour; VD-02 names the method: research/17-vendor-cbs-native-aml.md:453, reverse-engineer into a scratch schema) (evidence: docs/plan/phase-05.md:1045 and :1113 give the inputs) | B: the derivation stays the author's work in the workbench, and phase 10 section 3.1 says so and cites DSL.md B.9 steps 1, 2 and 4 (evidence: docs/DSL.md:659, :660, :664; docs/plan/phase-10.md:1786, a new version starts empty or from the published one; docs/plan/phase-04.md:1268 for `cr_mapping`)
+
+@@ BLOCK 05
+### 7.N Coverage gap and backfill: the blind period, not the pause row (V-05-11-a, MEDIUM; DR-413)
+The coverage gap is the source blind period of `admin.blind_periods` (phase 11 section 3.6, cause `source_paused`). Phase 11
+opens it in the transaction of the pause, the bank pause or the refusal. Phase 12 reads that period (its section 3.10), not
+`admin.source_pauses`. No backfill is planned from the pause row: phase 11 builds none (its section 7.4, DR-380), and a
+paused interval is caught up by the automatic catch-up on resume. This block replaces each base sentence that says the pause
+row feeds a coverage gap or a backfill: the C-15 item of the header, the section 1 prose and SQL comment, the resume
+paragraph of section 3.1 and the "Paused by the bank" paragraph of section 3.5.
+@@ END
+# V-05-11-a | MEDIUM | names used and where they exist: `admin.blind_periods` phase-11.md:78; phase 11 section 3.6 phase-11.md:968, opening rule phase-11.md:975; phase 11 section 7.4 phase-11.md:1493; DR-380 docs/plan/research.md:391; `admin.source_pauses` phase-05.md:170; phase 12 section 3.10 phase-12.md:923 | NEW: none
+# NOTE V-05-11-a: base sentences this block overrides, all in phase 05: lines 28-29 (C-15 item of the header), 44-45 (section 1 prose), 168-169 (SQL comment), 747 (resume paragraph of section 3.1), 998-999 (section 3.5). The refuter's named places are 44-45 and 168-169; if the lead prefers REP fixes, the block can be dropped and those five sentences changed one by one. The backfill half of the claim is refuted: no backfill job exists (phase-11.md:1493, DR-380). No key joins the two rows (`pause_id` appears in no phase file), and the block adds none; the lead decides whether one is wanted.
+
+# DROP V-05-06-a | docs/plan/phase-02.md:876 "`put_generated(tx, GeneratedEvidence, actor) -> EvidenceObject` (akr-worker; render output, snapshots, certificates," names the worker's write method for certificates; docs/plan/phase-05.md:815 sends the signed check to akr-worker, so phase 02 settles the method
+# DROP V-05-06-c | docs/plan/phase-05.md:1511-1513 "the job renders the grant check as canonical JSON, signs it with `akr-sign-certificate`, stores it as an evidence object owned by the source and writes `admin.source_grant_checks.evidence_object_id` (a check with it set is skipped)" holds the branch in one ordered sentence; the failure handling is the job harness at docs/plan/phase-00.md:544
+# SUMMARY: fixes written 4 (REP 2, BLOCK 2); DECIDE 1; DROP 2; claims covered: V-05-06-a, V-05-06-b, V-05-06-c, V-05-08-a, V-05-02-a, V-05-11-a

@@ -1,0 +1,19 @@
+Replacements made in docs/plan/phase-11.md by the second re-check (DR-413). 3 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-11-1]
+WHY: S-11-1 | CONFIRMED LOW (raised HIGH) | section 4 crate paragraph (the R-11-5b text): "none of the last three may link a driver" names akr-ingestd, akr-worker and akr-ctl, and akr-ingestd is the one binary that links a driver (the sentence before says so). A wrong word; the rule itself is stated right one sentence earlier | "and of these four only akr-ingestd links a driver"
+OLD: akr-ctl all call it, and none of the last three may link a driver.
+NEW: akr-ctl all call it, and of these four only akr-ingestd links a driver.
+
+=== F2 [S-11-2]
+WHY: S-11-2 | CONFIRMED LOW (raised MEDIUM) | section 3.5 resume step 4 lists the payload of `source.halt_resolved` as `{decision, tables, check_id}`; block 7.13 (the R-11-1a text) adds `as_of_marker` for one decision and is headed "resume step 3", so it does not say it extends step 4. Stale base text under a 7.x block | step 4 points to 7.13
+OLD: audit `source.halt_resolved {decision, tables, check_id}` (`check_id` is the fresh check of step 2;
+NEW: audit `source.halt_resolved {decision, tables, check_id}` (plus `as_of_marker` on a `false_alarm` after an `as_of_regressed` halt, 7.13; `check_id` is the fresh check of step 2;
+
+=== F3 [S-11-3]
+WHY: S-11-3 | CONFIRMED LOW (raised MEDIUM) | block 7.20 item 4 (the R-11-7 text) takes the columns from the newest accepted manifest but still refuses only "a table with no receipt yet"; a table whose only receipt is a rejected batch has a receipt and no accepted manifest | the refusal names the same test: no accepted manifest yet
+OLD: A table with no receipt yet is refused with `E_VALIDATION` at
+NEW: A table with no accepted manifest yet is refused with `E_VALIDATION` at

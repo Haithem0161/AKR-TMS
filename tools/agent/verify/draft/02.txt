@@ -1,0 +1,127 @@
+Fixes for the claims of tools/agent/verify/phase-02.md (drafted from tools/agent/verify/refute-02.md; lead to review before applying).
+
+@@ BLOCK 02
+### 7.N AccessReceipt is an opaque token (V-02-01-a, LOW; DR-413)
+`AccessReceipt` has no public fields and no public constructor. Only `AccessScope::record` builds it (section 3, `AccessScope` step 4), and only after the `AccessLog::record` call inside the extractor has committed the access events, which section 2 requires before the protected content is sent (`AccessLog` trait).
+@@ END
+# V-02-01-a | LOW | names used and where they exist: `AccessReceipt` phase-02.md:637, :730; `AccessScope::record` and its steps phase-02.md:719-733; `AccessLog` trait and `record` phase-02.md:585-588; `Accessed::new` phase-02.md:637 | NEW: none (the plan names the receipt and its only builder; only its contents were missing)
+
+@@ REP 02
+router mounts `GET /api/v1/_test/sensitive/{id}` to exercise `AccessScope` (section 6).
+@@ WITH
+router mounts `GET /api/v1/_test/sensitive/{id}` to exercise `AccessScope` (section 6). Its scope is `none (dev only)`, as `POST /api/v1/_echo` has in the phase 00 route table, and it has no Cedar action (section 3).
+@@ END
+# V-02-01-b | LOW | grep -c -F gave 1 | names used and where they exist: `POST /api/v1/_echo` with scope `none (dev only)` phase-00.md:456; `AccessScope` phase-02.md:719 | NEW: none
+# Pair: the Cedar line below. The route bullet is at phase-02.md:641-643.
+
+@@ REP 02
+**Cedar actions:** none; this phase adds no route.
+@@ WITH
+**Cedar actions:** none; the one route this phase adds (the `cfg(test)` route of section 2) has none.
+@@ END
+# V-02-01-b | LOW | grep -c -F gave 1 | names used and where they exist: `cfg(test)` route registration phase-02.md:740; "No Cedar decisions" phase-02.md:1269 | NEW: none
+# The lead-verified phase 03 fix V-03-03-a (tools/agent/verify/fixes/03.txt) gives the phase 00 `/api/v1/_echo` a `dev.echo` Cedar action. This test route is cfg(test) only and is outside that set, so the two do not conflict, but the lead should confirm.
+
+@@ BLOCK 02
+### 7.N PartitionMaintenance: handler and a failing table (V-02-03-a, V-02-03-b, LOW; DR-413)
+`PartitionMaintenance` implements the phase 00 `JobHandler` for kind `partition_maintenance` (section 4 job table): `run(&self, ctx: JobContext, payload: Value) -> Result<(), JobError>`, the maintenance routine of the `partition` module. A factory call that fails returns `JobError::Retryable`, so the attempt ends at that table. The tables after it get their months on the retry (phase 00 job harness, step 4), and until then the writer creates a missing month on demand (7.4).
+@@ END
+# V-02-03-a, V-02-03-b | LOW | names used and where they exist: `JobHandler` and `JobContext` phase-00.md:540; `JobError::Retryable` phase-00.md:543; `partition_maintenance` phase-02.md:1016; `PartitionMaintenance` phase-02.md:570, :632, :813, :1050; `PartitionRegistry` and its entries phase-02.md:1212-1219 (7.4); the writer creates a missing month phase-02.md:1220; a handler error backs off and reaches dead phase-00.md:788 | NEW: none
+# V-02-03-a: the entry part is refuted (7.4 gives table, factory and ahead_months, phase-02.md:1213-1219). The block fixes the method part only.
+# V-02-03-b: the stop-or-continue choice follows the job harness default (a handler error ends the attempt and is retried, phase-00.md:543 and :788). If the lead wants the other tables to run anyway, that is a DECIDE and this block changes.
+
+# DECIDE V-02-04-a | option A: a block in phase 00, the owner of the four kinds, gives their severity, SIEM flag and detail keys (its audit table is at phase-00.md:647-654); the keys stated there are `setting.updated` (before, after, source), `flag.updated` (before, after) and `job.dead` (kind, attempts), and none is stated for `restore_drill.recorded` | option B: a block in phase 02 section 7.5 gives the same values in the phase 02 catalogue, because phase-02.md:1071 says these kinds "join the catalogue with detail keys, severity and SIEM flag" and the normative per-phase rule of 7.5 covers phases 03 to 31 only (phase-02.md:1225). Severity and the SIEM flag are stated for these four kinds nowhere; the SIEM list of research/30-security-privacy.md section 10.4 (line 624) names no restore-drill kind. The lead must choose the severity and the SIEM flag.
+
+@@ BLOCK 02
+### 7.N RenderJob fields (V-02-05-a, LOW; DR-413)
+`RenderJob` holds what steps 1 and 2 of `RenderService::render` read: `html` (the rendered `index.html`), `assets` (the bundled asset files, by name), and the `dir` and `lang` that the caller sets in step 1. It has no template name and no template version: the caller renders the template before the call, so the service never receives either.
+@@ END
+# V-02-05-a | LOW | names used and where they exist: `RenderJob` phase-02.md:630, :897; `RenderService::render` steps 1-2 phase-02.md:898-903; `PdfRenderer { render(RenderJob) }` port phase-02.md:630; `RenderedPdf` is refuted by "Return the bytes and their SHA-256" phase-02.md:905 | NEW: none
+
+@@ BLOCK 02
+### 7.N Calling job and the two render errors (V-02-05-b, LOW; DR-413)
+Step 3 of `RenderService::render` is the only retry mapping, for `Unavailable` and `Timeout`. `Refused` (raised by the URL refusal of step 1) and `FontMissing` (raised only by the CI golden check) are permanent: the same HTML or font set fails the same way on every attempt. The calling job returns `JobError::Permanent` for both, so the job goes to `dead` without a retry (phase 00 job harness, step 4).
+@@ END
+# V-02-05-b | LOW | names used and where they exist: `RenderError { Unavailable, Timeout, Refused(String), FontMissing }` phase-02.md:597-598; step 1 refusal phase-02.md:898-900; step 3 retry phase-02.md:904; `FontMissing` in the CI check phase-02.md:911; `JobError::Permanent` and status `dead` phase-00.md:543-544 | NEW: none
+
+@@ BLOCK 02
+### 7.N ShredOutcome (V-02-07-a, LOW; DR-413)
+`ShredOutcome` is the value that `shred` returns (7.3). It holds `shredded_at: DateTime<Utc>`: the instant that the same transaction wrote to the row's `shredded_at` column (section 1).
+@@ END
+# V-02-07-a | LOW | names used and where they exist: `shred(tx, evidence_id, reason) -> ShredOutcome` phase-02.md:1202; `shredded_at` column phase-02.md:376; `DateTime<Utc>` in `AuditReceipt` phase-02.md:582; `shred` sets `shredded_at = now()` phase-23.md:666; the port's use in phase 23 phase-23.md:500 | NEW: none
+
+@@ REP 02
+the one phase 23 section 1.1 defines
+@@ WITH
+the one phase 23 section 1.2 defines
+@@ END
+# V-02-07-b | LOW | grep -c -F gave 1 | names used and where they exist: phase 23 section 1.2 (`0072_retention_guards_grants.sql`) phase-23.md:189; the classification row phase-23.md:449 | NEW: none
+# V-02-07-b is REFUTED. Fixed under the exception: the row exists and only the section number in the cross-reference is wrong.
+
+@@ REP 02
+the trigger of this section refuses
+@@ WITH
+the trigger of section 1 (`admin.evidence_objects_guard`) refuses
+@@ END
+# V-02-07-c | LOW | grep -c -F gave 1 | names used and where they exist: `admin.evidence_objects_guard` phase-02.md:395 (trigger `trg_evidence_objects_guard` follows it); refusal "lock_until can only be extended" phase-02.md:410 | NEW: none
+# V-02-07-c is REFUTED. Fixed under the exception: the refusal exists and only the pointer is wrong.
+
+@@ BLOCK 02
+### 7.N case_event anchor: the case heads digest (V-02-09-a, MEDIUM; DR-413)
+For stream `case_event` (7.7), `AnchorService::run` adds one step between steps 6 and 7. The cases are those with a `case_event` row in the range that step 4 reads. For each one, take `last_seq` and `head_hash` as they stand at `head`: the `seq` and `hash` of its last row in `casework.case_events` at or before `head` (phase 17 section 3.7 names the two fields). Sort the list of `{case_id, last_seq, head_hash}` by `case_id`, and take the SHA-256 of its canonical JSON. Step 7 adds one key, `case_heads_digest` (lowercase hex), to the statement of this stream only. The payload carries the digest, not the list (DR-122).
+@@ END
+# V-02-09-a | MEDIUM | names used and where they exist: `AnchorService::run` phase-02.md:743; steps 2 to 4 phase-02.md:746-751; steps 6 and 7 phase-02.md:756, :759 (the key list of step 7 has no digest key); 7.7 "one chain per case" and the digest rule phase-02.md:1238-1241; `last_seq`, `head_hash` phase-17.md:312-313; `casework.case_events` with `seq` and `hash` phase-17.md:335-347; the append rule phase-17.md:1111-1113; canonical JSON phase-02.md:759 | NEW: `case_heads_digest` (statement key; no existing key of step 7 carries the digest)
+# Settled by DR-122 (docs/plan/research.md:133): a digest, not a list. The two phase 17 REPs below follow it.
+# Not changed: steps 5 (continuity, phase-02.md:752) and 6 (Merkle root) still read one chain per stream as written. They cannot hold for interleaved case chains as written. The block does not settle them; a DECIDE for the lead if it wants a per-case rule. The base text at phase-02.md:530-531 ("chained and anchored by the same code") is overridden by 7.7, so it is left alone.
+
+@@ REP 17
+This phase extends its payload with the heads of the cases that
+@@ WITH
+This phase extends its payload with the digest of the heads of the cases that
+@@ END
+# V-02-09-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `case_heads_digest` (NEW, the phase 02 block above); DR-122 docs/plan/research.md:133 | NEW: none in this entry
+# Cross-file: phase 17 section 3.7 (phase-17.md:1119) named a list; DR-122 names a digest and wins over both texts.
+
+@@ REP 17
+section 3, Open doubts).
+@@ WITH
+section 7+, the case heads digest).
+@@ END
+# V-02-09-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: phase 02 has no "Open doubts" section (its headers are sections 1 to 6, 7+ and "What This Phase Does NOT Touch", phase-02.md:37-1264); the block above is in section 7+ | NEW: none
+# Cross-file: this is the wrong cross-reference the refuter found at phase-17.md:1121.
+
+@@ BLOCK 02
+### 7.N Verifier reads on akr-anchors (V-02-10-a, MEDIUM; DR-413)
+The `akr-worker` credential of the Store bullet of section 4 also gets `s3:ListBucketVersions` and `s3:GetObjectRetention` on `akr-anchors`. Step 3 of `Verifier::run` needs the first for the delete-marker check (the version listing) and the second for the retain-until check. The S3 guard passes both kinds of request (phase 00, object-store port and S3 guard). Phase 23 grants the same listing on `akr-evidence`, under `ev/` only.
+@@ END
+# V-02-10-a | MEDIUM | names used and where they exist: `Verifier::run(scope)` step 3 phase-02.md:793-795; Store bullet phase-02.md:1032-1036 (`akr-anchors` at :1033; writer sentence at :1035-1036); S3 guard passes "list object versions" and "get and put retention" phase-00.md:609-610; writer policy phase-00.md:618; `s3:ListBucketVersions` phase-23.md:923 | NEW: `s3:GetObjectRetention` (the IAM name of the "get retention" that phase 00 passes; no existing grant names it)
+
+# DROP V-02-11-a | docs/plan/phase-02.md:881 "`open(id) -> VerifiedReader` (akr-api for the phase 18 route; akr-worker for pack assembly)" and :886 "every segment is authenticated before release; the SHA-256 accumulates; at the last segment it must equal the row's": the reader's contract is in the open steps, phase-02.md:882-890
+
+@@ REP 02
+`GET /api/v1/evidence/{id}` is phase 18 (it calls `EvidenceStore::open`)
+@@ WITH
+`GET /api/v1/cases/{id}/evidence/{evidence_id}/content` is phase 18 (it calls `EvidenceStore::open`)
+@@ END
+# V-02-11-b | LOW | grep -c -F gave 1 | names used and where they exist: phase 18 content route `GET /api/v1/cases/{id}/evidence/{evidence_id}/content` phase-18.md:596; `EvidenceStore::open` phase-02.md:881 | NEW: none
+# The generic route was removed by DR-380 (docs/plan/research.md:391) and docs/API.md:236 says "there is no generic evidence route (DR-380)". First of two REPs for this claim; the second is the Does Not Touch bullet below.
+
+@@ REP 02
+`GET /evidence/{id}` (K3) is phase 18
+@@ WITH
+`GET /cases/{id}/evidence/{evidence_id}/content` (K3) is phase 18
+@@ END
+# V-02-11-b | LOW | grep -c -F gave 1 | names used and where they exist: as for the route bullet above, phase-18.md:596 | NEW: none | second of two REPs for this claim; the bullet is at phase-02.md:1267
+
+@@ BLOCK 02
+### 7.N Repository row types: columns (V-02-11-c, LOW; DR-413)
+- `StagedRow`: the `admin.evidence_objects` columns that `stage` sets in step 5: `id`, `kind`, `owner_kind`, `owner_id`, `retention_class`, `bucket` (`akr-quarantine`), `object_key` (`staging/...`), `sha256`, `size_bytes`, `content_type`, `file_name` (sealed), `classification`, `lang`, `av_status` (`pending`) and `created_by` (the actor).
+- `FinalRow`: the `StagedRow` columns as `put_generated` inserts them clean, with `bucket` and `object_key` of the final object, `av_status` = `clean`, and the `CleanFacts` fields (`version_id`, `scanned_at`, `lock_mode`, `lock_until`, `key_version`, `wrapped_dek`; `engine` is `av_engine_version`).
+- `EvidenceOpenRow`: the columns that `open` reads: `av_status` and `shredded_at` (step 1), `wrapped_dek` (step 2), `bucket`, `object_key` and `version_id` (step 3), and `sha256` (step 4).
+- `NewPackRow`: the `admin.packs` columns that step 3 of `PackService::publish` sets: `id`, `kind`, `scope`, `scope_key`, `lang`, `version` (from `next_version`), `evidence_id`, `sha256`, `manifest` and `created_by`.
+@@ END
+# V-02-11-c | LOW | names used and where they exist: `admin.evidence_objects` DDL phase-02.md:353-387; `stage(tx, NewEvidence, actor)` phase-02.md:839 and its step 5 phase-02.md:852; `put_generated` phase-02.md:876-879; `CleanFacts` phase-02.md:619; `open` steps 1-3 phase-02.md:882-885; `PackService::publish` step 3 phase-02.md:920; `admin.packs` DDL phase-02.md:423-436 | NEW: none
+
+# DECIDE V-02-11-d | option A: the infected or rejected object is kept, and no sweep deletes it; step 5 of `evidence_scan` names that in place of R12 (evidence: docs/plan/phase-02.md:1022-1023 "it never deletes an infected or rejected object") | option B: the object follows its owner's disposal, as every evidence object does, so R12 goes and the owner's class governs the object (evidence: docs/plan/phase-23.md:666 "An evidence object follows its owner (`owner` clock)"; the R12 row at docs/plan/phase-23.md:602 is 30 to 90 days for database tables and names no evidence object). The citation at docs/plan/phase-02.md:866 changes under either option.
+
+# SUMMARY: fixes written 16 (REP 8, BLOCK 8); DECIDE 2; DROP 1; claims covered: V-02-01-a, V-02-01-b, V-02-03-a, V-02-03-b, V-02-04-a, V-02-05-a, V-02-05-b, V-02-07-a, V-02-09-a, V-02-10-a, V-02-11-b, V-02-11-c, V-02-11-d (the 13 STANDS and PARTLY claims); V-02-07-b, V-02-07-c (REFUTED, pointer REPs under the exception); V-02-11-a (REFUTED, DROP)

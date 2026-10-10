@@ -1,0 +1,186 @@
+Fixes applied to docs/plan/phase-26.md by the verification pass (DR-413). 36 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/26.txt)
+OLD: A product code whose row has `islamic_contract_type` NULL and whose family is Islamic is refused for
+NEW: A product code whose row has `islamic_contract_type` NULL is refused for
+
+=== F2 REP (from fixes/26.txt)
+OLD: (b) every Islamic product row has a non-NULL type from the
+NEW: (b) every product row that a fixture deal uses has a non-NULL type from the
+
+=== F3 REP (from fixes/26.txt)
+OLD: (d) a code mapped to two types is refused by
+NEW: (d) a code mapped to two types with the same `valid_from` is refused by
+
+=== F4 REP (from fixes/26.txt)
+OLD: the same steps 1 to 6 for each candidate customer, then the rows whose customer is readable;
+NEW: the steps of the list block of section 7+, for the one customer named;
+
+=== F5 BLOCK (from fixes/26.txt)
+### 7.N List of one customer's deals (V-26-02-a, MEDIUM; DR-413)
+`IslamicDealService::list_for_customer(ctx, customer_id, cursor) -> Page<IslamicDealSummary>` serves `GET /islamic/deals?customer_id=`, with `X-Access-Purpose` required as on the deal read (422 `E_PURPOSE_REQUIRED` without it):
+1. Flag: as section 3.4 step 1.
+2. `customer_id` missing or not a UUID, or a malformed cursor: 422 `E_VALIDATION` (phase 00 cursor rules).
+3. The customer's party and its tier: section 3.4 steps 3 and 4. No current customer row gives the empty page.
+4. Cedar `islamic.deal.read` on that party, as section 3.4 step 5. A refusal writes the masked access event and answers 200 with the empty page, the body of a customer with no deals.
+5. No step-up on the list (lead decision). A row is a summary; each deal is opened by its id, and section 3.4 step 6 applies there. The three forbids of section 3.13 already hold the list of a suspicion-tier customer to M and the case team, on the analyst network, with a purpose.
+6. Read `IslamicDealRepository::list_for_customer(customer_id, after, limit)` (current rows). `IslamicDealSummary` is `{ id, contract_type, status, opened_on, closed_on, evidence_status }`: no party, no amount and no asset.
+7. Access events: `scope.record_hits(rows)` (phase 02 list rule), one `search_hit` per row when the customer's tier is restricted or suspicion, and nothing for the normal tier. No audit row.
+
+=== F6 BLOCK (from fixes/26.txt)
+### 7.N Step-up actions of this phase (V-26-02-b, MEDIUM; DR-413)
+This phase declares two `StepUpAction { name, class }` constants in `domain::islamic`, with phase 01's closed classes (section 4.5 gains this phase 01 item):
+- `DEAL_OPEN` is `{ "islamic.deal.open", record_open }`. It is consumed in section 3.4 step 6 and in step 1 of the content read of section 3.5, both with the resource ref `islamic_deal:<id>`.
+- `EVIDENCE_DECIDE` is `{ "islamic.evidence.decide", decision }`. It is consumed in step 2 of the verify of section 3.5, with the resource ref `possession_evidence:<id>`.
+
+=== F7 REP (from fixes/26.txt)
+OLD: header, record_open, "islamic_deal:<id>")
+NEW: header, DEAL_OPEN, Some("islamic_deal:<id>"))
+
+=== F8 REP (from fixes/26.txt)
+OLD: Step-up `decision` consumed with resource ref
+NEW: Step-up `EVIDENCE_DECIDE` (class `decision`) consumed with resource ref
+
+=== F9 REP (from fixes/26.txt)
+OLD: its display name from `canon.party_name`.
+NEW: its display name from the current `canon.party_name` rows (`superseded_at IS NULL`).
+
+=== F10 BLOCK (from fixes/26.txt)
+### 7.N Conditions of SCN-ISL-01 (V-26-03-a, V-26-03-b, MEDIUM; DR-413)
+The row of section 3.6 gives the fields; this is the logic the document carries. For one current deal, C is the party of role `customer` and S is each party of role `seller` or `supplier` (current `canon.deal_parties` rows). The rule fires when any of these holds for one S:
+1. Same party: S is C.
+2. Agent: S also holds the role `agent` on the same deal, or a current `canon.party_relationship` row of type `attorney` joins S and C in either direction. Phase 10 has no other agency type, and none is added.
+3. Related party: a current `party_relationship` row of any other type joins S and C in either direction, or S and C are both joined to one third party by rows of type `owner`, `controller`, `director` or `signatory` (the shared owner and the shared signatory of I-04).
+4. Shared contact: S and C have an equal `party_contact.value_hk` of the same `type` among `mobile`, `landline`, `email` and `address`. A NULL hash is never compared.
+5. Shared account: S and C both hold a current `account_party_role` row on one account, or hold accounts with an equal `number_hk` or `iban_hk`.
+The alert's evidence names which of the five matched, as a code, and never a contact value or an account number. The device match of I-04 is not covered, as the row says.
+
+=== F11 BLOCK (from fixes/26.txt)
+### 7.N Command centre tile counts (V-26-04-a, V-26-04-f, MEDIUM; DR-413)
+Phase 24's `CommandReadRepository` (`akr_app`) gains one method for each tile of section 5.3. Each takes the caller's visibility predicate as a bound parameter, as phase 24 section 2 requires, and applies it to the deal's customer party; for M, the only role that sees the two tiles, it admits every tier. Each reads current deal rows (`recorded_to IS NULL`) and returns one count.
+1. `islamic_awaiting_evidence(conn, predicate) -> Result<i64, RepoError>`: the deals whose `kyc.deal_evidence_status` is `attached`, plus those where it is `unknown` while `islamic.evidence_tracking` is TRUE.
+2. `islamic_duplicate_refs(conn, predicate) -> Result<i64, RepoError>`: the number of distinct `document_ref_hk` values that rows of two or more different deals hold, among rows with `document_ref_hk IS NOT NULL AND status <> 'rejected'` (the predicate of `idx_possession_doc`). One shared reference counts once.
+Both are called only while `pack.islamic` is on. Both pass through the small-number rule of phase 24 section 3.7 like every tile: a count from 1 to the threshold minus 1 is `value: null, suppressed: true`.
+The attach of section 3.5 makes no duplicate read and stores no duplicate mark, so its response and its timing are the same with or without a shared reference. `PossessionEvidenceRepository` therefore has no `duplicate_exists` method.
+
+=== F12 REP (from fixes/26.txt)
+OLD: `duplicate_exists(document_ref_hk, except_deal_id) -> bool` (used only to write the register warning, never returned to the caller).
+NEW: No duplicate method lives here: the tile method `islamic_duplicate_refs` of section 7+ counts the shared references when G1 is read.
+
+=== F13 REP (from fixes/26.txt)
+OLD: Duplicate check (`duplicate_exists(document_ref_hk, except deal)`, rows not rejected). A duplicate is recorded only in the G1 tile
+NEW: Duplicates: the attach makes no duplicate read and stores no mark. A reference that a row of another deal also holds (rows not rejected) shows only in the G1 tile
+
+=== F14 REP (from fixes/26.txt)
+OLD: whether or not step 7 found a duplicate.
+NEW: whether or not another deal holds the same reference.
+
+=== F15 REP (from fixes/26.txt)
+OLD: the G1 tile count as `m@` is 1, and as `a2@` the tile is absent.
+NEW: the G1 tile as `m@` reads `suppressed: true` (one shared reference is below the threshold; the tile read zero before the second attach), and as `a2@` the tile is absent.
+
+=== F16 BLOCK (from fixes/26.txt)
+### 7.N PossessionEvidenceService methods (V-26-04-b, LOW; DR-413)
+`PossessionEvidenceService` has four methods, each run by the steps of its part of section 3.5:
+- `attach(ctx, deal_id, AttachEvidence, file) -> PossessionEvidenceView` (Attach).
+- `verify(ctx, deal_id, evidence_id, if_match, DecideEvidence, header) -> PossessionEvidenceView` (Verify; `header` is the step-up assertion header).
+- `content(ctx, deal_id, evidence_id, download: bool) -> VerifiedReader` (Content; phase 02 `open`).
+- `sweep(now) -> EvidenceSweepCounts` is the body of the job `islamic_evidence_sweep` (Sweep); `EvidenceSweepCounts { missing, late }` holds the two counts of its step 3.
+
+=== F17 REP (from fixes/26.txt)
+OLD: file_name, classification: personal, lang, bytes })` (phase 02 section 3).
+NEW: file_name, classification: personal, lang, bytes }, ctx.user)` (phase 02 section 3).
+
+=== F18 REP (from fixes/26.txt)
+OLD: so a test asserts both (section 6, check 13).
+NEW: so a test asserts both (section 6, check 6 l).
+
+=== F19 REP (from fixes/26.txt)
+OLD: `facility.limit_amount`, `facility.currency`, `facility.contract_type` for sources without agreements (the mapping decides which; never both for one agreement); `party.staff_flag`, `party.related_to_staff`, `customer.party_id`
+NEW: `facility.limit_amount`, `facility.currency`, `facility.product_id`, `product.islamic_contract_type` for sources without agreements (the mapping decides which; never both for one agreement); `party.staff_flag`, `party.related_to_staff`, `party_relationship.type`, `customer.party_id`
+
+=== F20 BLOCK (from fixes/26.txt)
+### 7.N Conditions of SCN-ISL-06 and SCN-ISL-07 (V-26-05-a, LOW; V-26-05-b, V-26-05-c, V-26-05-d, MEDIUM; DR-413)
+SCN-ISL-06:
+- A qard hasan is a deal with `contract_type = 'qard_hasan'`, or, for a source without agreements, a `canon.facility` row whose product row has `islamic_contract_type = 'qard_hasan'` (`facility.product_id`). `facility.contract_type` is free text and is not read, as section 3.1 step 2 says.
+- Cap leg: `contract_amount` (or `limit_amount`) above `qard_cap_iqd`, compared only when the currency is `IQD`. A loan in another currency is not compared by this leg: the document keeps the DSL default `currency_mode: separate` with an IQD threshold only, and a deal row holds no IQD-equivalent amount. The two legs below still apply to it.
+- Staff leg: the recipient party has `staff_flag` TRUE.
+- Related-person leg: the recipient party has `related_to_staff` TRUE, or a current `party_relationship` row of type `family` joins the recipient and a party whose `staff_flag` is TRUE, in either direction. `related_to_staff` is filled only by the source's mapping, when the CBS holds such a flag; no job derives it and it is never written FALSE. A NULL flag with no such row does not fire the leg.
+SCN-ISL-07 (deals of one customer with `contract_type = 'qard_hasan'`; N is the new deal and `d` its `opened_on`):
+- Repeat leg: another deal with status `settled` or `closed` and a `closed_on` in the `repeat_months` months before `d`. `closed_on` is the date of full repayment; a `settled` deal with a NULL `closed_on` is not evaluable for this leg.
+- Unpaid leg: another deal opened before `d` whose status is `active` or `defaulted` on `d`.
+- `cancelled` and `unknown` deals feed neither leg.
+- Schedule sources: `canon.facility.events` has no event kind for a repayment in this plan, so the facility leg is not evaluable until the schedule mapping names one. The document grades B on such a source, as the row says, and its facility leg is P2.
+
+=== F21 BLOCK (from fixes/26.txt)
+### 7.N Freeze state with group tasks (V-26-06-a, HIGH; DR-413)
+Section 3.8 gains the state rule. Phase 20's `on_level` moves a freeze to `frozen` at the first verified level of its task. With several group tasks that would call the freeze frozen while the accounts of another group are unverified, and `timer_freeze_due` and `timer_freeze_limit` would then do nothing for them.
+When a freeze has more than one group task, `FreezeService::on_level(tx, freeze, level)` holds the freeze row `FOR UPDATE` (phase 20 lock order: the owner before the task) and then reads `verification_level` of every group task: the rows of `casework.ops_tasks` with `source_kind = 'freeze'`, `source_id = freeze.id` and `action IN ('freeze', 'restrict', 'hold')`.
+1. Any group task has a NULL level: the freeze stays `listed`. Nothing is written on the freeze, `freeze.frozen` is not audited, and both timers keep their meaning.
+2. Every group task has a level: the freeze moves to `frozen` with `frozen_at = now()`, and `freezes.verification_level` is the lowest level of the group tasks. A later rise sets it to the new lowest; it only rises, because each task's level only rises. Audit `freeze.frozen` once, with that level. `request_committee_report(reason = verified)` runs at this point, and at the deadline in any case.
+The lock makes two group tasks verified at the same moment run one after the other, so the second one sees the first one's level. A freeze with one task behaves as phase 20 ships.
+
+=== F22 REP (from fixes/26.txt)
+OLD: Release (`FreezeService::propose_release`, phase 20 section 3.5) uses the same groups, one release task per group.
+NEW: Release (`FreezeService::release_freeze`, phase 20 section 3.5 step 5, on approval) uses the same groups, one release task per group; a proposal creates no ops task.
+
+=== F23 REP (from fixes/26.txt)
+OLD: `ops_task.created` and `freeze.created`
+NEW: `ops.task_created` and `freeze.created`
+
+=== F24 BLOCK (from fixes/26.txt)
+### 7.N Aggregate counts and their query (V-26-07-a, LOW; DR-413)
+`AggregateCounts`, the return of `ShariaAggregateRepository::counts(period)`, holds the cells of section 3.9 step 3: `by_contract_type` (per contract type: active, settled, closed, other), `by_evidence_status`, `islamic_book_accounts` and `gaps` (three pairs of numerator and denominator: no asset, no supplier or seller party, evidence unknown). `counts` runs the one statement of section 3.9 step 2.
+`ShariaAggregateQuery::view(ctx, period) -> ShariaAggregateView` runs steps 1 and 4 to 7 of section 3.9 around that call.
+
+=== F25 REP (from fixes/26.txt)
+OLD: one query with grouped counts; section 3.4)
+NEW: one query with grouped counts; section 3.9)
+
+=== F26 REP (from fixes/26.txt)
+OLD: `ShariaAggregateView` (section 3.4)
+NEW: `ShariaAggregateView` (section 3.9)
+
+=== F27 REP (from fixes/26.txt)
+OLD: `reject_code_not_allowed`, `period_future` |
+NEW: `reject_code_not_allowed`, `period_future`, `period_invalid` |
+
+=== F28 REP (from fixes/26.txt)
+OLD: a future month is 422 `E_VALIDATION` at `/period` (sub-code `period_future`).
+NEW: a future month is 422 `E_VALIDATION` at `/period` (sub-code `period_future`), and a value that is not `YYYY-MM` with a month from 01 to 12 is 422 `E_VALIDATION` at `/period` (sub-code `period_invalid`).
+
+=== F29 REP (from fixes/26.txt)
+OLD: Checks of the file (section 6, check 17)
+NEW: Checks of the file (section 6, check 10)
+
+=== F30 REP (from fixes/26.txt)
+OLD: fails on a hit (section 6, check 17).
+NEW: fails on a hit (a `cargo test`, run with section 6 check 4).
+
+=== F31 REP (from fixes/26.txt)
+OLD: `--owner` is required: an Islamic scenario without a named owner is refused.
+NEW: `--owner` is required: an Islamic scenario without a named owner is refused before any write, with exit 1, as a failed seed is (phase 16 section 3.15 step 1).
+
+=== F32 BLOCK (from fixes/26.txt)
+### 7.N Islamic document in the release manifest, and rule 15 (V-26-08-c, MEDIUM; V-26-08-d, LOW; DR-413)
+Section 4.5 item 7 gains two points of the phase 16 extension that this phase owns (phase 16 section 7.2):
+- The release manifest also lists `packs/scenarios/islamic.v1.0.0.json` with its SHA-256 and signature. `akr-ctl packs seed` checks it as it checks `packs/scenarios/documents.v1.0.0.json` (phase 06 section 3.1 step 1), whether the flag is on or off.
+- Phase 16 rule 15 applies to `pack: islamic` as to `pack: akr`: a document without `evidence_label` is refused with `E_SCHEMA`.
+
+=== F33 REP (from fixes/26.txt)
+OLD: normalised document_ref)` (phase 02 `KeyedHash`), or NULL when no
+NEW: normalised document_ref)` (phase 00 `Crypto::keyed_hash`; normalised means the phase 10 transforms `Trim`, `DigitsWestern` and `Upper`, in that order, with inner characters kept as typed), or NULL when no
+
+=== F34 REP (from fixes/26.txt)
+OLD: `ON CONFLICT (source_key) DO NOTHING`, fixed
+NEW: `ON CONFLICT (source_key) WHERE source_key IS NOT NULL DO NOTHING` (written by phase 24's `warn`, block 7.2), fixed
+
+=== F35 REP (from fixes/26.txt)
+OLD: `ON CONFLICT (source_key) DO NOTHING`).
+NEW: `ON CONFLICT (source_key) WHERE source_key IS NOT NULL DO NOTHING`).
+
+=== F36 REP (from fixes/26.txt)
+OLD: the message catalogue. The insert-or-nothing on
+NEW: the same enum's `title {ar, en}` map ({"ar": "نواقص مستندات الحيازة في العقود الإسلامية", "en": "Possession evidence gaps on Islamic deals"}). The insert-or-nothing on

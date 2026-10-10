@@ -1,0 +1,237 @@
+Phase 24 fixes (verification pass, DR-413). Lead review of tools/agent/verify/draft/24.txt against the phase text.
+33 confirmed: 1 HIGH, 17 MEDIUM, 15 LOW; 1 rejected (V-24-01-b, by the refuter).
+Lead changes to the draft: the control report counts are read on the app pool (no new definer function); MRO gains the
+register and fairness reads the prose already promised (lead decision); `horizon_days` is dropped; the sample read uses
+phase 02's list rule (`record_hits`), not one `view` event per item; the board pack claim is MEDIUM (the phase 21 board
+row already gives CH and IA the report counts); the stale assessor key is fixed by REP, since 7.1 already rules.
+
+V-24-01-a MEDIUM
+@@ REP 24
+`resource_id`, `case_id`, and for `access_event` only `decision` and `tier`.
+@@ WITH
+`resource_id`, `case_id` (a column of `audit_log` only: with `case_id` set the search reads `audit_log` alone, and the reads of a case are found with `resource_type = case` and `resource_id`), and for `access_event` only `decision` and `tier`.
+@@ END
+
+V-24-02-a, V-24-08-b, V-24-12-d LOW
+@@ REP 24
+`unknown_pack_kind`, `sample_too_large` |
+@@ WITH
+`unknown_pack_kind`, `sample_too_large`, `title_not_bilingual`, `severity_not_allowed`, `subject_key_required`, `owner_not_governance`, `unknown_register_kind` (a `kind` of route 9 outside the five), `explanation_code_not_allowed`, `note_too_long` |
+@@ END
+
+@@ BLOCK 24
+### 7.N `sync_post_review`: the finding's title, body and join (V-24-02-b, MEDIUM; DR-413)
+Section 3.4 `sync_post_review`, for each event. The join: the event's `instance_id` is an `admin.workflow_instances` row with `purpose = 'post_review'` and `resource_kind = 'change_request'`; its `resource_id` is the change request, and the finding's `owner_id` is that request's `maker_id` (this settles Open doubts 31). The `title` is fixed by the outcome: `concern` is {"ar": "ملاحظة من المراجعة بعد التغيير", "en": "Concern from the post-change review"}; `rollback_needed` is {"ar": "المراجعة بعد التغيير تطلب التراجع", "en": "Post-change review asks for a rollback"}. `body` is `{subject_key: <change request id>, outcome, day}` and nothing else; the notes of the review are not copied.
+@@ END
+
+@@ BLOCK 24
+### 7.N Step-up action constants of this phase (V-24-02-c, V-24-11-e, LOW; DR-413)
+This phase declares two `StepUpAction { name, class }` constants with phase 01's closed classes: `register.accept_risk` (class `approval`) for the PATCH of section 3.4 when `status` becomes `accepted_risk`, and `export.download` (class `export`) for the file route of section 7.12. Pack downloads keep phase 06's `pack.download`.
+@@ END
+
+@@ BLOCK 24
+### 7.N Calendar sweep: the entry point (V-24-03-a, LOW; DR-413)
+The job `review_calendar_sweep` (section 4.1) calls `GovernanceRegisterService::sweep_calendar(now)`. It runs the row query of `review_calendar` (section 3.4) with no caller: calendar rows hold no customer, case or narrative data (section 3.15). For each red row it calls `RegisterWriter::warn` (section 7.7) with the source key of section 3.4.
+@@ END
+
+V-24-03-b LOW (7.3 rules: red on the due date)
+@@ REP 24
+`amber` within 30 days, `red` past due):
+@@ WITH
+`amber` in the 30 days before `due_on`, `red` on and after `due_on`, as 7.3 says):
+@@ END
+
+V-24-03-c LOW (lead decision: the parameter is dropped; route 13 names none and the calendar returns every open row)
+@@ REP 24
+**`review_calendar(ctx, horizon_days)`**
+@@ WITH
+**`review_calendar(ctx)`**
+@@ END
+
+@@ BLOCK 24
+### 7.N Board pack: which aggregates, under which predicate (V-24-04-a LOW, V-24-04-b MEDIUM; DR-413)
+The "aggregates of 3.4 to 3.7" of the board row (section 3.11) are the command-centre tiles of section 3.7 that M, CH and IA all may see: Late and at-risk clocks, Verification (status only), Data and coverage incidents, Arrivals against throughput, Backlog by elapsed age, Top scenarios with cases, QA status, Regulatory deadlines, Branch liaison reports and Governance open items (the counts of 3.4 and 3.5). Not in the pack: Decisions waiting for me, Productive alerts, UTRs and STRs, and the Tipping-off summary. Report counts reach the board through the periodic row of phase 21 only.
+`BoardSource::payload(period) -> Value` builds them. It calls the `CommandReadRepository` and `ClockReadRepository` methods of those tiles with the predicate of a principal that holds the role CH alone (no case access list entry, no QA grant), not the builder's own, so the pack shows no reader more than the command centre shows CH. The small-number rule of section 3.7 applies.
+@@ END
+
+@@ BLOCK 24
+### 7.N Case packs: an unknown case id (V-24-05-a, MEDIUM; DR-413)
+`POST /packs` with kind `case`: the Cedar check comes first (a caller without M is 403 `E_FORBIDDEN` whatever the id). For M the case is looked up before the enqueue, and an unknown id is 404 `E_NOT_FOUND`. A case that can no longer be read when the job runs fails the build with `pack.build_failed {kind: case, reason: case_not_found}`.
+@@ END
+
+V-24-05-b LOW (the route is phase 17's; phase 18 only adds fields)
+@@ REP 24
+`CaseFileSource` (the read model behind `GET /cases/{id}` of phase 18, not a new query)
+@@ WITH
+`CaseFileSource` (the read model behind phase 17's route `GET /cases/{id}`, `CaseReadService::header`, with the fields phase 18 adds; not a new query)
+@@ END
+@@ REP 24
+the case read model of phase 18 (the function behind `GET /cases/{id}`; no second query)
+@@ WITH
+the case read model of phase 17's route `GET /cases/{id}` with the fields phase 18 adds (`CaseReadService::header`; no second query)
+@@ END
+@@ BLOCK 17
+### 7.N The read behind `GET /cases/{id}` (V-24-05-b, LOW; DR-413)
+The answer of the row `GET /api/v1/cases/{id}` is built by `CaseReadService::header(ctx, case_id) -> CaseView` (akr-api), under the visibility predicate of section 3.10 and with the step-up of the row. Phase 18 adds its fields to the same view (phase 18 section 4.5 item 5), and the case pack of phase 24 calls this method instead of a second query.
+@@ END
+
+V-24-06-a LOW (7.1 already rules; the base text is brought in line)
+@@ REP 24
+ ('assessor.grant_max_days',       '30', 'integer', '{"max": 30, "basis": "M-62 time-boxed read-only assessor grant"}'::jsonb, TRUE,
+@@ WITH
+ -- no 'assessor.grant_max_days' row: the cap of an AS grant is phase 04's access.assessor_max_days (section 7.1)
+@@ END
+@@ REP 24
+  '{"ar": "أقصى مدة لصلاحية المقيّم (أيام)", "en": "Longest assessor grant (days)"}'),
+@@ WITH
+ -- (its label line is removed with it)
+@@ END
+@@ REP 24
+no more than `assessor.grant_max_days` after `valid_from`
+@@ WITH
+no more than `access.assessor_max_days` (phase 04's key, section 7.1) after `valid_from`
+@@ END
+@@ REP 24
+`validation.evidence_max_days` (180; governed), `assessor.grant_max_days` (30; governed; floor max 30),
+@@ WITH
+`validation.evidence_max_days` (180; governed),
+@@ END
+@@ REP 24
+`assessor.grant_max_days` `{"max": 30}`, finding due days max 365
+@@ WITH
+phase 04's `access.assessor_max_days` at most 30, finding due days max 365
+@@ END
+
+@@ BLOCK 24
+### 7.N Route 27: the method and its access events (V-24-07-a MEDIUM, V-24-07-b LOW; DR-413)
+`AssessorService::sample(ctx, id) -> AssessorSampleView` (route 27, `assessor.sample`) reads `SampleRepository::get`. The answer lists ids and ranks, so the list rule of phase 02 applies: `scope.record_hits` writes one `search_hit` event for each restricted or suspicion-tier item, with purpose `supervisory_inspection`, before the response. An item is "viewed" (step 2 of `draw`, DR-226) when the assessor traces it: every node of the trace writes its `view` event (section 3.9). No audit kind is added.
+@@ END
+
+@@ BLOCK 24
+### 7.N Route 9: the list method and its reads (V-24-08-a, MEDIUM; DR-413)
+`GovernanceRegisterService::list(ctx, kind, filter, cursor) -> Page<RegisterView>` (route 9, `register.read`) reads by kind: `findings` and `warnings` with `RegisterRepository::list`; `fairness` with `FairnessRepository::list`; `exclusions` with phase 12's `CoverageRepository::list_exclusions`; `decisions` with `CaseDecisionRepository::register_page(conn, predicate: &VisibilityPredicate, page: Keyset) -> Result<Page<DecisionRegisterRow>, RepoError>`, a method this phase adds to phase 18's repository. `DecisionRegisterRow` holds the columns section 3.4 lists and never `text_enc`. A `kind` outside the five is 422 `E_VALIDATION` `unknown_register_kind`.
+@@ END
+
+V-24-08-c MEDIUM (lead decision: MRO gains the reads the prose promised; see the block below). The route numbers of two sentences are corrected in passing.
+@@ REP 24
+| GET | `/api/v1/registers/{kind}` | `dashboard.read` |
+@@ WITH
+| GET | `/api/v1/registers/{kind}` | `dashboard.read`, `model.risk` |
+@@ END
+@@ REP 24
+| GET | `/api/v1/registers/{kind}/entries/{id}` | `dashboard.read` |
+@@ WITH
+| GET | `/api/v1/registers/{kind}/entries/{id}` | `dashboard.read`, `model.risk` |
+@@ END
+@@ REP 24
+| GET | `/api/v1/registers/review-calendar` | `dashboard.read` |
+@@ WITH
+| GET | `/api/v1/registers/review-calendar` | `dashboard.read`, `model.risk` |
+@@ END
+@@ REP 24
+| GET | `/api/v1/fairness/attributes` | `dashboard.read` |
+@@ WITH
+| GET | `/api/v1/fairness/attributes` | `dashboard.read`, `model.risk` |
+@@ END
+@@ REP 24
+| `/registers` | M, CH, IA, MRO |
+@@ WITH
+| `/registers` | M, CH, IA (MRO reads the registers themselves, not the tile) |
+@@ END
+@@ REP 24
+(route 15; `fairness.review`, roles M and MRO)
+@@ WITH
+(route 14; `fairness.review`, roles M and MRO)
+@@ END
+@@ REP 24
+seeded in 1.4; route 14 reads it
+@@ WITH
+seeded in 1.4; route 15 reads it
+@@ END
+@@ BLOCK 24
+### 7.N MRO reads the registers and the fairness metrics (V-24-08-c, MEDIUM; DR-413)
+Lead decision. Sections 3.5 and 3.15 say MRO reads the registers of exclusions, findings and warnings and the fairness metrics, and MRO writes findings and resolves fairness reviews; the action table and the policies of section 3.12 gave MRO no read. MRO gains it. Routes 9, 11, 13 and 15 accept the scope `model.risk` beside `dashboard.read`, and `60_audit.cedar` gains:
+```cedar
+@id("gov.read.mro") @role("MRO")
+permit (principal, action in [Akr::Action::"register.read", Akr::Action::"fairness.read"], resource)
+when { principal.roles.contains("MRO") };
+```
+The action table row reads: `register.read` and `fairness.read` for M, CH, IA and MRO; `command.read`, `clock.read` and `training.read` for M, CH and IA. For MRO the kind `decisions` of route 9 returns an empty page: its predicate is phase 17's, which admits no case for MRO. Test: `mro@` reads `GET /registers/findings` and `GET /registers/fairness` with 200, gets an empty page from `GET /registers/decisions`, and gets 403 `E_SCOPE` from `GET /dashboard/command-centre`.
+@@ END
+
+V-24-09-a MEDIUM
+@@ REP 24
+later phases add their
+@@ WITH
+this phase's two variants are `ReviewCalendarRed` (source `review_calendar`; title {"ar": "حان موعد المراجعة", "en": "Review due date reached"}) and `FairnessRateReview` (source `fairness`; title {"ar": "معدل مجموعة يحتاج إلى مراجعة إنصاف", "en": "Group rate needs a fairness review"}); later phases add their
+@@ END
+
+V-24-09-b LOW
+@@ REP 24
+jobs (section 1.1), and
+@@ WITH
+jobs (section 4.1), and
+@@ END
+
+@@ BLOCK 24
+### 7.N Control report: the two case-grant counts are read on the app pool (V-24-10-a, HIGH; DR-413)
+`akr_readonly` reads nothing in `casework` (section 1.3), so the two counts of 7.11 cannot run on `readonly_pool`. `AccessHistoryService::control_report` reads them on the app pool with `CaseAccessRepository::manual_grant_counts(conn, from, to) -> Result<(i64, i64), RepoError>` (made, expired), a method this phase adds to phase 18's repository; its query is the one 7.11 gives. Every other count of section 3.2 stays on `readonly_pool`. The sentence of section 3 that every query of sections 3.1 to 3.3 runs on `readonly_pool` reads with this one exception. Test: as `m@`, the report of a month with five manual grants on suspicion-tier cases returns `5`, and no query of the request fails with permission denied.
+@@ END
+
+V-24-10-b LOW
+@@ REP 24
+of the access-request register of phase 18 section 7+.
+@@ WITH
+of the time-boxed manual grants of phase 18 section 7.10.
+@@ END
+
+V-24-11-a MEDIUM
+@@ REP 24
+Status of the caller's own export (New; requester only)
+@@ WITH
+Status of the caller's own export (New; requester only; the Cedar action of the list route the export names)
+@@ END
+@@ REP 24
+access event `export` first (New; requester only)
+@@ WITH
+access event `export` first (New; requester only; the Cedar action of the list route the export names)
+@@ END
+
+@@ BLOCK 24
+### 7.N Export service, its job row and its owner kind (V-24-11-b, V-24-11-d, V-24-11-f, MEDIUM; DR-413)
+- `ExportService` holds the three routes of section 7.12 (`request`, `status`, `file`) and the handler of the job `register_export`. It keeps a closed map in code from the screen ID to the list method of that screen; the phase that owns a REGISTER screen adds its entry, and a screen ID with no entry is 422 at `/register`. This phase's entries: G4 is `GovernanceRegisterService::list` (one export per kind) and G9 is `TrainingRegisterService::list`. G5 holds counts only and G6 is never exported (section 3.1 step 9), so neither has an entry. The job rebuilds the requester's context from `requested_by` and calls the entry.
+- Section 4.1 gains the row: `register_export` | worker | `{ register, filters, format, requested_by }` [`register_export:<export id>`] | 1, 3 | enqueued in the request transaction of `POST /exports`; the export id is the job id.
+- Section 4.5 item 1 and Open doubts 29: `register_export` is a third owner kind of phase 02's evidence registry, beside `validation_pack` and `training_record`. Its `EvidenceResolver` is this phase's and admits the requester alone.
+@@ END
+
+V-24-11-c, V-24-11-g MEDIUM
+@@ REP 24
+= the export id, and is served only once clean.
+@@ WITH
+= the export id, retention class `R6` for the kind `decisions` and `R9` for every other register of this phase, classification `restricted` (a file holds whatever rows the requester may read), and is served only once clean: while the scan is pending or the file is not clean, the file route answers 404 `E_NOT_FOUND` and the status route shows the state.
+@@ END
+
+@@ BLOCK 24
+### 7.N Explanation: the method, the guarded write and the note scan (V-24-12-a, V-24-12-b, V-24-12-c, MEDIUM; DR-413)
+`ParallelRunService::explain(ctx, row_id, code, note)` (the explanation row of section 7.13, `parallel_run.write`) runs step 3 in this order: the note passes `PolicyPackService::scan` (phase 09, scope `reason_text`; a forbidden term is 422 `E_VALIDATION` `forbidden_term`), as the DDL comment says; then `ParallelRunRepository::explain(tx, row_id, code, note, by, at) -> Result<u64, RepoError>` runs one UPDATE with `WHERE id = $1 AND explanation_code IS NULL AND outcome IN ('akr_only', 'incumbent_only')`. Zero rows updated is 409 `E_NOT_ALLOWED_IN_STATE` (404 `E_NOT_FOUND` when the row is absent or outside the caller's party visibility), so the second of two explainers is refused and nothing is overwritten. `ParallelRunRepository` is this phase's repository of `alert.parallel_run_rows`; it also holds `insert_rows(tx, rows)`, `rows(conn, filter, predicate, page)`, `import_status(conn, import_id, predicate)` and `summary(conn, predicate)` for steps 2, 4 and 5.
+@@ END
+
+@@ BLOCK 24
+### 7.N Parallel-run policies (V-24-12-e, LOW; DR-413)
+Section 3.12 gains `entity ParallelRunRow = { outcome: String, explained: Bool };` and, in `C0_governance.cedar`, one role per policy:
+```cedar
+@id("parallel_run.read.m") @role("M")
+permit (principal, action == Akr::Action::"parallel_run.read", resource) when { principal.roles.contains("M") };
+@id("parallel_run.read.ch") @role("CH")
+permit (principal, action == Akr::Action::"parallel_run.read", resource) when { principal.roles.contains("CH") };
+@id("parallel_run.write.m") @role("M")
+permit (principal, action == Akr::Action::"parallel_run.write", resource) when { principal.roles.contains("M") };
+```
+@@ END
+
+V-24-11-f (the registry table of phase 02 names the kinds of this phase)
+@@ REP 02
+| `validation_pack`, `training_record` | 24 | - |
+@@ WITH
+| `validation_pack`, `training_record`, `register_export` | 24 | - |
+@@ END

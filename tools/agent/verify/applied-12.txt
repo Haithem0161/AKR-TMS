@@ -1,0 +1,97 @@
+Fixes applied to docs/plan/phase-12.md by the verification pass (DR-413). 20 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/06.txt)
+OLD: Attributes evaluated: role membership, `principal.active`,
+NEW: Attributes evaluated: role membership, `principal.status`,
+
+=== F2 BLOCK (from fixes/11.txt)
+### 7.N Values of the quarantine gate (V-11-06-a, MEDIUM; DR-413)
+`gate` (section 3.11; phase 11 section 7+) has two values, derived when the row is read and never stored: `txn_type`
+for a row whose `reason_code` is `unmapped_code` and whose `detail.field` is `txn_type`, and `none` for every other
+row, so the Cedar attribute is always a string. A card-guard row is known by its `reason_code` `card_guard`, not by
+the gate: the service refuses its exclusion with `card_guard_not_excludable` after the policy decision.
+
+=== F3 REP (from fixes/12.txt)
+OLD: 9. One transaction: `evaluate`, `complete` with
+NEW: 9. One transaction: `evaluate`, the issue upserts of step 8 (their audit event is this step's `recon.completed`, whose `open` and `source_anomaly` counts per rung are the issues written), `complete` with
+
+=== F4 REP (from fixes/12.txt)
+OLD: and is signed by the bank (else 422 reason `document_required`).
+NEW: and is signed by the bank, that is of kind `exception_signed` (phase 05 `SourceDocumentKind`; else 422 reason `document_required`).
+
+=== F5 REP (from fixes/12.txt)
+OLD: `ChangeRequestService::submit` with object kind `known_adjustment`, object key `dq_issue:<id>`, the proposal in the
+NEW: `ChangeRequestService::create(origin = Dedicated)`, which continues with `submit` in the same transaction (phase 04 section 3.2), with object kind `known_adjustment`, object key `dq_issue:<id>`, the proposal in the
+
+=== F6 REP (from fixes/12.txt)
+OLD: `ChangeRequestService::submit` with object kind `exclusion`, object key `exclusion:<source>:<unit>:<unit_ref>`.
+NEW: `ChangeRequestService::create(origin = Dedicated)`, which continues with `submit` in the same transaction (phase 04 section 3.2), with object kind `exclusion`, object key `exclusion:<source>:<unit>:<unit_ref>`.
+
+=== F7 REP (from fixes/12.txt)
+OLD: `card_guard_not_excludable` for a card reason (card data is fixed at source)
+NEW: `card_guard_not_excludable` for a row whose `reason_code` is `card_guard`, the phase 10 row failure that phase 11 writes as a `row_failed` row (card data is fixed at source)
+
+=== F8 REP (from fixes/12.txt)
+OLD: `excluded`, `open` or `retried` to
+NEW: `excluded`;
+
+=== F9 REP (from fixes/12.txt)
+OLD: `assigned`; `excluded` to anything is refused;
+NEW: `excluded` to anything is refused; an assign of an `open` or `retried` row sets its owner and keeps its status;
+
+=== F10 REP (from fixes/12.txt)
+OLD: A reconciliation run for a restore gap is therefore valid as it stands.
+NEW: A reconciliation run for a restore gap is therefore valid as it stands. Phase 30 inserts the run row and queues the `recon_run` job itself, as `recon_sweep` step 1 does, so the route checks of `POST /recon/runs` step 1 (`source_not_active`, `no_batches`) do not run for it.
+
+=== F11 REP (from fixes/12.txt)
+OLD: shows as a break, which is the intended result: the break is
+NEW: shows as a break when some of its batches are in and as `source_anomaly` with `no_batches` (section 3.1 `recon_run` step 2) when none is, which is the intended result: the gap is
+
+=== F12 REP (from fixes/12.txt)
+OLD: signed_document_id, change_request_id, due_at, updated_at, version) ON admin.dq_issues TO akr_app;
+NEW: signed_document_id, change_request_id, due_at, updated_at, version, detail, count, last_seen) ON admin.dq_issues TO akr_app;
+
+=== F13 REP (from fixes/12.txt)
+OLD: -- akr_app assigns, resolves, accepts and expires; nobody deletes.
+NEW: -- akr_app assigns, resolves, accepts (writing detail.accepted_delta) and expires, and upserts the recon breaks of
+-- recon_run (count, last_seen); nobody deletes.
+
+=== F14 REP (from fixes/12.txt)
+OLD: `akr_app` assigns, resolves, accepts, expires; `akr_ingest` upserts counts
+NEW: `akr_app` assigns, resolves, accepts, expires and upserts the recon breaks of `recon_run`; `akr_ingest` upserts counts
+
+=== F15 BLOCK (from fixes/12.txt)
+### 7.N The latest recon result of an issue (V-12-10-b, V-12-10-c, MEDIUM; DR-413)
+`ReconRepository` gains one read:
+`async fn latest_result(&self, conn: &mut PgConnection, source_id: Uuid, rung: Rung, object: &str, group_key: &GroupKey) -> Result<Option<ReconResult>, RepoError>;`
+It returns the `recon_results` row with this rung, object and group key from the completed run of the source with the
+newest `finished_at`, or `None`. In block 7.5, "the latest recon result for its object and field" is this read: the
+issue stores its object as `<rung>:<object>` (section 3.1 `recon_run` step 8), which the caller takes apart, and its
+field is the group key. An issue of another kind than `recon_break` has no recon result; for it, and whenever the read
+returns `None`, `activate` writes no `accepted_delta`.
+
+=== F16 REP (from fixes/12.txt)
+OLD: `DqIssueRepository::accepted_for` takes the field
+NEW: `DqRepository::accepted_for` takes the field
+
+=== F17 REP (from fixes/12.txt)
+OLD: `accepted_for(source, object, kind = recon_break)`
+NEW: `accepted_for(source, <rung>:<object>, kind = recon_break)`
+
+=== F18 REP (from fixes/12.txt)
+OLD: source table, landed object or the rung of a break
+NEW: source table, landed object or `<rung>:<object>` of a recon break
+
+=== F19 REP (from fixes/12.txt)
+OLD: for an accepted issue of the same object and
+NEW: for an accepted issue of the same stored object (`<rung>:<object>`, section 3.1 `recon_run` step 8) and
+
+=== F20 BLOCK (from fixes/12.txt)
+### 7.N Blind periods that cover a date (V-12-12-a, MEDIUM; DR-413)
+`CoverageRepository` gains one read, used by section 3.7 step 5 and by the certificate of section 3.8:
+`async fn blind_periods_covering(&self, conn: &mut PgConnection, source: Uuid, as_of: NaiveDate) -> Result<Vec<BlindPeriod>, RepoError>;`
+It reads `admin.blind_periods` (phase 11's table; `akr_app` holds SELECT) and returns the periods of scope `system`
+and the periods of scope `source` of this source that cover `as_of` by the rule of block 7.6. `BlindPeriod` is the
+phase 11 entity. Nothing is written.

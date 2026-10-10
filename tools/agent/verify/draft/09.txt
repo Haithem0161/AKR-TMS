@@ -1,0 +1,87 @@
+@@ REP 09
+and stored with its variant name.
+@@ WITH
+and stored in `hijri_label` with its variant name inside the label text (no separate column).
+@@ END
+# V-09-01-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `hijri_label` phase-09.md:128; `calendar_day.propose` phase-09.md:722-724 (the sentence sits in section 3.3, not section 1); `HijriVariant` phase-09.md:434 | NEW: none (reuse before add: the existing text column carries the variant; the lead may prefer a separate `hijri_variant` column instead, which would need a DDL line in section 1, and the GRANT at phase-09.md:215 and the column list at :243 would change)
+
+@@ BLOCK 09
+### 7.N Clock method name in phases 00 and 04 (V-09-01-d, MEDIUM; DR-413)
+Section 4, phase 00 and phase 04 bullets: this phase renames the `BusinessClock` method to
+`add(from, n, unit) -> Result<ClockResult, ClockError>` (section 2). The phase 00 trait line (its section 3, `add_working`)
+and the two phase 04 calls (`clock.add_working` in phase 04 section 3.2, `BusinessClock::add_working` in phase 04 section 3.6
+for the task due date) change to `add`, and each call handles the `Result`.
+@@ END
+# V-09-01-d | MEDIUM | names used and where they exist: `BusinessClock::add` phase-09.md:459; `add_working` phase-00.md:567 and phase-04.md:923, :1108; `add` already used by phase-17.md:2030 | NEW: none
+
+@@ BLOCK 09
+### 7.N CaptureRun fields (V-09-01-e, LOW; DR-413)
+Section 2, `CaptureRepository::latest_run`: `CaptureRun` is a read of the phase 05 `admin.discovery_runs` row with the
+fields `id`, `source_id`, `status` and `finished_at`.
+@@ END
+# V-09-01-e | LOW | names used and where they exist: `admin.discovery_runs` phase-05.md:258 (columns id, source_id, status, finished_at); `latest_run` phase-09.md:530 | NEW: none (CaptureObject not fixed: its two values are the CHECK at phase-09.md:146, so that half of the claim is refuted)
+
+@@ BLOCK 09
+### 7.N Error codes missing from the section 3.8 table (V-09-01-b, V-09-04-b, V-09-05-a, V-09-09-a, MEDIUM; DR-413)
+The `E_VALIDATION` row of section 3.8 ("Document, template, switch or expiry validation") gains these `errors[]` codes, each with the JSON pointer of the offending key or value:
+- Calendar (section 3.3): `E_SCHEMA` for a weekend list that is not a subset of `1..=7` of size 1 to 3; `week_too_short` (fewer than three working days); `unknown_currency`; `duplicate_entry` (the same `(on_date, kind)` twice in one request); `ramadan_order` (`from` not before `to`); `too_many_rows` (above 400 per request).
+- Authority matrix (section 3.6): `E_SCHEMA` for a `max_priority` outside the four classes and for a `second_review` that is not a boolean; `max_days_out_of_bounds` (outside `1..=delegation.max_days`).
+- Policy pack (section 3.5): `clock_out_of_bounds` (step 2); `inactive_reason_code` and `unknown_matrix_version` (step 4); `placeholder_not_allowed` (step 5); `duplicate_entry` (step 5 template keys, step 6 term ids); `empty_forbidden_list` (step 6).
+- A `fixed` clock or switch that the document omits: 422 `E_VALIDATION` with `fixed_key_missing` (steps 2 and 3). The bootstrap file carries every `fixed` key.
+@@ END
+# V-09-01-b, V-09-04-b, V-09-05-a, V-09-09-a | MEDIUM (all four) | names used and where they exist: `E_VALIDATION` with errors[] phase-09.md:926; `ValidationError { pointer, code, params }` phase-00.md:445; `E_SCHEMA` DSL.md:1096 (reused for the weekend list size and subset, max_priority and second_review); `unknown_key` phase-09.md:801 (style of the snake_case codes); `delegation.max_days` phase-03.md:938; `budget_out_of_bounds` phase-05.md:1240 (style of `<name>_out_of_bounds`) | NEW: `duplicate_entry`, `week_too_short`, `unknown_currency`, `ramadan_order`, `too_many_rows`, `max_days_out_of_bounds`, `clock_out_of_bounds`, `inactive_reason_code`, `unknown_matrix_version`, `placeholder_not_allowed`, `empty_forbidden_list`, `fixed_key_missing` (no DSL code names a currency, a matrix, bounds or a row count; E_DANGLING_REF names calendars and roles but no currency or matrix; E_PARAM_OUT_OF_BOUNDS is scenario-only; E_SCHEMA would fit an absent fixed key only if the schema marked it required, and that schema is not defined, phase-09.md:400). Convention to confirm: API.md:985 says errors[] takes DSL codes, but phase-09.md:926 uses snake_case codes; the block follows phase 09. The unknown-role refusal of V-09-04-b is not in the block (refuted part: E_DANGLING_REF covers it)
+
+@@ REP 09
+with the estimate in the body (phase 04 pattern).
+@@ WITH
+with the estimate in the body (API.md section 6).
+@@ END
+# V-09-05-b | LOW | grep -c -F gave 1 | names used and where they exist: `E_COST_GUARD` API.md:992 (section 6, "estimate in the body"); phase-11.md:1062 uses the same code for replays and cites it as API.md s.6 | NEW: none
+
+@@ BLOCK 03
+### 7.N Delegation is refused until the first matrix is signed (V-09-04-a, HIGH; DR-413)
+DR-83 governs: delegations are refused until the first authority matrix is signed (phase 09 section 3.6, step 1). This replaces the step 3 rule of phase 03 section 3.9 (`DelegationAuthority::check`, "`NoMatrix` passes") and the `None` path of phase 03 section 7.6. `NoMatrix` is a refusal: 422 `E_VALIDATION` at `/roles` with `no_matrix` (phase 09 section 3.8). The port's window method is `window_limit_days(roles: &[RoleCode]) -> Result<u32, DelegationRefusal>` (phase 09 section 2). Step 2 caps the window at `min(delegation.max_days, n)` in every case. The phase 03 test that expects `NoMatrix` to pass asserts the refusal.
+@@ END
+# V-09-04-a | HIGH | names used and where they exist: `DelegationRefusal::NoMatrix` phase-09.md:469 and :874; `window_limit_days` phase-09.md:467 (Result form); `no_matrix` at `/roles` phase-09.md:930 (3.8 row "Delegation refused by the matrix"); `DelegationService` create step 2 phase-03.md:938 and step 3 phase-03.md:939-941; `DelegationAuthority` port in phase 03 section 2 phase-03.md:461-463; DR-83 docs/plan/research.md:94 (refusal until the first matrix is signed) | NEW: none (the fix sits in phase 03 because the wrong text is there; phase 09 already holds the right rule)
+
+@@ BLOCK 09
+### 7.N Fields of PolicyPackSummary and Validated (V-09-05-c, LOW; DR-413)
+`PolicyPackSummary` (the list rows of `PolicyPackRepository::list` in section 2) is the `PolicyPackView` of section 2 without `document`: `version`, `sha256`, `origin`, `approved_by` (display name) and `effective_from`. `Validated`, the success result of `PolicyValidator::validate` in section 3.5, holds the canonical `document`, its `content_sha256` (validation step 8), the `changed_keys` (step 9) and the warnings of step 6.
+@@ END
+# V-09-05-c | LOW | names used and where they exist: `PolicyPackView` phase-09.md:573 (version, document, sha256, origin, approved_by, effective_from); `PolicyPackRepository::list` phase-09.md:547 (returns PolicyPackSummary); `Validated` phase-09.md:799; `ValidationIssue` phase-16.md:922 (`{ path, code, message, severity }`), phase-04.md:768 (re-exported as WfValidationIssue); API `ValidationError { pointer, code, params }` phase-00.md:445 | NEW: none. The HistorySample and NewPolicyPack parts are refuted and not fixed. Not fixed, lead decides: which ValidationIssue the validator returns (option A: the phase 16 DSL type, mapped to the API's ValidationError at the 422; option B: the phase 00 ValidationError returned directly, with no severity)
+
+@@ BLOCK 09
+### 7.N Signature check before the reference seed writes (V-09-08-a, MEDIUM; DR-413)
+Section 3.1, `akr-ctl ref seed` (section 4), gains a first step before any write: verify the release manifest signature (phase 00 release signing) and the SHA-256 of each release file against its manifest entry. A mismatch exits 1 and writes nothing, as the catalogue seed does in phase 06 section 3.1 step 1.
+@@ END
+# V-09-08-a | MEDIUM | names used and where they exist: `signature` rule phase-00.md:752-753 (bundle verify checks the manifest signature); phase 06 section 3.1 step 1 phase-06.md:510-511 (the check copied); `ref seed` phase-09.md:612-613; `verify-data` SHA-256 only phase-09.md:1193 | NEW: none. Alternative not chosen: the seed runs only after `bundle verify`, which needs the reference packs in the signed bundle list of phase 00 (phase-00.md:748-750 names adapter packs only), so that is a phase 00 change. The `verify-data` command has the same SHA-256-only gap; not in this block.
+
+@@ BLOCK 09
+### 7.N Keys of the reference release files (V-09-08-b, HIGH; DR-413)
+Each release file of `backend/packs/reference/` carries its `release_id` (1 to 64 characters, section 1) and the rows of one table. A `countries` row carries `iso2`, `name`, `risk_level` and `basis`; a `governorates` row carries `code`, `name` and `region`; a `currencies` row carries `code`, `minor_unit`, `name` and `is_active`. These are the section 1 columns that a release sets; `version` and `updated_at` are set by the seed and are not keys. `reference-release.v1.json` is closed and validates exactly these keys.
+@@ END
+# V-09-08-b | HIGH | names used and where they exist: `ref.countries` phase-09.md:37-44 (release_id :42); `ref.governorates` :69-75 (release_id :73); `ref.currencies` :77-84 (release_id :82); `reference-release.v1.json` phase-09.md:399; "each with its release_id" phase-09.md:613 (the one-file-per-table layout is read from it; the lead should confirm); `reason-codes.v1.json` phase-09.md:743 | NEW: none. Not fixed, lead decides: (1) the manifest format: option A reuses the phase 00 bundle manifest of SHA-256 digests (phase-00.md:750); option B is a separate signed reference manifest of {file, sha256} entries; (2) the keys of `reason-codes.v1.json` (phase-09.md:743) and the default calendar's release data (phase-09.md:720, :1191), which the plan names but does not specify
+
+@@ BLOCK 09
+### 7.N Later reference releases: new, changed and unchanged rows (V-09-08-c, MEDIUM; DR-413)
+Section 3.1 seed, for a release after the first: a key the table does not hold is inserted with the release's `release_id`. A row whose content differs is updated (`IS DISTINCT FROM`, the rule of section 2 `upsert_days`) with the new `release_id` and `updated_at`; a changed `countries` row also bumps `countries.version`, since governorates and currencies have no version column (section 1). An identical row is not written and keeps its version and `release_id`.
+@@ END
+# V-09-08-c | MEDIUM | names used and where they exist: `countries.version` phase-09.md:37-44 and its UPDATE grant phase-09.md:206; governorates and currencies without version phase-09.md:69-84; `IS DISTINCT FROM` rule phase-09.md:563; `upsert_days` phase-09.md:523; second-run rule phase-09.md:1191-1192; audit counts already stated at phase-09.md:946 (refuted part); no-delete rule phase-09.md:34-35 | NEW: none. Not fixed, lead decides: a removed entry (a key the table holds that the later release omits). Option A: leave the row as it is and list it in the seed output, since reference rows are never deleted (phase-09.md:34-35). Option B: refuse the release until a change request ends the row (phase 04).
+
+@@ BLOCK 09
+### 7.N Owners of the seed and of verify-data (V-09-08-d, LOW; DR-413)
+Section 2, "Crate placement": `ref seed` and `ref verify-data` are operations of `ReferenceService` (section 3.1), which also holds the reason-code seed (section 3.4); `policy-pack seed` is an operation of `PolicyPackService` (section 3.5). The `ctl` commands of section 4 call those services with the release directory.
+@@ END
+# V-09-08-d | LOW | names used and where they exist: `ReferenceService` phase-09.md:610 (3.1 heading) and :734 (3.4 heading); `PolicyPackService` phase-09.md:760 (3.5 heading); "Crate placement" phase-09.md:391; the ctl commands phase-09.md:420 and :1051 | NEW: none
+
+@@ BLOCK 09
+### 7.N Backward walk: earliest day and its error (V-09-11-a MEDIUM, V-09-11-b LOW; DR-413)
+In section 7.4 the last sentence is replaced. The backward walk has a lower bound `covered_from`, the earliest active row date of any kind in the calendar (the mirror of `covered_until`, section 3.3 step 4). The backward load reads the closed days from `d - (3n + 14)` days to `d`. A walk that passes `covered_from` before `n` is reached returns `ClockError::BeforeCoverage` (a new variant of `ClockError`). Unlike the forward walk (section 3.3 step 7), it returns no flagged date.
+@@ END
+# V-09-11-a, V-09-11-b | MEDIUM (a), LOW (b) | names used and where they exist: `covered_until` phase-09.md:698 and :706 (forward bound, the mirror); `working_days_back` phase-09.md:1306; `ClockError` phase-09.md:459 (named with no variants); `days_between` phase-09.md:519 (range method, no earliest-date method) | NEW: `covered_from` (earliest-date bound, the mirror of covered_until; no plan name exists) and `ClockError::BeforeCoverage` (no variant of ClockError is named anywhere in the plan)
+
+# DECIDE V-09-03-a | option A: the pack holds queue routing as a key (for example `routing`) that names queue codes and pool ids, both checked by section 3.5 step 4, and phase 17 reads it for the alert pool in place of the `casework.queues` filter (evidence docs/plan/phase-09.md:762-763, :800-806, :814; docs/plan/phase-17.md:1053); this clashes with phase 17's rule that queues change only through `queue_definition` unless the key only names queues (docs/plan/phase-17.md:1180) | option B: the pack holds no queue routing: "Routing" leaves "What a pack holds" (docs/plan/phase-09.md:762-763), the one routing switch `branch_first_routing` stays fixed at false (docs/plan/phase-09.md:775), steps 4 and 9 of section 3.5 drop the queue and routing items, and queues stay in the phase 17 `queue_definition` target (docs/plan/phase-17.md:1180)
+# DECIDE V-09-06-a | option A: each kind-level item carries one fixed `object_id` per kind (section 3.7 requires one validator approval per kind before the first change of that kind, docs/plan/phase-09.md:896-897), and phase 04 section 3.2 step 3 maps an `object_key` to the item of its kind; no column changes, so this reuses `object_id` (docs/plan/phase-04.md:516, :533, :886-887) | option B: phase 04's inventory table gains a nullable `object_key` and the gate looks up `(kind, object_key)`; `Prepared` already carries `object_key` as a string (docs/plan/phase-04.md:658), but the table changes (docs/plan/phase-04.md:512-534)
+# DECIDE V-09-07-a | option A: a save-time scan reads the active version; `scan(scope, text)` keeps its signature, and a term added today also blocks new saves on open cases (docs/plan/phase-09.md:797) | option B: the scan reads the calling case's pinned version (pinning at docs/plan/phase-09.md:831 and docs/plan/phase-17.md:306), so `scan` gains a version input and every caller passes it: phase 18 (docs/plan/phase-18.md:668), phase 19 (docs/plan/phase-19.md:1074), and the callers in phases 20, 21, 22, 23, 24 and 28 (docs/plan/phase-20.md:570, docs/plan/phase-21.md:931, docs/plan/phase-22.md:494)
+# REFUTED V-09-01-c, V-09-02-a, V-09-02-b, V-09-04-c: no fix or note written, as the refuter's verdicts stand (the parts of V-09-01-c and V-09-02-a that the refuter flagged as wording points are left to the lead)
+# SUMMARY: fixes written 12 (REP 2, BLOCK 10); DECIDE 3; DROP 0; claims covered: V-09-01-a, V-09-01-b, V-09-01-d, V-09-01-e, V-09-03-a, V-09-04-a, V-09-04-b, V-09-05-a, V-09-05-b, V-09-05-c, V-09-06-a, V-09-07-a, V-09-08-a, V-09-08-b, V-09-08-c, V-09-08-d, V-09-09-a, V-09-11-a, V-09-11-b (all 15 PARTLY and all 4 STANDS)

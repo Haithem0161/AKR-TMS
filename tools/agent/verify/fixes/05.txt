@@ -1,0 +1,28 @@
+Fixes for the claims of tools/agent/verify/phase-05.md (Haiku draft tools/agent/verify/draft/05.txt, lead-reviewed).
+@@ REP 05
+stores it through `EvidenceStore::stage` with owner kind `source`,
+@@ WITH
+stores it through `EvidenceStore::put_generated` (the worker's path for generated output; `stage` is for uploads through akr-api) with kind `render` and owner kind `source`,
+@@ END
+@@ BLOCK 05
+### 7.N Permits in use at a listener reload (V-05-08-a, MEDIUM; DR-413)
+A rebuild of a `LoadGovernor` (the reload of 7.8 and the rebuilds on NOTIFY in section 3.5) does not release a permit
+that is already out. The permit's session still counts against `max_sessions` in the rebuilt governor (section 3.5
+step 3), and the rebuilt rate bucket keeps the level it had (step 4). A rebuild therefore grants no session and no
+rows per minute that the budget does not allow.
+@@ END
+@@ REP 05
+VD-02 (each mapping from the bank's own dictionary, comments and samples, under change control)
+@@ WITH
+VD-02 (partly: this phase reads the inputs to each mapping, the bank's dictionary, column comments, value lists and candidate columns; the mapping itself is written by its author in the phase 10 workbench and published under `cr_mapping`)
+@@ END
+@@ BLOCK 05
+### 7.N Coverage gap and backfill: the blind period, not the pause row (V-05-11-a, MEDIUM; DR-413)
+The coverage gap is the source blind period of `admin.blind_periods` (phase 11 section 3.6, cause `source_paused`).
+Phase 11 opens it in the transaction of the pause, the bank pause or the refusal, and phase 12 reads that period
+(its section 3.10), not `admin.source_pauses`. No backfill is planned from the pause row: phase 11 builds none (its
+7.4, DR-380), and a paused interval is caught up by the automatic catch-up on resume (C-16). `admin.source_pauses`
+stays the record of who paused a source, when and why. This block replaces each base sentence that says the pause row
+feeds a coverage gap or a backfill: the C-15 item of the header, the section 1 prose and SQL comment, the resume
+paragraph of section 3.1 and the "Paused by the bank" paragraph of section 3.5.
+@@ END

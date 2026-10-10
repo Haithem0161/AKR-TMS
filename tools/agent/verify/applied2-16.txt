@@ -1,0 +1,48 @@
+Replacements made in docs/plan/phase-16.md by the first re-check (DR-413). 8 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-16-1]
+WHY: R-16-1 | CONFIRMED LOW | "the four entry points of section 3.2": one of them is in section 3.6 | pointer
+OLD: adds the four entry points of section 3.2 to phase 13's module
+NEW: adds the four entry points of sections 3.2 and 3.6 to phase 13's module
+
+=== F2 [R-16-2]
+WHY: R-16-2 | CONFIRMED LOW | 7.15 calls every set inside the band that does not loosen "minor"; a `capacity` reason is at least material | clause narrowed
+OLD: a set inside the band that does not loosen is minor and needs a replay;
+NEW: a set inside the band that does not loosen and has no `capacity` reason is minor and needs a replay;
+
+=== F3 [R-16-3a]
+WHY: R-16-3 | CONFIRMED LOW (raised MEDIUM) | the route row and a column comment still say the test route runs unit and seeded cases; 7.17 makes it unit cases only | both lines corrected
+OLD: | Unit and seeded cases of the draft; `draft` to `testing` on pass
+NEW: | Unit cases of the draft (7.17; seeded cases run by section 3.12); `draft` to `testing` on pass
+
+=== F4 [R-16-3b]
+WHY: R-16-3 | CONFIRMED LOW (raised MEDIUM) | the route row and a column comment still say the test route runs unit and seeded cases; 7.17 makes it unit cases only | both lines corrected
+OLD: -- set when the unit and seeded cases pass (DSL A.9)
+NEW: -- set when the unit cases pass (7.17; DSL A.9)
+
+=== F5 [R-16-4a]
+WHY: R-16-4 | CONFIRMED MEDIUM | `touch_id` on `scn.scenario_runs` exists only in the prose of 7.9; the CREATE TABLE and the unique index of migration 0055 do not have it | column, CHECK and index written into the migration text
+OLD:     batch_id                UUID,                                   -- canon.touched batch (incremental, settled, shadow)
+NEW:     batch_id                UUID,                                   -- canon.touched batch (incremental, settled, shadow)
+    touch_id                UUID,                                   -- the touch of that batch which started the run (7.9)
+
+=== F6 [R-16-4b]
+WHY: R-16-4 | CONFIRMED MEDIUM | `touch_id` on `scn.scenario_runs` exists only in the prose of 7.9; the CREATE TABLE and the unique index of migration 0055 do not have it | column, CHECK and index written into the migration text
+OLD:     CHECK (batch_id IS NULL OR mode IN ('incremental', 'settled', 'shadow')),
+NEW:     CHECK (batch_id IS NULL OR mode IN ('incremental', 'settled', 'shadow')),
+    CHECK (touch_id IS NULL OR batch_id IS NOT NULL),
+
+=== F7 [R-16-4c]
+WHY: R-16-4 | CONFIRMED MEDIUM | `touch_id` on `scn.scenario_runs` exists only in the prose of 7.9; the CREATE TABLE and the unique index of migration 0055 do not have it | column, CHECK and index written into the migration text
+OLD: -- A batch is run once per version and mode: a second delivery of the same canon.touched event finds the row and stops
+NEW: -- A touch of a batch is run once per version and mode (7.9): a second delivery of the same canon.touched event finds the row and stops
+
+=== F8 [R-16-4d]
+WHY: R-16-4 | CONFIRMED MEDIUM | `touch_id` on `scn.scenario_runs` exists only in the prose of 7.9; the CREATE TABLE and the unique index of migration 0055 do not have it | column, CHECK and index written into the migration text
+OLD: CREATE UNIQUE INDEX IF NOT EXISTS uq_scenario_runs_batch ON scn.scenario_runs (scenario_version_id, mode, batch_id)
+    WHERE batch_id IS NOT NULL;
+NEW: CREATE UNIQUE INDEX IF NOT EXISTS uq_scenario_runs_batch ON scn.scenario_runs (scenario_version_id, mode, touch_id)
+    WHERE touch_id IS NOT NULL;

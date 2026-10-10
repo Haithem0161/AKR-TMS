@@ -1,0 +1,357 @@
+# Fixes for the claims of tools/agent/verify/refute-25.md (phase 25). Fix drafter output; the lead reviews each entry before it is applied.
+@@ REP 25
+is called only by `activate` (step 6 below) and by the case read path that already exists (phase 17).
+@@ WITH
+is called by no step of this phase: activation does not look at the case (step 8, DR-233).
+@@ END
+# V-25-01-a | HIGH | grep -c -F gave 1 | names used and where they exist: `CaseExistence` phase-25.md:756 (the struct field `cases` has no caller left after this fix); step 8 phase-25.md:786; DR-233 phase-25.md:1429 | NEW: none
+
+@@ REP 25
+A request in `requested` may be ended by the requester (status `lapsed`, log `lapsed`).
+@@ WITH
+A request in `requested` may be ended by the requester (status `lapsed`, log `lapsed`, audit `break_glass.lapsed`). A grant in any other status is refused with `E_NOT_ALLOWED_IN_STATE` (409).
+@@ END
+# V-25-01-b, V-25-01-d | MEDIUM | grep -c -F gave 1 | names used and where they exist: `E_NOT_ALLOWED_IN_STATE` API.md:982 and the 3.11 row phase-25.md:983; `break_glass.lapsed` phase-25.md:1152; End paragraph phase-25.md:796 | NEW: none (no sub-code: no entry of the closed list fits the End refusal)
+
+@@ REP 25
+| `break_glass.lapsed` | request not approved within its lifetime (sweep) | break_glass | yes |
+@@ WITH
+| `break_glass.lapsed` | request not approved within its lifetime (sweep), or ended by its requester | break_glass | yes |
+@@ END
+# V-25-01-d | MEDIUM | grep -c -F gave 1 | names used and where they exist: `break_glass.lapsed` phase-25.md:1152 (the existing kind; the requester's end sets the same status `lapsed` and log kind, so the kind is reused); End paragraph phase-25.md:796 | NEW: none
+
+@@ REP 25
+An approver holding both must name the role.
+@@ WITH
+An approver holding both must name the role, and one who names none is refused with `E_VALIDATION`, sub-code `approver_role_required` (422).
+@@ END
+# V-25-01-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: `E_VALIDATION` API.md:985 and the 3.11 row phase-25.md:982; `approver_role_mismatch` phase-25.md:785 (step 7, not reused here: it describes the second approval) | NEW: `approver_role_required` (listed in the 3.11 sub-code BLOCK below)
+# DECIDE V-25-01-c (the named role the approver does not hold; step 5 says "when given and held ... else the one role") | A: keep the fallback the text gives: the approval records the one role the approver holds (evidence phase-25.md:783) | B: refuse with `E_VALIDATION`, sub-code `approver_role_mismatch` (already in the 3.11 list, phase-25.md:982, and used by step 7 at phase-25.md:785), so the record never shows a role other than the one named (evidence phase-25.md:783, :785)
+
+@@ REP 25
+by reading it under an active grant (Open doubts 14).
+@@ WITH
+by reading it under an active grant (Open doubts 6).
+@@ END
+# V-25-01-h | LOW | grep -c -F gave 1 | names used and where they exist: `Open doubts 6` phase-25.md:1464 ("What the approvers and the requester learn"); `Open doubts 14` phase-25.md:1472 is the apply record, not this point | NEW: none
+
+@@ BLOCK 25
+### 7.N Step-up action constants (V-25-01-e, MEDIUM; DR-413)
+Each step-up call of this phase uses a declared action, in the form of phase 22 section 3.6 (`StepUpAction { name, class }`; the classes are the closed list of phase 01). `BREAK_GLASS_REQUEST` (section 3.2 Request) is `StepUpAction { name: "break_glass.request", class: break_glass }`, the name of its Cedar action. `BREAK_GLASS_APPROVE` is `{ name: "break_glass.approve", class: break_glass }` (3.2 Approve). `ACCESS_REVIEW_SIGN` is `{ name: "access_review.sign", class: approval }` (3.1 Sign). `RELEASE_APPLIED` is `{ name: "release.applied", class: approval }` (3.6 Applied). `SUPPORT_SESSION_APPROVE` is `{ name: "support_session.approve", class: access_change }` (3.8 Approve). `SUPPORT_BUNDLE_REGISTER` is `{ name: "support_bundle.register", class: export }` (3.8 Support bundle).
+@@ END
+# V-25-01-e | MEDIUM | names used and where they exist: `StepUpAction { name, class }` phase-01.md:711 (form and closed classes); `StepUpAction { name: "branch.monthly.sign", class: signing }` phase-22.md:548 (form); `StepUpAction::BREAK_GLASS_REQUEST` phase-25.md:771; actions in prose phase-25.md:737, :778, :901, :935, :946; Cedar action names phase-25.md:1003 and :1050 | NEW: `BREAK_GLASS_REQUEST`, `BREAK_GLASS_APPROVE`, `ACCESS_REVIEW_SIGN`, `RELEASE_APPLIED`, `SUPPORT_SESSION_APPROVE`, `SUPPORT_BUNDLE_REGISTER` are declared here: the plan uses `BREAK_GLASS_REQUEST` but declares it nowhere, and the others are named only in prose, so their constant names are new; the action strings are the plan's own
+
+@@ REP 25
+settings: Arc<SettingsService>, cfg: Arc<OidcUpstreamConfig> }
+@@ WITH
+settings: Arc<SettingsService> }
+@@ END
+# V-25-01-f | LOW | grep -c -F gave 1 | names used and where they exist: `BreakGlassService` struct phase-25.md:756-757; no step of section 3.2 reads an upstream setting (steps at phase-25.md:771-796); `OidcUpstream` phase-25.md:820 | NEW: none
+
+@@ REP 25
+`OidcUpstream` is configuration, not a service:
+@@ WITH
+`OidcUpstream` is the read-only configuration struct of section 4.3, not a service:
+@@ END
+# V-25-05-d | LOW | grep -c -F gave 1 | names used and where they exist: `OidcUpstream` heading phase-25.md:818 and prose phase-25.md:820; `oidc_config` phase-25.md:1245 | NEW: none (the type takes the name the section already uses; its fields are the prose of points 1 and 2, phase-25.md:823-824)
+
+@@ REP 25
+oidc_config: Arc<OidcUpstreamConfig>
+@@ WITH
+oidc_config: Arc<OidcUpstream>
+@@ END
+# V-25-05-d | LOW | grep -c -F gave 1 | names used and where they exist: `OidcUpstream` phase-25.md:818 and :820; `oidc_config` phase-25.md:1245 (AppState) | NEW: none
+
+@@ REP 25
+in the same transaction as the dead-letter rows.
+@@ WITH
+in the same transaction as the dead-letter rows; the first advance inserts the row (the `INSERT` grant of migration `0082`) and later advances update it.
+@@ END
+# V-25-02-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `admin.siem_cursors` table phase-25.md:309; `INSERT` grant phase-25.md:539 (0082); step 2 missing-row rule phase-25.md:854 | NEW: none
+
+@@ REP 25
+if not acquired, return (another forwarder runs).
+@@ WITH
+if not acquired, return (another forwarder runs). Steps 2 to 7 run on the connection that took the lock, and the job releases it with `pg_advisory_unlock(hashtext('siem_forward'))` before it returns to the pool, on every exit path including an error.
+@@ END
+# V-25-02-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `pg_try_advisory_lock` phase-25.md:853 (step 1, session level); lock order of section 3.16 phase-25.md:1216 (`siem_forward` is an advisory lock taken first) | NEW: none. The fix keeps the session lock and adds the unlock; the other option, a transaction-scoped lock around the whole run, would hold a database transaction across the network sends
+
+@@ BLOCK 25
+### 7.N SiemForwarder fields and entry point (V-25-02-d, LOW; DR-413)
+`pub struct SiemForwarder { siem: Arc<dyn SiemRepository>, settings: Arc<SettingsService>, collector: Arc<dyn SiemCollector> }`, where `SiemCollector` is the TLS syslog client of the transport paragraph of section 3.5, with `send(line: &str) -> Result<(), PlatformError>`, which returns `Ok` only on the collector's delivery acknowledgement. The job entry point is `pub async fn forward(&self) -> Result<(), PlatformError>;` (job `siem_forward`; it runs the steps of section 3.5).
+@@ END
+# V-25-02-d | LOW | names used and where they exist: `SiemRepository` phase-25.md:663; `SettingsService` phase-25.md:702-704 (section 3.1 struct); `SiemForwarder` phase-25.md:839 and :841; transport phase-25.md:848; acknowledgement phase-25.md:857 (step 5) | NEW: `SiemCollector` and `forward` (the plan names the job `siem_forward` and the transport, but no type or entry point)
+
+@@ REP 25
+Severity: Info 3, Notice 5, Warning 7, Critical 9 (phase 02 `Severity`).
+@@ WITH
+Severity: Info 3, Notice 5, Warning 7, Critical 9 (phase 02 `Severity`), read from the phase 02 catalogue entry of the row's kind in the forwarder, because `audit.siem_page` returns no severity column.
+@@ END
+# V-25-02-e | HIGH | grep -c -F gave 1 | names used and where they exist: `audit.siem_page` RETURNS TABLE phase-25.md:350-358 (no severity column); phase 02 `EventKind` with `severity: Severity` phase-02.md:549; the same line already reads the catalogue name from the Rust catalogue (phase-25.md:846) | NEW: none
+
+@@ REP 25
+(the output of `audit.siem_page`, never a `case_id` field)
+@@ WITH
+(the output of `audit.siem_page` with `severity` read from the catalogue, section 3.5; never a `case_id` field)
+@@ END
+# V-25-02-e | HIGH | grep -c -F gave 1 | names used and where they exist: `SiemLine` phase-25.md:653; `audit.siem_page` phase-25.md:349 | NEW: none
+
+@@ REP 25
+reads through `SiemPageReader`
+@@ WITH
+reads through `SiemRepository`
+@@ END
+# V-25-02-j | LOW | grep -c -F gave 1 | names used and where they exist: `SiemRepository` phase-25.md:663 and :1245; header line 9 is the only use of `SiemPageReader` | NEW: none
+
+@@ REP 25
+akr-ctl (new subcommands `support-bundle` and `oidc upstream check`; no new binary)
+@@ WITH
+akr-ctl (new subcommands `support-bundle` and `oidc upstream check`, and `identity link-upstream` and `identity unlink-upstream` of the phase 01 `identity` group; no new binary)
+@@ END
+# V-25-05-c | LOW | grep -c -F gave 1 | names used and where they exist: `identity link-upstream` phase-25.md:825 and :833; the 4.5 statement that both are phase 01 `akr-ctl identity` subcommands phase-25.md:1259 | NEW: none
+
+@@ REP 25
+has no open session (unique index `uq_support_sessions_open`).
+@@ WITH
+has no open session (unique index `uq_support_sessions_open`). Refusals: a vendor user that is missing, not `human` or not `active` gives `E_VALIDATION`, sub-code `vendor_user_invalid`; a user holding another role gives `E_VALIDATION`, sub-code `sod_conflict` (the phase 04 code of the same check); an open session gives `E_NOT_ALLOWED_IN_STATE`, sub-code `session_open` (409).
+@@ END
+# V-25-03-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `uq_support_sessions_open` phase-25.md:253; `sod.json` lists `VS` as exclusive phase-25.md:931; `sod_conflict` phase-04.md:955 (the SoD check of role grants, 422); `E_VALIDATION` API.md:985; `E_NOT_ALLOWED_IN_STATE` API.md:982 | NEW: `vendor_user_invalid`, `session_open` (listed in the sub-code BLOCK below); `sod_conflict` is reused from phase 04
+
+@@ BLOCK 25
+### 7.N Sub-codes of the section 3.11 closed lists (V-25-01-c, V-25-03-a, V-25-04-b, MEDIUM; DR-413)
+Section 3.11 gains these sub-codes. Under `E_VALIDATION` (422): `approver_role_required`, `vendor_user_invalid`, `sod_conflict` (the phase 04 code, reused), `bundle_not_found` and `manifest_missing`. Under `E_NOT_ALLOWED_IN_STATE` (409): `session_open`. Each one is the `errors[].code` or the `reason` that the step naming it returns.
+@@ END
+# V-25-01-c, V-25-03-a, V-25-04-b | MEDIUM | names used and where they exist: 3.11 table phase-25.md:982 (`E_VALIDATION`) and :983 (`E_NOT_ALLOWED_IN_STATE`); `E_VALIDATION` API.md:985 ("errors[]"); `sod_conflict` phase-04.md:955; `review_open` phase-25.md:715 (the pattern for `session_open`) | NEW: `approver_role_required`, `vendor_user_invalid`, `bundle_not_found`, `manifest_missing`, `session_open` (no closed sub-code fits these refusals)
+
+@@ REP 25
+A session still `requested` after one hour is set `refused_timeout` (`ended_at` set, no grant).
+@@ WITH
+A session still `requested` after one hour is set `refused_timeout` (`ended_at` set, no grant). A `DELETE` on a session that is neither `active` nor `requested` is refused with `E_NOT_ALLOWED_IN_STATE` (409).
+@@ END
+# V-25-03-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: `E_NOT_ALLOWED_IN_STATE` phase-25.md:983 (no sub-code entry for End, as for the break-glass End); `DELETE /admin/support-sessions/{id}` phase-25.md:944 and the route table phase-25.md:668-690; API.md:982 | NEW: none
+
+@@ REP 25
+sessions_cache: Arc<dyn SessionRevoker>
+@@ WITH
+identity: Arc<dyn IdentityProvider>, tokens: Arc<dyn TokenRepository>
+@@ END
+# V-25-03-f | LOW | grep -c -F gave 1 | names used and where they exist: `IdentityProvider` with `revoke_all_sessions(id)` phase-01.md:468; `TokenRepository` with `revoke_all_for_user(tx, user_id, actor, reason)` phase-01.md:457; `SessionService` phase-01.md:582 (its `revoke` is for the caller's own session, phase-01.md:609, so it is not the admin revoke) | NEW: none
+
+@@ REP 25
+through the phase 01 `SessionRevoker` in the same transaction
+@@ WITH
+through the phase 01 `IdentityProvider::revoke_all_sessions` and `TokenRepository::revoke_all_for_user` in the same transaction
+@@ END
+# V-25-03-f | LOW | grep -c -F gave 1 | names used and where they exist: as above; `SessionRevoker` occurs only at phase-25.md:919 and :944 | NEW: none | NOTE for the lead: `IdentityProvider` is a Kratos call and cannot share the database transaction; the lead decides the order of the Kratos call against the commit. So "in the same transaction" holds for the token rows only.
+
+@@ BLOCK 25
+### 7.N Audit kind for the refused timeout (V-25-03-d, MEDIUM; DR-413)
+Section 3.13 gains one row: `support_session.refused_timeout {session_id, reason_code}` (NEW), SIEM yes, written by the sweep when it sets a session still `requested` after one hour to `refused_timeout` (section 3.8, End and expiry).
+@@ END
+# V-25-03-d | MEDIUM | names used and where they exist: the four support-session kinds phase-25.md:1160-1163 (`support_session.expired` at :1163 is the time-box passing with the grant revoked, not this move); `refused_timeout` phase-25.md:944 | NEW: `support_session.refused_timeout` (no existing kind names the move)
+
+@@ BLOCK 25
+### 7.N The VS grant insert (V-25-03-e, MEDIUM; DR-413)
+Section 2 declares the repository trait `RoleGrantWriter` (the struct at section 3.8 names it; no file declares it): `insert_support_grant(tx, user_id, support_session_id, scope, valid_from, valid_to, granted_by) -> Uuid`, the one insert into `admin.role_grants` of Approve step 3 (`role = 'VS'`, `source = 'support_session'`). Phase 03 `GrantRepository` has no insert, and the phase 01 `GrantRepository` names only `insert_bootstrap`.
+@@ END
+# V-25-03-e | MEDIUM | names used and where they exist: `RoleGrantWriter` phase-25.md:918 (struct field only); `GrantRepository` phase-03.md:440-442 (no insert); phase 01 `GrantRepository` phase-01.md:448 (`insert_bootstrap`); Approve step 3 phase-25.md:938 | NEW: `RoleGrantWriter` (declared here) and `insert_support_grant`
+
+@@ BLOCK 25
+### 7.N Audit kind for the move to verifying (V-25-04-e, MEDIUM; DR-413)
+Section 3.13 gains one row: `release.verifying {release_id, release_version}` (NEW), SIEM yes, written by the verify job in step 1, in the same transaction as the move to `verifying`.
+@@ END
+# V-25-04-e | MEDIUM | names used and where they exist: `verifying` as a status phase-25.md:176 (CHECK) and :893 (step 1); the five release kinds phase-25.md:1155-1159 (no move kind); the one-event rule phase-25.md:1136 | NEW: `release.verifying` (no kind of the five names the move, and a status move of business data needs its own event under the rule at phase-25.md:1136)
+
+@@ REP 25
+(read-only mount; the server never follows links out of it).
+@@ WITH
+(read-only mount; the server never follows links out of it). A `bundle_ref` that names no directory is refused with `E_VALIDATION`, sub-code `bundle_not_found`; a directory without `manifest.json` is refused with `E_VALIDATION`, sub-code `manifest_missing`; both are answered before the 202.
+@@ END
+# V-25-04-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `manifest.json` read by step 2 phase-25.md:889 (before the 202); `E_VALIDATION` API.md:985; `E_BAD_REQUEST` API.md:965 is not used because a missing directory is not a malformed request | NEW: `bundle_not_found`, `manifest_missing` (sub-code BLOCK above)
+
+@@ REP 25
+write the verification report as evidence (kind `package`, owner kind `release`, R10, classification internal)
+@@ WITH
+write the verification report as evidence (`EvidenceStore::put_generated` with kind `package`, owner kind `release`, owner id the release id, R10, classification `internal`, content type `application/json`, file name sealed (phase 02 rule))
+@@ END
+# V-25-04-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: `EvidenceStore::put_generated(tx, GeneratedEvidence, actor)` phase-02.md:876; the same fields as section 3.1 step 4 phase-25.md:723 | NEW: none. NOTE for the lead: `application/json` is my choice of content type for the report; the plan does not name the report's format, so please confirm it
+
+@@ REP 25
+change request `cr_access` (maker ADM, checker SEC); 202; IDEM (added)
+@@ WITH
+change request `cr_access` (maker ADM, checker SEC); 202; IF; IDEM (added)
+@@ END
+# V-25-04-f | LOW | grep -c -F gave 1 | names used and where they exist: marker legend phase-25.md:666 (IF = If-Match); API.md:43 (If-Match on every versioned mutation); the `expected` parameter of `propose` (section 3.6 services block) | NEW: none
+
+@@ REP 25
+**SU** `approval`; IDEM (added)
+@@ WITH
+**SU** `approval`; IF; IDEM (added)
+@@ END
+# V-25-04-f | LOW | grep -c -F gave 1 | names used and where they exist: as above; `record_applied` takes `expected` phase-25.md:882 | NEW: none
+
+@@ REP 25
+count of grants with `review_overdue` and no review
+@@ WITH
+count of `admin.break_glass_log` rows of kind `review_overdue` whose grant has `reviewed_at IS NULL`
+@@ END
+# V-25-06-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `review_overdue` as a log kind phase-25.md:149 (`admin.break_glass_log` CHECK); the grant status CHECK has no such value phase-25.md:100; sweep step 3 writes the log kind phase-25.md:803 | NEW: none
+
+@@ REP 25
+`now() - siem_cursors.last_occurred_at`
+@@ WITH
+the age of the first row that `audit.siem_page` returns after the cursor (`now()` minus its `occurred_at`), or 0 when it returns none
+@@ END
+# V-25-06-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `audit.siem_page` phase-25.md:349 (returns rows after the cursor, exported kinds only); the code reads only through it, phase-25.md:664; `siem.max_lag_s` phase-25.md:570 (the critical line) | NEW: none
+
+@@ REP 25
+The lag is `now() - last_occurred_at` of the cursor and is shown on the cockpit (section 3.10);
+@@ WITH
+The lag is the age of the first row that `audit.siem_page` returns after the cursor (`now()` minus its `occurred_at`), or zero when it returns none, and it is shown on the cockpit (section 3.10);
+@@ END
+# V-25-06-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: as above; `siem.max_lag_s` phase-25.md:859 (step 7) | NEW: none. NOTE for the lead: the readiness rule of section 4.4 (phase-25.md:1253) also tests "the cursor is older than siem.max_lag_s", so a quiet system would be flagged there too; the lead may want the same definition in 4.4
+
+@@ REP 25
+ON CONFLICT (source_key) DO NOTHING
+@@ WITH
+ON CONFLICT (source_key) WHERE source_key IS NOT NULL DO NOTHING RETURNING id
+@@ END
+# V-25-07-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `uq_registers_source_key` is partial, `WHERE source_key IS NOT NULL`, phase-24.md:75; the statement phase-25.md:748 | NEW: none. NOTE for the lead: phase 26 has the same `ON CONFLICT (source_key) DO NOTHING` against that partial index at phase-26.md:277 and phase-26.md:444; those are outside this draft and need the same predicate
+
+@@ REP 25
+`due_on < bank_today` and no `access_review.overdue` event yet, write audit `access_review.overdue` (siem yes) and open a warning in the phase 24 register:
+@@ WITH
+`due_on < bank_today`, open a warning in the phase 24 register by the insert below; only when that insert returns a row, write audit `access_review.overdue` (siem yes) in the same transaction (the application role cannot read the audit trail, so the unique source key is the guard):
+@@ END
+# V-25-07-d | HIGH | grep -c -F gave 1 | names used and where they exist: `access_review.overdue` phase-25.md:1145; the application role reads only four audit columns, `GRANT SELECT (id, occurred_at, prev_hash, entry_hash)` phase-02.md:308, inherited through the membership at phase-02.md:44; "the code has no SELECT on audit.audit_log" phase-25.md:664; the unique key phase-24.md:75 | NEW: none
+
+@@ REP 25
+cmd: DecideItem)
+@@ WITH
+cmd: DecideAccessReviewItem)
+@@ END
+# V-25-07-c | LOW | grep -c -F gave 1 | names used and where they exist: `DecideAccessReviewItem` phase-25.md:656 | NEW: none
+
+@@ REP 25
+set_status(tx, id, ReviewState, expected_version)
+@@ WITH
+set_status(tx, id, ReviewStatus, expected_version)
+@@ END
+# V-25-07-c | LOW | grep -c -F gave 1 | names used and where they exist: `ReviewStatus` phase-25.md:645 (the `status` field of `AccessReview`) | NEW: none
+
+@@ BLOCK 25
+### 7.N The grant reader of the access review snapshot (V-25-07-c, LOW; DR-413)
+Section 2 declares the read port `RoleGrantReader` (the struct at section 3.1 names it; no file declares it): `in_force_at(at) -> Vec<RoleGrant>`, with the predicate of snapshot step 3. Phase 03 `GrantRepository` has `all_active()`, which reads the grants in force now and not at `snapshot_at`, so it does not serve the snapshot.
+@@ END
+# V-25-07-c | LOW | names used and where they exist: `RoleGrant` phase-03.md:441; `GrantRepository` phase-03.md:440-442; snapshot step 3 phase-25.md:722; struct phase-25.md:702 | NEW: `RoleGrantReader` (declared here) and `in_force_at`
+
+@@ BLOCK 25
+### 7.N Count methods of the ops tiles (V-25-06-d, LOW; DR-413)
+Section 2 gains `BreakGlassRepository::counts(now) -> BreakGlassCounts { active, active_past_expiry, review_overdue }` (tiles `break_glass_active` and `break_glass_review_overdue`), `SupportSessionRepository::count_open(now) -> i64` (tile `support_sessions_open`), and the trait `AnchorTimestampRepository` with `count_unverified() -> i64` and `oldest_unverified() -> Option<DateTime<Utc>>` (tile `anchor_timestamp_unverified`). The tile `access_review_overdue` reads `AccessReviewRepository::open_reviews_due(now)`, and the two SIEM tiles read `SiemRepository::status()`.
+@@ END
+# V-25-06-d | LOW | names used and where they exist: `BreakGlassRepository` phase-25.md:659; `SupportSessionRepository` phase-25.md:662; `AccessReviewRepository` phase-25.md:658 (`open_reviews_due(now)`); `SiemRepository` phase-25.md:663 (`status()`); `admin.anchor_timestamps` phase-25.md:336 (a table with no repository) | NEW: `BreakGlassCounts`, `AnchorTimestampRepository`, and the methods `counts`, `count_open`, `count_unverified`, `oldest_unverified`. NOTE for the lead: confirm that `open_reviews_due(now)` means open reviews past `due_on`; the plan names it without a definition
+
+@@ BLOCK 25
+### 7.N Snapshot writes of the access review (V-25-07-b, MEDIUM; DR-413)
+Section 2 `AccessReviewRepository` gains `insert_items(tx, review_id, &[AccessReviewItem])` (snapshot step 5: one row per grant, decision `pending`) and `set_snapshot(tx, id, evidence_id, evidence_sha256, item_count, expected_version)` (snapshot step 6: status `open` with the snapshot identity). `set_status` carries none of those columns.
+@@ END
+# V-25-07-b | MEDIUM | names used and where they exist: `AccessReviewRepository` phase-25.md:658 (`set_status` only); `AccessReviewItem` phase-25.md:646; snapshot steps 5 and 6 phase-25.md:724-725 | NEW: `insert_items` and `set_snapshot`
+
+@@ BLOCK 25
+### 7.N Audit kind for a superseded review item (V-25-07-e, MEDIUM; DR-413)
+Section 3.13 gains one row: `access_review.item_superseded {item_id, review_id, grant_id}` (NEW), SIEM no, written for each item moved to `superseded`, by decide step 4 and by sweep step 1 (section 3.1).
+@@ END
+# V-25-07-e | MEDIUM | names used and where they exist: `superseded` moves phase-25.md:731 (decide step 4) and :747 (sweep step 1); the access-review kinds phase-25.md:1140-1145 (no move kind); the value `superseded` in the item CHECK phase-25.md:73 | NEW: `access_review.item_superseded` (decide step 4 names no decider, so `access_review.item_decided` does not fit). NOTE for the lead: decide step 4 writes `superseded` and then answers `E_NOT_ALLOWED_IN_STATE`; if that error rolls the transaction back, the move and its event are lost, so the lead may want the write committed before the error
+
+@@ BLOCK 25
+### 7.N Row-count test for the excluded tables (V-25-10-a, LOW; DR-413)
+Section 6 check 4 gains one database test: the support bundle fixture's row-count list (section 3.8 step 1) contains none of the seven table names of 7.3.
+@@ END
+# V-25-10-a | LOW | names used and where they exist: section 6 check 4 phase-25.md:1313; 7.3 test reference phase-25.md:1369; the row counts of the support bundle, 3.8 step 1, phase-25.md:947 | NEW: none (the test is added to the list that 7.3 already cites; the other option is to drop the reference)
+
+@@ BLOCK 25
+### 7.N Route for the rollout record of the apply (V-25-12-a, HIGH; DR-413)
+Section 2 route table gains one row, added to API.md section 3 by the lead like the other added rows: | POST | `/api/v1/admin/releases/{id}/evidence` | `admin.system` | Upload the `rollout.json` of the apply as evidence of kind `package`, owner kind `release`, owner id this release (`EvidenceStore::stage`, multipart); Cedar `release.applied`; IDEM (added) |. The owner check of section 7.8 applies to that evidence.
+@@ END
+# V-25-12-a | HIGH | names used and where they exist: `EvidenceStore::stage(tx, NewEvidence, actor)` phase-02.md:839 (the upload routes call it); "there is no generic evidence route" API.md:236 (uploads are per owner route); Cedar `release.applied` phase-25.md:901 and the permit `rel.adm` phase-25.md:1102; the route table phase-25.md:668-690 has no evidence row; `admin.system` is the ADM scope (conventions) | NEW: the route path `/api/v1/admin/releases/{id}/evidence` (no route for this evidence exists). The Cedar action is reused, because the upload is part of recording the apply
+
+@@ REP 25
+`RecordReleaseApplied { }`
+@@ WITH
+`RecordReleaseApplied { rollout_evidence_id: Option<Uuid> }`
+@@ END
+# V-25-12-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `rollout_evidence_id` phase-25.md:1400 (7.8); DTO list phase-25.md:656 | NEW: none
+
+@@ REP 25
+pub async fn record_applied(&self, ctx: &RequestCtx, idem: &IdemKey, release: Uuid, expected: i32, header: StepUpHeader)
+@@ WITH
+pub async fn record_applied(&self, ctx: &RequestCtx, idem: &IdemKey, release: Uuid, expected: i32, cmd: RecordReleaseApplied, header: StepUpHeader)
+@@ END
+# V-25-12-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `RecordReleaseApplied` phase-25.md:656; `ReleaseRepository::record_applied` phase-25.md:660 (a different signature, unchanged) | NEW: none
+
+@@ REP 25
+the status must be `approved`.
+@@ WITH
+the status must be `approved` (else `E_NOT_ALLOWED_IN_STATE`, sub-code `release_not_approved`). The steps run in one transaction, in this order: consume the step-up assertion; lock the release; check the status; when `rollout_evidence_id` is given, read that evidence with `EvidenceRepository::get` and refuse unless its owner kind is `release` and its owner id is this release (`E_VALIDATION`, as section 7.8 says); then write and audit.
+@@ END
+# V-25-12-b, V-25-12-c | MEDIUM (12-b), LOW (12-c) | grep -c -F gave 1 | names used and where they exist: `EvidenceRepository::get(id) -> Option<EvidenceObject>` phase-02.md:616; `release_not_approved` phase-25.md:983 (3.11 list); `E_VALIDATION` API.md:985; section 7.8 phase-25.md:1399-1404; the step-up-then-lock order of Approve phase-25.md:778-780 | NEW: none. The transaction choice follows Approve (section 3.2) and Sign (section 3.1)
+
+@@ REP 25
+outside the Arabic and Latin ranges (SP-70)
+@@ WITH
+outside the Arabic and Latin ranges (UX-20)
+@@ END
+# V-25-08-c | LOW | grep -c -F gave 1 | names used and where they exist: `UX-20` research/31-analyst-ux.md:920 (the bidirectional scan; its source column cites "File 30 SP-70"); `SP-70` research/30-security-privacy.md:1443 (the coding rules) | NEW: none. NOTE for the lead: the UX-20 row cites SP-70 as its source, so the lead may correct that column too
+
+@@ REP 25
+Route 19 (`GET /help/articles?kind=`) returns
+@@ WITH
+`GET /help/articles?kind=` returns
+@@ END
+# V-25-08-d | LOW | grep -c -F gave 1 | names used and where they exist: the help row of the route table phase-25.md:668-690 (no numbering in the table); "route 19" elsewhere only in phase-24.md:711, for another route | NEW: none
+
+@@ REP 25
+The KV entry `akr/keys/auth-hmac` (DR-356) holds
+@@ WITH
+The KV entry `keys/auth-hmac` (DR-356; the path is relative to the mount `akr/`, as in 7.1) holds
+@@ END
+# V-25-09-a | LOW | grep -c -F gave 1 | names used and where they exist: the mount rule phase-00.md:893-894 (7.5: paths "written without a mount prefix"); 7.1 phase-25.md:1351 | NEW: none
+
+@@ REP 25
+1. Write a new KV version of `akr/keys/auth-hmac` with a fresh random value, under the operator's OpenBao policy.
+@@ WITH
+1. Write a new KV version of `keys/auth-hmac` with a fresh random value, under the operator's OpenBao policy (the operator types the mount prefix `akr/` in the CLI).
+@@ END
+# V-25-09-a | LOW | grep -c -F gave 1 | names used and where they exist: as above | NEW: none. The mount-prefix sentence is the one the claim asks for; the lead may prefer to move it to 7.1
+
+@@ BLOCK 02
+### 7.N Evidence owner kind added by phase 25 (V-25-07-f, HIGH; DR-413)
+The registry of 7.1 also holds `access_review` (phase 25 section 3.1 step 4: the quarterly snapshot, owner id the review id). Without it, `EvidenceStore::put_generated`, which runs steps 1 to 3 of `stage` for the snapshot, refuses the snapshot at the owner-kind check.
+@@ END
+# V-25-07-f | HIGH | names used and where they exist: `owner_kind` must be in the registry phase-02.md:847 (`stage` step 3); `put_generated` runs steps 1 to 3 of `stage` phase-02.md:876-877; registry of 7.1 phase-02.md:1162; the same pattern for `release` phase-02.md:1261; `access_review` owner kind phase-25.md:723 | NEW: none (the owner kind is the plan's own name; no new evidence kind)
+
+@@ BLOCK 00
+### 7.N Help articles and release notes in the bundle (V-25-08-b, MEDIUM; DR-413)
+From phase 25 on, `akr-ctl bundle build` (step 7 of section 4) also writes `help/*.json` (the articles and "what changed" entries of phase 25 section 3.9) and `notes.json` (the bilingual release notes that phase 25 section 3.6 step 5 reads). The manifest lists both with their SHA-256 digests, as the other files do (7.12).
+@@ END
+# V-25-08-b | MEDIUM | names used and where they exist: bundle item 7 phase-00.md:745-751 (no help folder and no notes file); 7.12 phase-00.md:985-988 (the pattern for added bundle files); `help/*.json` phase-25.md:960; `notes.json` phase-25.md:897 | NEW: none (paths only)
+
+@@ BLOCK 25
+### 7.N Counts returned by the sweeps (V-25-01-g, LOW; DR-413)
+The break-glass sweep (section 3.2, Sweep) returns `SweepCounts { lapsed, expired, review_overdue }`, one count for each of its steps 1 to 3. The support session sweep (section 3.8, End and expiry) returns `SweepCounts { ended, expired, refused_timeout }`, and the bundle purge (section 3.8, Purge) returns `SweepCounts { archive_deleted }`.
+@@ END
+# V-25-01-g | LOW | names used and where they exist: `SweepCounts` phase-25.md:710, :764 and :925-926 (signatures); the access-review sweep counts `{ superseded, overdue_opened }` phase-25.md:749; break-glass sweep steps phase-25.md:800-803; support statuses phase-25.md:944 | NEW: none (the fields are the status and kind names the steps already use)
+
+# DECIDE V-25-02-c (limit above 500 on the pull route) | A: keep the pull cap at 500 as the SIEM pull's own limit, an exception to API.md pagination (maximum 200, API.md:46), and refuse a higher `limit` with `E_VALIDATION` (422) (evidence phase-25.md:862 "limit ≤ 500"; API.md:46) | B: cap the pull at 200 as API.md:46 says, refuse a higher `limit` the same way, and change the curl check to `limit=200` (evidence phase-25.md:862; phase-25.md:1334 uses `limit=500`)
+# DECIDE V-25-02-f (the cursor move writes `admin.siem_cursors` on every batch) | A: the cursor move writes no audit event; that exempts it from the one-event rule of phase-25.md:1136, which phase 02 grants only to anchoring (phase-02.md:777), so phase 02 must list the exemption too; the audit log stays the source of truth (phase-25.md:859) | B: one event per run that moves the cursor, kind `siem.cursor_advanced` (NEW), SIEM no; at the 10-second cadence (phase-25.md:1231) that is up to about 8,640 rows a day on a busy bank, and with SIEM yes the forwarder would forward its own events (evidence phase-25.md:858, :1136, :1231)
+# DECIDE V-25-02-g (dead letters have columns, an index and a grant, but no resolve operation) | A: add the resolve operation: a `SiemRepository` method `resolve(tx, id, by, at)`, a route row `POST /api/v1/admin/siem/dead-letters/{id}/resolve` (ADM) and an audit kind `siem.dead_letter_resolved` (NEW, SIEM no); the grant at phase-25.md:542 and the columns at :328-329 stay | B: no resolve operation: drop the grant at phase-25.md:542 and the two columns at :328-329, state that dead letters stay open, and let the tile at :967 count every dead letter (evidence phase-25.md:328-332, :542, :663, :668-690, :967)
+# DECIDE V-25-02-i (the client certificate source, OpenBao `pki/akr-worker-siem`, is defined nowhere) | A: an OpenBao PKI engine at mount `pki` issuing from the bank's own CA: the bank signs the engine's intermediate certificate at install, and role `akr-worker-siem` issues the forwarder's client certificate; phase 00 defines the engine and the role (phase-00.md:383 lists only transit and KV) | B: an OpenBao PKI engine at mount `pki` with its own root made at install; the root certificate goes to the bank's SIEM team on a separate channel with the pinned collector fingerprint, as the server certificate does (evidence phase-25.md:848 and the transport paragraph; `akr-ctl siem configure` at phase-25.md:1251)
+# DECIDE V-25-04-a (the policy bundle hash is computed in step 3 and never compared) | A: fold the comparison into check (f) as its last clause: the expected hash is the canonical bundle hash that the release notes carry (phase-03.md:546), and `policy_bundle_hash_mismatch` is already in the CHECK (phase-25.md:181); phase 30's check (g) in 7.7 stays as it is (phase-25.md:1395) | B: a separate check after (f), named (g), with phase 30's chart check renumbered (h) in 7.7 (phase-25.md:1395); the refusal order of step 4 then ends at (h)
+# DECIDE V-25-04-d (`ReleaseCurrency` names no method) | A: drop the port `currency: Arc<dyn ReleaseCurrency>` (phase-25.md:877) and read the tile through `ReleaseRepository::find_applied_latest()` and `newest_verified()` (phase-25.md:660), with `newest_verified()` widened to approved releases, as the tile text says (phase-25.md:903, :968) | B: keep the port with one method `state(now) -> Result<ReleaseCurrencyState, PlatformError>` (NEW type) that returns the applied release's age and whether a newer verified or approved release waits unapplied (evidence phase-25.md:877, :903, :968)
+# DECIDE V-25-05-a (the Kratos OIDC flag is tied to the mode, but the mode switch is said to need no redeploy) | A: the flag `selfservice.methods.oidc.enabled` stays `true` whenever the one generic provider is configured; the BFF button (point 4, phase-25.md:826) and a refusal of upstream sign-in in `local_only` apply the mode, so a switch needs no restart (keeps the closing paragraph at phase-25.md:837; point 1 at :823 is rewritten) | B: the flag follows the mode (point 1 at phase-25.md:823 stands), so a switch changes the rendered Kratos configuration and the closing paragraph at :837 says a Kratos restart is needed; section 4.4 already makes the Kratos egress rule depend on the mode (phase-25.md:1251, "the rule is absent in `local_only`")
+# DECIDE V-25-06-c (`release_currency` critical condition cannot occur) | A: critical when a newer verified or approved release has waited unapplied for 30 days, the same test as the warn condition with the 30-day limit (phase-25.md:968) | B: critical when the applied release is older than `release.currency_days` plus 30 days (setting at phase-25.md:574; tile at :968). The state the text names cannot occur: an applied release leaves `applied` only for `superseded` (release guard at phase-25.md:474; a refused release does not reopen, :477), and superseding needs a newer apply (phase-25.md:901)
+# DECIDE V-25-08-a (a malformed help article has no outcome; section 6 uses a code the list lacks) | A: a malformed article refuses the release: a tenth refusal code (NEW, e.g. `article_invalid`) joins the `refusal_code` CHECK of 0081 (phase-25.md:178-181); the job records it as the refusal, which DR-236 supports ("a refusal is a field of the release record", phase-25.md:1435); section 6 check 5 (phase-25.md:1338) then expects that code | B: a malformed article is not inserted and the release verifies without it; the job records the skipped code, and section 6 (phase-25.md:1338) checks that the article row is absent while the release is `verified` (evidence phase-25.md:960, :897 step 5, :995)
+# NOTE: every REP old text was checked with `grep -c -F` against docs/plan/phase-25.md before this draft was written, and each gave 1. The REPs that share a line (lines 9, 748, 944 and 960 of the plan) use disjoint substrings, so they can be applied in any order.
+# NOTE: "7.N" in each block header is a placeholder; the lead numbers the blocks. The new sub-codes and kinds are NEW only as the notes say; the sub-code BLOCK must be applied with the REPs that name them.
+# NOTE: these claims are spread over several entries, and each entry names the claim in its note: V-25-01-d, V-25-02-e, V-25-03-f, V-25-04-f, V-25-05-d, V-25-06-b, V-25-07-c, V-25-09-a, V-25-12-b.
+# SUMMARY: fixes written 51 (REP 36, BLOCK 15); DECIDE 10; DROP 0; claims covered: V-25-01-a, V-25-01-b, V-25-01-c, V-25-01-d, V-25-01-e, V-25-01-f, V-25-01-g, V-25-01-h, V-25-02-a, V-25-02-b, V-25-02-c, V-25-02-d, V-25-02-e, V-25-02-f, V-25-02-g, V-25-02-i, V-25-02-j, V-25-03-a, V-25-03-c, V-25-03-d, V-25-03-e, V-25-03-f, V-25-04-a, V-25-04-b, V-25-04-c, V-25-04-d, V-25-04-e, V-25-04-f, V-25-05-a, V-25-05-c, V-25-05-d, V-25-06-a, V-25-06-b, V-25-06-c, V-25-06-d, V-25-07-a, V-25-07-b, V-25-07-c, V-25-07-d, V-25-07-e, V-25-07-f, V-25-08-a, V-25-08-b, V-25-08-c, V-25-08-d, V-25-09-a, V-25-10-a, V-25-12-a, V-25-12-b, V-25-12-c (50 of 50: 42 STANDS and 8 PARTLY)

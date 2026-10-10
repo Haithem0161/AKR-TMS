@@ -16,6 +16,9 @@ partitions from phase 02), TS-13, TS-22 (buckets and the S3 port; evidence write
 TS-28 (platform metrics), TS-29 (compose half; Helm in phase 30), TS-30, TS-31, TS-37, TS-38, TS-39 (tooling; the
 audit record from phase 02), TS-40, TS-41, TS-42, TS-43, SP-04, SP-05, SP-06, SP-08, SP-09, SP-11, SP-12, SP-13,
 SP-66, SP-70, SP-72, SP-73, SP-74, SP-75, SP-84, VO-07
+- Gap pass 1 (coverage), implemented here: C-33 (the CBS egress rule: only akr-ingestd reaches the CBS listeners, host-enforced).
+- Gap pass 1 (coverage), partly implemented: SP-10 (field encryption by class and keyed match hashes), SP-45 (the column classification registry and its coverage test); VA-21 (profile S: one server plus a backup, one runtime and one scheduler); VB-25 (the profile S compose stack on premises, no big-data cluster), VB-28 (SBOMs with maintainer and country); VC-36 (the licence allow-list in cargo deny).
+- Gap pass 1 (coverage), not carried: SP-69 (vendor development practice, DR-396), SP-102 (the bank privacy office's records, DR-396).
 
 ## 1. SQLx Migration Changes
 
@@ -688,13 +691,13 @@ Environment variables only for bootstrap (`AKR_ENV`, binds, OpenBao address and 
 |-|-|-|-|
 | `postgres` | PostgreSQL 17 (pinned digest) | `z1_db`, `z2_app`, `z3_ory`, `z4_db` | builtin `C.UTF-8`; TLS; `wal_level=replica`; pgBackRest `archive_command` |
 | `postgres-standby` | same | `z2_app` | streaming replica (production bundle; dev profile `standby`) |
-| `pgbackrest` | pgBackRest (pinned) | `z2_app` | WAL every 60 s, weekly full, nightly differential, four fulls; repository on the backup server plus offsite (SP-84) |
+| `pgbackrest` | pgBackRest (pinned) | `z2_app` | WAL every 60 s, weekly full, nightly differential, four fulls; repository on the backup server plus offsite, both encrypted by pgBackRest (`repo-cipher-type = aes-256-cbc`) with the passphrase held off the server (SP-84) |
 | `restic` | restic (pinned) | `z2_app` | every 15 min: store drive directories (consistent snapshot) and OpenBao snapshots; repository passphrase held off the server |
 | `openbao` | OpenBao (pinned) | `z1_bao`, `z2_app` | raft storage; TLS listener; Shamir 3-of-5 in production; `make bao-dev` initialises 1-of-1 for development only |
 | `objectstore` | AKR Silo build (pinned tag, built and signed by our pipeline) | `z2_store` (internal) | `MINIO_BROWSER=off`; non-root; read-only root fs; no egress; reachable only from the guard |
 | `s3guard` | `akr-s3guard` | `z2_store`, `z2_app`, `z3_edge` | `z3_edge` only for presigned GET through the edge |
 | `valkey` | Valkey 9 (pinned) | `z2_app`, `z4_cache` | cache, rate limits, SSE fan-out; no persistence required |
-| `kratos`, `kratos-migrate` | Ory Kratos (pinned) | `z3_ory`, `z3_edge` | containers up and healthy; flows and config in phase 01 |
+| `kratos`, `kratos-migrate` | Ory Kratos (pinned) | `z3_ory` (only the BFF in `akr-api` and `akr-ctl` reach it; phase 01 section 4) | containers up and healthy; flows and config in phase 01 |
 | `hydra`, `hydra-migrate` | Ory Hydra (pinned) | `z3_ory`, `z3_edge` | as Kratos |
 | `gotenberg` | AKR Gotenberg image with IBM Plex fonts (RQ-11) | `z2_app` | used from phase 02 |
 | `clamd` | ClamAV (pinned) | `z2_app` | signatures from the bank's mirror or the bundle; used from phase 02 |
@@ -734,7 +737,7 @@ Environment variables only for bootstrap (`AKR_ENV`, binds, OpenBao address and 
      --check`; the schema checks of section 6; the redaction golden test; the OpenBao parity suite (RQ-02) against a
      pinned OpenBao container.
   4. `cargo build --release` with `cargo-auditable`; images on a pinned distroless base, non-root.
-  5. SBOMs: `cargo-cyclonedx` per binary and Syft per image (CycloneDX), with maintainer and country per component
+  5. SBOMs: `cargo-cyclonedx` per binary, the frontend packages from the pnpm lock file, and Syft per image (CycloneDX), with maintainer and country per component
      (VO-07, TS-37); Trivy scan (HIGH and CRITICAL fail unless waived); cosign signature with the vendor key held in
      the vendor's KMS under two-person control (SP-73); push to the vendor Harbor.
   6. Object store: build the Silo tag from source, compare with Silo's published checksums and provenance, run the
@@ -827,7 +830,282 @@ drift check in CI. No tokens, shell or screens (phase 08). Backend and platform 
 
 ## 7+. Gap Additions
 
-_None yet._
+Gap pass 1 (2026-10-10), run 1, from tools/agent/gap1-run1.md; lead-verified (tools/agent/gap1-run1-verdict.md).
+
+### 7.1 Outbox handler lists and topic names
+- `TopicHandler` registrations are a list per topic. `register(topic, handler)` appends. `OutboxDispatcher` runs the
+  list for a row in order, inside one transaction, and sets `dispatched_at` only when every handler succeeded. If any
+  handler fails, the row stays undispatched and the back-off of this section applies. Every handler is idempotent (the
+  owner re-check rule of section 3).
+- The reserved topic `notify` (phase 22) is named `notify.request`, because the `admin.outbox` CHECK requires a dotted
+  name. Replace "`notify` (22)" in the reservation sentence with "`notify.request` (22)".
+- Topic `siem.export` (phase 25) is released: no phase uses it. Remove it from the reservation sentence.
+- Each topic is registered by the phase that produces or consumes it, through `register`. The registry is per topic,
+  not per phase.
+
+### 7.2 Job harness: lease heartbeat, cluster-wide concurrency, database clock, listener reload
+- Lease heartbeat: `JobStore::heartbeat(id, locked_by)` refreshes `locked_at` every third of the kind's lease
+  (`jobs.lease_s` or the per-kind override) while a handler runs; the update is guarded by `status = 'running'` and `locked_by` (the reaper leaves `locked_by` as it was, so the status test is what stops a late heartbeat). A heartbeat that matches no row (the reaper re-queued the job) changes nothing: the runner lets the handler finish, since handlers are idempotent (at-least-once, section 3), and a handler that uses `complete_in` (7.18) then rolls back. The lease
+  reaper re-queues only rows whose `locked_at` is older than the lease.
+- Cluster-wide concurrency: the claim enforces `JobKind::concurrency` across all nodes. Inside the claim transaction it
+  takes `pg_advisory_xact_lock(hashtext(kind))` and counts the kind's `running` rows. No new field on `JobKind`. The
+  per-process semaphore stays as a local bound only.
+- Scheduler: schedule slots are computed from the database clock (`now()`), never from the process clock.
+- Listeners: a LISTEN connection reloads its state in full after every reconnect; the notification is a hint only.
+  Channels in the system: `akr_jobs` (this section), `akr_policy` (phase 03; polls `active_id()`), `akr_source`
+  (phase 05), `akr_assess_policy` and `akr_assess_gateway` (phase 29).
+
+### 7.3 Timer kinds registered by later phases
+The timer kind registry is a list of kind and owner kind pairs. The sweep enqueues the job `timer_<kind>`; a kind that
+is not in the registry is never claimed (the job rule of this section). Kinds registered by later phases (each in its
+own section 4.2):
+
+| Timer kind | Owner kind | Registered by |
+|-|-|-|
+| `cr_activate`, `cr_emergency_review`, `cr_post_review` | `change_request` | phase 04 |
+| `task_timeout` | `task` | phase 04 |
+| `screening_alert_clock` | `screening_alert` | phase 14 |
+| `kyc_review_clock` | `kyc_review` | phase 15 |
+| `alert_touch`, `alert_age` | `alert` | phase 17 |
+| `work_item_due` | `work_item` | phase 18 |
+| `case_acl_expiry` | `case_acl` | phase 18 |
+| `rfi_clock` | `rfi` | phase 19 |
+| `breach_stage` | `alert`, `work_item` | phase 19 |
+| `watch_expiry` | `watch` | phase 19 |
+| `hibernation_expiry` | `hibernation` | phase 19 |
+| `qa_grant_expiry` | `qa_sample` | phase 19 |
+| `intake_clock` | `internal_report`, `authority_request` | phase 19 |
+| `freeze_due`, `freeze_limit`, `committee_report_due`, `second_report_due` | `freeze` | phase 20 |
+| `refrain_due` | `refrain` | phase 20 |
+| `report_filing_target` | `report` | phase 21 |
+| `report_rework_due` | `report_task` | phase 21 |
+| `liaison_due` | `liaison_monthly_report` | phase 22 |
+
+### 7.4 Monitoring and retention roles
+Migration 0001 is unchanged. The role list of section 1 is completed with the two roles that later phases create
+(DR-22: login facts are provisioning):
+- `akr_monitor`: a LOGIN role created by `akr-ctl db provision` (password in OpenBao `db/akr_monitor`), member of
+  `pg_monitor` only, with no privilege on any AKR schema (phase 03 section 4.4; phase 01 7.2).
+- `akr_retention`: NOLOGIN, created by phase 23 migration 0072 with its table grants; its LOGIN role
+  `akr_retention_login` (member of `akr_retention` and of `akr_audit_writer`, password `db/akr_retention_login`) is
+  created by `akr-ctl db provision` (phase 23 sections 1.2 and 4.4; phase 01 7.2).
+
+### 7.5 KV mount rule, AppRole policy additions and KV paths
+- **One KV v2 mount, relative paths (DR-356).** OpenBao has one KV v2 mount, `akr/` (section 3). Every KV path in every
+  phase is relative to it and is written without a mount prefix: `db/<role>`, `s3/<name>`, `keys/<name>`,
+  `sources/<id>`, `ory/<x>`, `polis/<x>`, `release/trust`, `kratos/oidc/<provider>`, `assistant/<x>`. The spellings
+  `kv/...` (phases 25 and 31) and `secret/...` (phase 28) mean the same paths under `akr/`; those phases' own 7.x
+  record the correction.
+- AppRole policies (section 3), in addition to the current lines:
+  - `akr-api`: KV read `db/akr_readonly` (read-only pool, phase 24), `s3/stager` (stager credential, phase 02) and
+    `polis/directory` (webhook secret, phase 31).
+  - `akr-worker`: KV read `db/akr_readonly` (verifier pool, phase 02), `db/akr_retention_login` (phase 23),
+    `assistant/llama` and `assistant/golden-hmac` (phase 28) and `release/trust` (phase 25); read on
+    `sys/seal-status` and `sys/health` (phase 03); sign on the signing keys of 7.6.
+  - `akr-ingestd`: unchanged (`db/akr_ingest`, `sources/*`).
+  - `akr-assess`: transit encrypt and decrypt on `akr-kek`; KV read `db/akr_assess`, `keys/assess-decision/*`,
+    `keys/assess-extract/*` (phase 29 section 4.4).
+  - New AppRoles: `akr-monitor` (KV read `db/akr_monitor`, for the postgres exporter, phase 03); `akr-migrate` (KV
+    read `db/akr_migrate` only, issued per release, phase 30); `akr-polis` (KV read `ory/polis` and `polis/keys`
+    only, phase 31).
+- KV items added: `s3/stager` (phase 02), `keys/model-artifact/v<N>.pub` (phase 27, verify-only), `db/akr_monitor`,
+  `db/akr_retention_login`, `db/akr_migrate`, `db/akr_readonly`, `polis/directory`, `polis/keys`, `ory/polis`,
+  `release/trust`, `kratos/oidc/<provider>`, `assistant/llama`, `assistant/golden-hmac`.
+
+### 7.6 Signing keys: inventory (DR-357)
+The transit key list of section 3 (OpenBao layout) becomes:
+- `akr-kek` (aes256-gcm96, wraps DEKs);
+- ed25519 signing keys used by `akr-worker`: `akr-sign-anchor` (audit anchors, phase 02), `akr-sign-package`
+  (as section 3 names it), `akr-sign-certificate` (coverage certificates, phases 05 and 12) and `akr-sign-deletion`
+  (deletion certificates and batch manifests, phase 23; a separate key with its own rotation and custody, DR-194;
+  phase 23 wrote it `akr-sign-cert`, corrected in its 7.1);
+- `akr-sign-bundle` (ed25519; support bundles, phase 25): signed by `akr-ctl support-bundle create` on the bank host
+  under an operator policy issued for that act, never by a service AppRole;
+- `akr-sign-decision`: reserved and unused. Decision signing uses a seed wrapped under `akr-kek`, unwrapped once per
+  node at start-up (DR-294, phase 29 section 3.4).
+In the `akr-worker` AppRole line, "sign on the four signing keys" becomes "sign on `akr-sign-anchor`,
+`akr-sign-package`, `akr-sign-certificate` and `akr-sign-deletion`".
+
+### 7.7 Zone matrix rows, networks and zones.yaml keys
+- Row `akr-assess` (line 705): networks `z4_gateway`, `z4_db`, `z4_cache`, `z5_mgmt` and `z1_bao` (phase 29 section 4.4).
+- New networks: `z2_egress` (not internal; attached to `akr-worker` only; created only when `egress.proxy` is declared;
+  phase 07 section 4). `z2_bank` (not internal; `akr-worker` only; egress only to the SIEM collector and TSA addresses
+  declared with `akr-ctl siem configure`; phase 25 section 4.4). `z3_idp` (not internal; `kratos` only; egress to the
+  OIDC issuer; phase 25 section 4.4). `z2_model` (`internal: true`; members `akr-worker`, `llama`, `llama-eval`; no
+  egress; phase 28 section 4.4).
+- New rows: `node-exporter` (`z5_mgmt`), `postgres-exporter` (`z2_app`, `z5_mgmt`), `blackbox-exporter` (`z5_mgmt`,
+  `z3_edge`, `z1_bao`, `z2_store`; phase 03 section 4.4); `polis` (`z3_ory`, `z3_edge`; phase 31 section 4.4).
+- Zone rules in `deploy/zones.yaml` (add to the rule list at line 713): `akr-worker` -> `prometheus:9090`; `prometheus`
+  -> the three exporters; `blackbox-exporter` -> `caddy:443`, `openbao:8200`, `s3guard:9000`; `postgres-exporter` ->
+  `postgres:5432` (phase 03); `akr-worker` -> `gotenberg:3000` and `clamd:3310` (phase 02 section 4); `akr-worker` ->
+  `llama:8080` (phase 28); `akr-worker` -> the declared egress proxy (phase 07); `akr-worker` -> the bank's SMTP relay
+  (`notify.smtp_host`, `notify.smtp_port`; phase 22 section 4.4); `akr-assess` -> `openbao:8200`.
+- Keys read by the renderer, added to `deploy/zones.yaml`: `cluster.apiserver`, `cbs.listeners`, `gateway.cidrs` and
+  `backup.repository` (phase 30 sections 4.4 and 7.5) and `egress.proxy` (phase 07 section 4).
+
+### 7.8 Compose services, volumes, profiles and the image lock
+- Services added to the table of section 4: `node-exporter`, `postgres-exporter`, `blackbox-exporter` (phase 03,
+  section 4.4, pinned, networks as in 7.7); `llama` (`akr/llama-server`, pinned and signed, `z2_model`, volume
+  `assistant-store` read-only, bearer secret from a read-only file); `llama-eval` (same image, profile `assistant-eval`);
+  `llama-stub` (test only, profile `test`, never in the production bundle) (phase 28 section 4.4).
+- Volumes: the installation file `deploy/branding.json`, a read-only bind mount into `akr-worker` at
+  `/etc/akr/branding.json` (phase 06 section 4); `model-store`, read-only, mounted into `akr-worker` at `/var/akr/models` with `AKR_MODEL_STORE` set
+  (phase 27 section 4.4); `assistant-store`, read-only, mounted into `llama` and `akr-worker` at `/var/akr/assistant`
+  (phase 28 section 4.4); the inbox host path `AKR_INGEST_INBOX_ROOT` (default `/var/akr/inbox`), mounted into
+  `akr-ingestd` only (phase 11 section 4.2).
+- Profiles: `cdc` (opt-in, `akr-cdc`, not started unless `ingest.cdc_enabled`; phase 11 section 4.2); dev profiles
+  `fixtures`, `fixtures-oracle` and `fixtures-mssql` (phase 05 section 4; images pinned by digest).
+- `deploy/images.lock`: the file that pins every image by digest, one line per image (name, digest, source). Phases 05
+  and 28 read it; section 4 must define it.
+
+### 7.9 Readiness: akr-assess and akr-ingestd
+- Replace "`akr-assess` database, Valkey" with: "`akr-assess` database, the decision key loaded, every enabled list
+  index built, and the policy snapshot loaded. Valkey is not a readiness condition (DR-325)."
+- `akr-ingestd` adds: `source_listener` (the `LISTEN akr_source` connection is up) and `adapters` (every compiled
+  adapter's client library loads; a missing Oracle client makes that adapter `unavailable`, not the binary unready).
+
+### 7.10 Caddy edge headers, exclusions and the web pipeline
+- Caddy adds, for `/`: `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+  font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'`;
+  `Strict-Transport-Security`; `X-Content-Type-Options: nosniff`; `Referrer-Policy: no-referrer`; `Permissions-Policy`
+  denying camera, microphone, geolocation, payment and USB. `Cache-Control: no-store` on `index.html`; hashed assets
+  immutable for one year. `/branding.json` is served with `no-cache`. (Phase 08 section 4.)
+- Caddy answers 404 for `/api/v1/directory/events` in every profile, before the `/api/*` rule (phase 31 section 4.4).
+- Web pipeline steps (section 6): `pnpm install --frozen-lockfile`; `pnpm licenses list` check; `tsc -b`; `eslint`;
+  `scripts/lint-design.mjs`; `scripts/gen-tokens.mjs` and `scripts/check-contrast.mjs`; the Orval, contract and
+  policy-matrix drift check; `vitest run`; `vite build` with the bundle budget; Playwright with axe (phase 08 section 4).
+
+### 7.11 maintenance_sweep and backup_check additions
+`maintenance_sweep` also deletes:
+(a) `admin.stepup_assertions` rows older than `stepup.retention_days` (phase 01);
+(b) objects under `staging/` in `akr-quarantine` older than `evidence.staging_ttl_h` that have no evidence row or whose row is
+    clean; it never deletes an infected or rejected object (phase 02 section 3);
+(c) goAML `transient/` objects older than `evidence.staging_ttl_h` whose run is final or missing; the run is flagged
+    `transient_deleted` and audited as `goaml_check.transient_deleted` with `by: sweep` (phase 07 section 3.2).
+`backup_check` also sets the gauge `akr_failover_drill_age_days` from `ops.last_failover_drill_at` (phase 30 section 3.2).
+
+### 7.12 Release bundle: charts and K3s artifacts
+- `akr-ctl bundle build` (step 7 of section 4) adds `chart/` (the Helm chart `chart/akr` and the third-party charts pinned by
+  digest) and `k3s/` (the K3s binary, the air-gap images tarball of the pinned release, the install script). The manifest
+  lists them with SHA-256 digests, as the other files do.
+- `akr-ctl bundle verify` also verifies the chart signatures. Nothing else in the verify path changes (phase 30 section 3.12).
+
+### 7.13 Schema list: train
+Migration 0001 is unchanged. Phase 31 creates the schema `train` in its own migration (`CREATE SCHEMA IF NOT EXISTS
+train AUTHORIZATION akr_migrate`, with its grants; DR-338). The schema list of section 1 names it as a later addition,
+as it does for the schemas of later phases.
+
+### 7.14 Config and coverage tests for the audit partitions
+- `Config::validate` refuses `TracingSink` when `AKR_ENV = production` (phase 02 section 2).
+- The classification and retention coverage tests of section 6 skip partitions (`relispartition = true`) and run over the
+  `audit` schema as well (phase 02 section 4).
+
+### 7.15 Keyed-hash purposes
+Every call of `keyed_hash(purpose, data)` names a purpose, declared as a constant of `common::crypto::Purpose` by the
+phase that uses it; a test asserts that the names are unique. Purposes declared so far: `csrf`, `token` and
+`login_identifier` (phase 01), and `islamic.document_ref` (phase 26; phase 26 wrote "phase 02 purpose", corrected in
+its 7.1). The phase 10 mapping transform `KeyedHash(purpose)` computes `_hk` values with the match key
+`keys/match-key` and declares its purposes the same way.
+
+Adversarial pass (2026-10-10), run 4 (clocks and timers on closed, merged or reopened items), from tools/agent/adv-run4.md; lead-verified (tools/agent/adv-run4-verdict.md).
+
+### 7.16 Cancel touches pending timers only (ADV-4-10, MEDIUM; DR-410)
+`TimerService::cancel` and `cancel_for_owner` run `UPDATE admin.timers SET cancelled_at = now() WHERE <id, or owner_kind,
+owner_id and kind> AND fired_at IS NULL AND cancelled_at IS NULL` and return the number of rows changed. A timer that
+already fired or was cancelled matches nothing, so the call succeeds with 0; without the predicate the CHECK `fired_at IS
+NULL OR cancelled_at IS NULL` would fail the owner's transaction (a freeze release, a filing, a work item completion).
+Test: a fired `freeze_due` timer, then `cancel_for_owner` on the freeze: 0 rows, and the release commits.
+
+Adversarial pass (2026-10-10), run 6 (idempotency, audit chain and outbox replay), from tools/agent/adv-run6.md; lead-verified (tools/agent/adv-run6-verdict.md).
+
+### 7.17 One transaction for the claim, the handler and the stored response (ADV-6-01, ADV-6-02, HIGH; DR-412)
+`IdempotencyService` (section 3) changes as follows; DR-412 replaces the takeover clause of DR-21.
+1. After step 3 the middleware opens the request transaction `RequestTx` and runs `SET LOCAL lock_timeout` to
+   `idempotency.in_flight_lease_s`. Step 4's claim INSERT runs on it.
+2. The handler receives `RequestTx` as its business transaction (an extractor) and never commits it. A step that a
+   phase names "in its own transaction" (the decision row of phase 03, access events of phase 02, the opened-view rows of
+   phase 18) keeps its own transaction: those rows record an attempt, and a retry may write them again.
+3. Handler success (2xx): the business audit emit is still the last business statement (phase 02 rule); the middleware
+   then seals the body, writes step 5's columns on the claim row and commits once. Any other outcome rolls the whole
+   transaction back, which replaces "delete the claim"; the transient failure stays retryable.
+4. A second request with the same key and hash blocks on the uncommitted claim (READ COMMITTED: `INSERT ... ON CONFLICT
+   DO NOTHING` waits for the other transaction). When the first commits it reads `completed_at` and replays; when the
+   first rolls back its own INSERT succeeds and it runs the handler; when the wait passes `lock_timeout` it answers 409
+   `E_IDEMPOTENCY_IN_FLIGHT`.
+5. The takeover branch of step 4 is removed: a dead process leaves no committed claim.
+Tests: (a) a fault hook that kills the request after the handler returns and before commit: a retry runs the handler
+once and the case has one note; (b) a handler that sleeps 3 s with a 1 s lease and two requests with one key: one
+handler run, the second gets 409 or the replay.
+
+### 7.18 Jobs complete in their own transaction (ADV-6-05, MEDIUM; DR-412)
+`JobContext::complete_in(tx)` runs `UPDATE admin.jobs SET status = 'done', finished_at = now() WHERE id = $1 AND status
+= 'running' AND attempts = $2` in the handler's transaction (`$2` is the attempt number `JobContext` carries; every claim adds one to `attempts`, so it names this worker's claim, and `locked_at` cannot, because the heartbeat of 7.2 moves it). One
+row: the effects and the completion commit together, and the harness's step 4 write is skipped. Zero rows (the lease
+reaper re-queued the job or another worker holds it): the handler returns `JobError::Retryable` and its transaction
+rolls back, so only one attempt's effects commit. A handler whose work is one transaction uses it; from phase 15 on
+`rating_compute` does. Handlers that run one transaction per item make each item's own state change the marker, so a second attempt skips the items already done (phase 19 `hibernation_release` sets `released_at` per hit).
+
+### 7.19 Lost outbox rows and dead jobs page the operator; the key window (ADV-6-04 MEDIUM, ADV-6-06 LOW; DR-412)
+1. `deploy/observability/` holds two alert rules: `akr_outbox_stuck > 0` for 5 minutes, and an increase of
+   `akr_jobs_dead_total` over 15 minutes; each is a P2 page to the operator, in addition to the phase 03 cockpit tile. A
+   row at `outbox.max_attempts` is lost to its consumers (a KYC trigger, a notice, an alarm) until someone acts, so it
+   must not wait for someone to open the cockpit.
+2. An `Idempotency-Key` is valid for `idempotency.ttl_days` (DR-21: a storage window). A retry after the sweep is a new
+   request; the generated client retries within minutes and makes a new key for a new user action.
+
+Verification pass (2026-10-10), from tools/agent/verify/; lead-verified (tools/agent/verify-verdict.md).
+
+### 7.20 SP-74: the VEX statement, and where models are listed (V-00-02-b, V-00-02-c, MEDIUM; DR-413)
+- CI step 7 (section 4): the bundle also holds one VEX statement per release (CycloneDX), beside the SBOMs and under the
+  manifest digests. It lists the known vulnerabilities of the release's components that are not exploitable in AKR-TMS,
+  each with its reason and owner, taken from the waiver register `deploy/waivers.toml` (step 2), which also holds the
+  waived Trivy findings of step 5.
+- `akr-ctl bundle verify` treats the VEX statement as part of the SBOM set: a bundle without it is refused as a bundle
+  without an SBOM is (phase 25 refusal code `sbom_missing`).
+- A model is not a release component: a release imports no model (DR-390). The signed manifest of a model version is
+  its bill of materials (phase 27 section 3.3; phase 28 section 3.9), so the release SBOM lists no model.
+
+### 7.21 A failing WAL archive pages the operator (V-00-03-a, MEDIUM; DR-413)
+From phase 03 on (the postgres exporter), `deploy/observability/` holds a third alert rule beside the two of 7.19: the
+WAL archiver reports a failure newer than its last success for 5 minutes (the exporter's `pg_stat_archiver` series). It
+is a P2 page to the operator (SP-84, the loud WAL-gap alarm). `backup_check` and its marker are unchanged: they cover the
+age of the last backup, not a gap in the archive.
+
+### 7.22 Crypto port errors (V-00-05-a, MEDIUM; DR-413)
+Section 2 crypto port: the trait line is shorthand. Every method returns `Result<_, CryptoError>` (OpenBao or the key
+cannot be reached, or the tag and AAD check of `open` fails). `CryptoError` is the type phase 12's
+`CertificateSigner::sign` already names. A caller maps it to 503 `E_UNAVAILABLE`, as phase 02 section 3 does for its
+`Crypto` case, unless its own error section says otherwise.
+
+### 7.23 The TopicHandler trait (V-00-06-a, MEDIUM; DR-413)
+Section 3 `OutboxDispatcher`, with 7.1: a topic handler implements
+`trait TopicHandler { async fn handle(&self, tx: &mut Transaction<'_, Postgres>, row: &OutboxRow) -> Result<(), JobError>; }`.
+`OutboxRow` is the claimed `admin.outbox` row that `OutboxStore::claim` returns; `tx` is the row's transaction of 7.1.
+Any `Err` leaves the row undispatched under the back-off of that section; `JobError::Permanent` is treated like
+`Retryable` here, because a row leaves the queue only by success or at `outbox.max_attempts`.
+
+### 7.24 Harness rows and retention sweeps emit no audit event (V-00-09-a, V-00-10-a, LOW; DR-413)
+Rows of `admin.jobs`, `admin.outbox`, `admin.timers` and `admin.idempotency_keys` are operational state, not business
+data. Their inserts, claims, fires, cancels, retries and retention deletes emit no audit event: the owner's own event
+records the business effect, and `job.dead` is the one harness event (section 3, the audit-event table). The same holds for the
+`maintenance_sweep` deletes of 7.11 (a) and (b): the issue and the use of a step-up assertion are audit events already
+(phase 01), and a staging object that never became evidence has no record to keep. `maintenance_sweep` reports every
+delete count to metrics. Item (c) of 7.11 stays audited, because it changes a run's row.
+
+### 7.25 Setting change hooks (V-06-04-b, MEDIUM; DR-413)
+`SettingsService::apply` consults a registry of `SettingChangeHook`s, one list per key, empty in this phase and registered by the consuming phase (the pattern of phase 03's `FlagChangeHook`). A hook runs in the caller's transaction after the write, for every `ChangeSource` and for a revert. From phase 06 on, phase 06 registers the hook that enqueues `coverage_grade {reason: "setting"}` when `coverage.maintained_fields` changes; that is the enqueue phase 06 sections 3.3 and 4 give to "the phase 04 activation of the setting".
+
+### 7.26 Keyset cursor and Page<T> (V-06-06-c, LOW; DR-413)
+The cursor of the `common` module (section 2) is the type `Keyset`: an opaque position on a list's sort columns, sent as the `cursor` query parameter and returned as `next_cursor`, as the pagination rule of docs/API.md states. `Page<T> { items: Vec<T>, next: Option<Keyset> }` is what every keyset list method returns; `next` is `None` on the last page. `Cursor` in the repository signatures of phases 03 and 04 is the same type.
+
+### 7.27 Who creates the transit keys (V-23-09-a, MEDIUM; DR-413)
+The transit keys of the OpenBao layout (section 3 and 7.6) are created once per install by the OpenBao ceremony runbook (SP-12), and by `make bao-dev` in development. No `akr-ctl` command creates a key; phase 23 named an `akr-ctl ops provision` that does not exist.
+
+### 7.28 Help articles and release notes in the bundle (V-25-08-b, MEDIUM; DR-413)
+From phase 25 on, `akr-ctl bundle build` (section 4, item 7) also writes `help/*.json` (the help articles and "what changed" entries of phase 25 section 3.9) and `notes.json` (the bilingual release notes with the policy bundle hash, which phase 25 section 3.6 reads). The manifest lists both with their SHA-256 digests, like every other file.
+
+### 7.29 The failover drill key: CLI exemption and null seed (V-30-06-a, V-30-06-b, MEDIUM; DR-328; DR-413)
+From phase 30 on, the CLI-only exemption of section 3 covers two governed keys: `ops.last_restore_drill_at`, written by `akr-ctl ops record-restore-drill`, and `ops.last_failover_drill_at`, written by `akr-ctl ops record-failover-drill` (phase 30 section 3.9). Both writes go through `SettingsService::apply` with `ChangeSource::Direct`, and no other governed key is covered. The settings registry marks `ops.last_failover_drill_at` nullable until the first passed drill, as it marks `ops.last_restore_drill_at`, so the null seed of migration `0095` is allowed.
 
 ## What This Phase Does NOT Touch
 

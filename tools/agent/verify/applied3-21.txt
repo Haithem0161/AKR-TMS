@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-21.md by the second re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-21-1]
+WHY: S-21-1 | CONFIRMED LOW (raised HIGH) | the trailer (the R-21-2 text) says this phase "only implements the phase 20 port method `LetterRequester::delivered`"; sections 2 and 3.15 and section 4.5 say it implements the whole port, `request` too. A wrong word in the scope trailer; the body is right | the trailer names the port and both methods
+OLD: this phase only implements the phase 20 port method `LetterRequester::delivered` (section 4.5 item 9). The freeze clocks are phase 20's.
+NEW: this phase only implements the phase 20 port `LetterRequester` (`request` in section 3.15, `delivered` in section 4.5 item 9). The freeze clocks are phase 20's.

@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-18.md by the third re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [T-18-1]
+WHY: T-18-1 | CONFIRMED LOW (raised MEDIUM) | section 4.5 item 4 still says `AssignmentService` "revokes the previous assignee's grant on reassignment" with no condition: the third place of the sentence that L2-17-1 corrected in two (phase 17 section 7.2, phase 18 section 3.2). The lead's sweep for the second re-check missed it | the item names the two reasons and points to section 3.2
+OLD: writes the access-list grants of section 3.2 in the assignment transaction, and revokes the previous assignee's grant on reassignment.
+NEW: writes the access-list grants of section 3.2 in the assignment transaction, and on a reassignment revokes the previous assignee's grant of the reasons `assignment` and `second_review` (section 3.2).

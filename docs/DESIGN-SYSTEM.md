@@ -660,7 +660,7 @@ The catalogue below is the source for `frontend/src/app/screens.ts` (ID, route, 
 generates the routes, the role-aware rail, the access-matrix report and the route-to-policy coverage test (every
 route maps to a Cedar action; none answers without a decision) (UX-53; SP-25, SP-71). Research file 31 section 10
 holds each screen's purpose and key elements; this table adds the route and the layout pattern. Screens E1 and E2
-are added by this document for the two early pieces of P0.
+are added by this document for the two early pieces of P0; G10 is added by phase 08 (DR-74).
 
 Layout patterns:
 
@@ -680,11 +680,11 @@ Layout patterns:
 |---|---|---|---|---|
 | X1 | Sign-in and step-up | `/sign-in` (dialog everywhere) | FORM | P1 (P0 for staff) |
 | X2 | Global search and command palette | header | overlay | P1 |
-| X3 | Notifications and task inbox | `/notifications` | LIST | P1 |
-| X4 | Profile and preferences | `/me` | FORM | P1 |
+| X3 | Notifications and task inbox | `/inbox` | LIST | P1 (task half P0, phase 08) |
+| X4 | Profile and preferences | `/me` | FORM | P1 (security section P0, phase 08) |
 | X5 | Help centre, glossary, what changed | `/help` | reading | P1 |
 | X6 | Not found and no access | any | message | P0 |
-| E1 | goAML checker | `/goaml-check` | STEPPER | P0 |
+| E1 | goAML checker (with the profile pages at `/goaml-check/profiles`) | `/goaml-check` | STEPPER | P0 |
 | E2 | Discovery and CBI coverage gap report | `/discovery` | DASH | P0 |
 | W1 | My work | `/work` | DASH | P1 |
 | W2 | Alert and case queue | `/queues/:id` | LIST | P1 |
@@ -729,6 +729,8 @@ Layout patterns:
 | G7 | Retention and legal holds | `/retention` | REGISTER | P1 |
 | G8 | Assessor workspace | `/assessor` | DASH | P1 |
 | G9 | Training register | `/training` | REGISTER | P1 |
+| G10 | Change requests | `/changes` | LIST + detail | P0 (phase 08) |
+| I1 | Sharia board aggregates | `/islamic/sharia-board` | DASH | P1 (phase 26, optional pack) |
 | B1 | Branch home | `/branch` | INBOX | P1 |
 | B2 | Branch review | `/branch/items/:id` | FORM | P1 |
 | B3 | Observation form | `/branch/observe` | FORM | P1 |
@@ -740,7 +742,9 @@ Layout patterns:
 | A3 | Platform health | `/admin/health` | DASH | P0 |
 | A4 | Release and updates | `/admin/releases` | STEPPER | P1 |
 
-**Count:** 61 screens (59 from research file 31 plus E1 and E2), 8 with approved mockups (01 G1, 02 W3, 03 S1,
+**Count:** 63 screens (59 from research file 31 plus E1, E2, G10, the change-request screen behind the rail's
+"Governance (change requests)" entry, added by phase 08, DR-74, and I1, the Sharia board view of phase 26, added by
+gap pass 1), 8 with approved mockups (01 G1, 02 W3, 03 S1,
 04 K1, 05 D2, 06 W6, 07 R1, 08 T1).
 
 ### 8.2 Rail by role
@@ -780,7 +784,10 @@ overdue and at-risk clocks, verification failures, data and coverage incidents),
 before (arrivals against throughput, capacity ratio, QA status, tipping-off summary), then the detail (backlog by
 elapsed age, top scenarios with cases, UTRs and STRs and a defined "productive", regulatory deadlines with words,
 branch liaison reports submitted of total). Every tile has a definition, a formula in its help, the data-as-of time,
-and opens its list. Open work reads "1,284 alerts in 911 cases". Stacked bars gapped and labelled.
+and opens its list. Open work reads "1,284 alerts in 911 cases". Stacked bars gapped and labelled. From phase 29,
+the Assessment tile (phase 29 section 5.3): modes per rail, list freshness, open blind periods and open release
+exceptions, counts only; visible to M, CH and IA; it opens the Assessment tab of D3 for M and CH and the
+release-without-decision list for IA.
 
 **W2 Alert and case queue (UX-05, UX-13, UX-14; IR-10 to IR-16).** LIST pattern. Columns: priority class (code and
 word), customer (Name, Arabic first), top reason (ReasonChip), age, next due (Clock), merged-alert count, owner; no
@@ -806,6 +813,12 @@ aliases in help), each with its consequence line (freeze clock and 48-hour Commi
 reason recorded). "Remember this decision for this pair" appears only on Incorrect match, unticked, with its expiry.
 Four-eyes notice on freeze lists; coded reason required.
 
+**S2 Screening queue, tab Holds (phase 29 section 5.1).** A tab beside the alert queue lists payment holds
+(`GET /api/v1/assess/holds`) with the rail, the mode label ("held at the gateway", "advisory: not held at the
+gateway", "shadow: no gateway effect"), reason codes, age, the countdown to expiry and the proposal state. A
+suspicion-tier subject the caller may not see is not listed. Claim, propose release or reject, and approval by a
+second person follow the alert rules of S2, each with step-up class `decision`.
+
 **K1 Customer risk profile (mockup 04; UX-59).** The number, the level word and the 12-month trend (no decorative
 gauge). Drivers as sorted bars with points, reasons, refresh dates and the missing-input share; floors and triggers
 that applied, in words; override history; rating-change reasons; EDD checklist with dates; open cases and watches
@@ -816,6 +829,11 @@ segment with hard bounds and approved band shown; plain-language description "wr
 history and below-the-line sample; the change-request panel with computed class, volume effect and route (7.17);
 version history; effective date. The example reason in the mockup is replaced by a risk reason, and capacity wording
 is flagged.
+
+**D3 Policy studio, tab Assessment (phase 29 section 5.2).** Three panels: Fail policy (the matrix as a table and
+the bands per currency), Rail modes (one row per rail with its mode, effective-from instant and readiness criteria
+with observed and required values) and Prohibited rules (read-only list with "Propose a rule"). Each panel says
+that a change is material and needs MLRO and CHK, and CH for a decrease.
 
 **W6 Network view (mockup 06; UX-10, UX-61).** 7.16, plus "Open one case for the cluster" and "Add graph to evidence"
 with the snapshot note.

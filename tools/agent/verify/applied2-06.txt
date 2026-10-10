@@ -1,0 +1,34 @@
+Replacements made in docs/plan/phase-06.md by the first re-check (DR-413). 6 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-07-1e]
+WHY: R-07-1 | CONFIRMED MEDIUM (raised HIGH) | the running operation totals are one short from phase 04 on: phase 04 has 32 operations with the evidence route of 7.2, so 86, 107, 121 and 130, not 85, 106, 120 and 129 (lead counted the route rows: 22, 32, 32, 21, 14, 9) | six numbers corrected in phases 04 to 07
+OLD: 14 new operations (120 with phases 01, 03, 04 and 05)
+NEW: 14 new operations (121 with phases 01, 03, 04 and 05)
+
+=== F2 [R-06-1]
+WHY: R-06-1 | CONFIRMED LOW | 7.10 makes `code` and `name` of a linked entry optional but leaves `restricted` required on every entry | `restricted` is present only on a restricted entry
+OLD: (absent for a restricted scenario, which carries `restricted: true`).
+NEW: (absent for a restricted scenario, which carries `restricted: true`); `restricted` itself is present, as true, only on such an entry.
+
+=== F3 [R-06-2]
+WHY: R-06-2 | CONFIRMED HIGH | step 1 of `gap_report_build` ends on any run that is not `queued`, so the retry of a failed render stops at once and leaves the run `running`; the active-run index then refuses every new run | a `running` run is a retry and resumes
+OLD: the lifecycle events of section 3.8 cover the run); a run that is not `queued` -> done.
+NEW: the lifecycle events of section 3.8 cover the run): a `queued` run becomes `running`; a run already `running` is a retry of this job and resumes from the step it reached (section 4); a `completed` or `failed` run -> done.
+
+=== F4 [R-06-3a]
+WHY: R-06-3 | CONFIRMED HIGH | the cover reads `deploy/branding.json` "which akr-worker mounts", but section 4 says compose is unchanged and the phase 00 volume list has no such mount, so every run would fail | the mount is added in phase 06 section 4 and phase 00 section 7.8
+OLD: - **Docker compose:** no change. Gotenberg
+NEW: - **Docker compose:** one change: akr-worker gains a read-only bind mount of the installation file `deploy/branding.json` at `/etc/akr/branding.json` (the cover of section 3.5 reads the bank name from it; the phase 00 volume list names it). Gotenberg
+
+=== F5 [R-06-4]
+WHY: R-06-4 | CONFIRMED LOW | pointer: the file is named in phase 08 section 3.10, not section 4 | pointer
+OLD: from the installation file `deploy/branding.json` of phase 08 section 4, which
+NEW: from the installation file `deploy/branding.json` of phase 08 section 3.10, which
+
+=== F6 [R-06-5]
+WHY: R-06-5 | CONFIRMED LOW (raised MEDIUM) | `AttributeKey` is used and never defined | defined in the 7.x block
+OLD: `reasons` carries `no_scenario` when item rule 1 gives D, and `missing_fields` follows item rule 3.
+NEW: `reasons` carries `no_scenario` when item rule 1 gives D, and `missing_fields` follows item rule 3. `AttributeKey`, used here and by `Need` and `grade` in section 2, is a newtype over `String` that holds one canonical attribute reference (`<entity>.<field>`, the `CanonicalRef` form of DSL.md B.1) and is checked when it is built.

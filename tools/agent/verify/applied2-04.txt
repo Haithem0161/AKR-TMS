@@ -1,0 +1,50 @@
+Replacements made in docs/plan/phase-04.md by the first re-check (DR-413). 9 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-04-1]
+WHY: R-04-1 | CONFIRMED LOW | the pointer "(section 3.1, DR-54)" in section 4 reads as a section of this phase; the statement is in phase 03 section 3.1 and in section 3.5 of phase 04 | pointer names both
+OLD: the announced change-request pair is not added (section 3.1, DR-54)
+NEW: the announced change-request pair is not added (phase 03 section 3.1 and section 3.5 of this phase, DR-54)
+
+=== F2 [R-04-2a]
+WHY: R-04-2 | CONFIRMED LOW | the section 1 comment and the section 6 check still say only lifecycle columns are updatable, while the grant now includes `evidence` (7.18) | both lines name `evidence`
+OLD: -- lifecycle columns are the only updates.
+NEW: -- lifecycle columns are the only updates, with one exception: evidence, which the maker's evidence route
+-- appends to (sections 7.2 and 7.18).
+
+=== F3 [R-04-2b]
+WHY: R-04-2 | CONFIRMED LOW | the section 1 comment and the section 6 check still say only lifecycle columns are updatable, while the grant now includes `evidence` (7.18) | both lines name `evidence`
+OLD:    lifecycle columns only; `UPDATE admin.change_requests SET proposed = '{}'` as `akr_app` fails (permission);
+NEW:    lifecycle columns and `evidence` only (section 7.18); `UPDATE admin.change_requests SET proposed = '{}'` as `akr_app` fails (permission);
+
+=== F4 [R-04-3]
+WHY: R-04-3 | CONFIRMED LOW | the evidence route closes at "no decision recorded yet" in the table and at outcome `approved` or `rejected` in the steps; a `signed` outcome is a decision too | steps say: no deciding task in state `done` in the current pass
+OLD: with no task of the request's instance whose `outcome` is `approved` or `rejected` in
+NEW: with no deciding task of the request's instance in state `done` (a recorded decision: outcome `approved`, `rejected` or `signed`) in
+
+=== F5 [R-04-4]
+WHY: R-04-4 | CONFIRMED MEDIUM | block 7.19 names no refusal code for `mode: rework` without `to`, nor for a `to` that is not an earlier step | `E_SCHEMA` and `E_DANGLING_REF` named
+OLD: and the definition validator refuses `mode: rework` without it.
+NEW: and the definition validator refuses `mode: rework` without it (`E_SCHEMA`); a `to` that is not a step of the definition from which the rejecting step can be reached is `E_DANGLING_REF`.
+
+=== F6 [R-07-1a]
+WHY: R-07-1 | CONFIRMED MEDIUM (raised HIGH) | the running operation totals are one short from phase 04 on: phase 04 has 32 operations with the evidence route of 7.2, so 86, 107, 121 and 130, not 85, 106, 120 and 129 (lead counted the route rows: 22, 32, 32, 21, 14, 9) | six numbers corrected in phases 04 to 07
+OLD: - **Route table** (31 operations; scope
+NEW: - **Route table** (32 operations with the evidence route of section 7.2; scope
+
+=== F7 [R-07-1b]
+WHY: R-07-1 | CONFIRMED MEDIUM (raised HIGH) | the running operation totals are one short from phase 04 on: phase 04 has 32 operations with the evidence route of 7.2, so 86, 107, 121 and 130, not 85, 106, 120 and 129 (lead counted the route rows: 22, 32, 32, 21, 14, 9) | six numbers corrected in phases 04 to 07
+OLD: `admin-users`; 31 operations, each with `x-akr-action`;
+NEW: `admin-users`; 32 operations (the 31 of section 2 and the evidence route of section 7.2), each with `x-akr-action`;
+
+=== F8 [R-07-1c]
+WHY: R-07-1 | CONFIRMED MEDIUM (raised HIGH) | the running operation totals are one short from phase 04 on: phase 04 has 32 operations with the evidence route of 7.2, so 86, 107, 121 and 130, not 85, 106, 120 and 129 (lead counted the route rows: 22, 32, 32, 21, 14, 9) | six numbers corrected in phases 04 to 07
+OLD: 31 new operations (85 with phases 01 and 03)
+NEW: 32 new operations (86 with phases 01 and 03)
+
+=== F9 [L-04-1a]
+WHY: L-04-1 | CONFIRMED LOW (lead, second look) | the Complexity line and the status.md row still count 31 routes; the phase has 32 with the evidence route of 7.2 (R-07-1 fixed the three check places only) | both say 32
+OLD: **Complexity:** XL (31 routes and the workflow engine)
+NEW: **Complexity:** XL (32 routes with the evidence route of section 7.2, and the workflow engine)

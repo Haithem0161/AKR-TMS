@@ -1,0 +1,264 @@
+Fixes applied to docs/plan/phase-11.md by the verification pass (DR-413). 39 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/11.txt)
+OLD: audit `source.halt_resolved {decision, tables, check_id}`
+NEW: audit `source.halt_resolved {decision, tables, check_id}` (`check_id` is the fresh check of step 2; the id in the job payload is the check the route read)
+
+=== F2 REP (from fixes/11.txt)
+OLD: ConnectionGuard::connect(source, Trigger::Resume)
+NEW: ConnectionGuard::connect(source, CheckTrigger::Resume)
+
+=== F3 REP (from fixes/11.txt)
+OLD: Halts are cleared; no watermark
+NEW: The as-of marker of section 7.13 is written when the halt was `as_of_regressed`. Halts are cleared; no watermark value
+
+=== F4 BLOCK (from fixes/11.txt)
+### 7.N The watermark rows are created before the first unit (V-11-02-a, HIGH; DR-413)
+`advance` is an UPDATE, so a table with no row could never take its first value. `WatermarkRepository` gains
+`ensure_rows(conn, source, table, branches: &[String], kind: WatermarkKind) -> Result<u64, RepoError>`: an insert with
+`value` NULL and `ON CONFLICT (source_id, source_table, branch_code) DO NOTHING`, run as its own statement before the
+unit's transaction (`akr_ingest` already holds INSERT on `admin.watermarks`). `ingest_load` step 2 calls it after the
+branch-dates read: one row per branch for a `business_date` table, one row with `branch_code` `*` for every other
+kind. `ingest_file_scan` calls it with the manifest's `branch_code` before the sequence comparison of section 3.4
+extract step 2; a NULL `value` reads as sequence 0, so the first manifest of a table and branch has sequence 1. A new
+row is `never_loaded` for the freshness job (section 3.7 rule b). No audit event: the first `batch.recorded` records
+the first move.
+
+=== F5 REP (from fixes/11.txt)
+OLD: `UnitPlanner::plan(watermarks, kind, overlap, settle, history_from, closed_dates, slice_days, max_unit_rows)`
+NEW: `UnitPlanner::plan(watermarks, kind, overlap, lookback, lag_days, lookback_max_days, sequence_overlap_keys, settle, history_from, closed_dates, slice_days, max_unit_rows)`
+
+=== F6 BLOCK (from fixes/11.txt)
+### 7.N Fields of the watermark port types (V-11-02-c, LOW; DR-413)
+`StaleChange` (`WatermarkRepository::set_stale`) is `{ source_id, source_table, branch_code, class: FreshnessClass,
+reason: Option<StaleReason>, data_as_of: Option<NaiveDate> }`; a `reason` of None clears the stale mark.
+`StaleTransition` has the same fields and is returned only for a row whose stored mark changed: with a reason it is
+`freshness.stale_entered`, with None `freshness.recovered`. `WatermarkWithSource` is `{ watermark: Watermark,
+source_code: String, source_state: SourceState }` (phase 05's enum, read by rule a2 of section 7.9).
+
+=== F7 REP (from fixes/11.txt)
+OLD: 3. Estimate: `LandingStore::estimate` counts the landed rows of each table in the window
+NEW: 3. Estimate: `BatchRepository::rows_landed_in` sums `rows_landed` over the receipts of each table in the window
+
+=== F8 BLOCK (from fixes/11.txt)
+### 7.N The replay estimate reads receipts, not raw (V-11-03-a, HIGH; DR-413)
+akr-api never reads `raw` (section 4.3) and `LandingStore` is akr-ingestd's, so the route of section 3.8 cannot call
+`LandingStore::estimate`. `BatchRepository` gains `rows_landed_in(conn, source, table, from: DateTime<Utc>, to:
+DateTime<Utc>) -> Result<i64, RepoError>`: the sum of `rows_landed` over the table's receipts whose `started_at` is in
+the window, replay receipts left out. Step 3 of `POST /mappings/{id}/replays` uses it for `estimate_rows` and for the
+`E_COST_GUARD` refusal. `LandingStore::estimate` is called by the job only (akr-ingestd), before its first page, for
+the `cost_guard` comparison of job step 7.
+
+=== F9 BLOCK (from fixes/11.txt)
+### 7.N Replay receipts of a files table carry no file hash (V-11-03-b, HIGH; DR-413)
+A replay page is not a file, yet the `admin.batches` CHECK asked every receipt of a `files` table for `file_sha256`.
+Migration 0033 (section 1.1): the CHECK `((file_sha256 IS NOT NULL) = (delivery = 'files'))` becomes
+`CHECK ((file_sha256 IS NOT NULL) = (delivery = 'files' AND NOT (manifest ? 'replay')))`. A replay receipt (section
+3.8 apply step 2) has `file_name` and `file_sha256` NULL for every delivery.
+
+=== F10 REP (from fixes/11.txt)
+OLD: `mapping_version_id` set, watermark fields NULL (a replay moves no
+NEW: `mapping_version_id` set, `status` `mapped` or `partial` by the rule of section 3.2 step 6, watermark fields NULL (a replay moves no
+
+=== F11 REP (from fixes/11.txt)
+OLD: the unit machinery of section 3.2 steps 2 to 5 without the
+NEW: the mapping and the writer of section 3.2 step 5 over the landed rows of the window, read in `(extracted_at, id)` order with `LandingStore::read_window` (apply lands no raw row, so steps 2 to 4 of section 3.2 do not run), without the
+
+=== F12 REP (from fixes/11.txt)
+OLD: 7. Failure: status `failed` with `error_code`
+NEW: 7. Failure: status `failed` with `finished_at` and `error_code`
+
+=== F13 REP (from fixes/11.txt)
+OLD: that port is not in phase 04 today.
+NEW: phase 04 section 7+ adds that port (`approver_ids`), so this doubt is closed.
+
+=== F14 REP (from fixes/11.txt)
+OLD: `ended_at`, `business_from`, `business_to` and a `comment` of 10 to 2,000 characters.
+NEW: `business_from` and `business_to`, a required `ended_at` (not in the future, not before `started_at`; a declaration records a period that is over, so no declared period stays open and none needs a close route) and a `comment` of 10 to 2,000 characters.
+
+=== F15 REP (from fixes/11.txt)
+OLD: `started_at`, `ended_at?`, `business_from?`,
+NEW: `started_at`, `ended_at`, `business_from?`,
+
+=== F16 REP (from fixes/11.txt)
+OLD: cause `akr_outage` and a `started_at` after the newest anchor returns 200
+NEW: cause `akr_outage`, a `started_at` after the newest anchor and an `ended_at` returns 200, and without `ended_at` 422
+
+=== F17 REP (from fixes/11.txt)
+OLD: `scope_invalid`, `started_before_anchor` |
+NEW: `scope_invalid`, `started_before_anchor`, `in_future` (at `/started_at` or `/ended_at`), `too_short` and `too_long` (at `/comment`); `range_inverted` also answers an `ended_at` before `started_at` and a `business_to` before `business_from` |
+
+=== F18 BLOCK (from fixes/11.txt)
+### 7.N The declaration call (V-11-04-a HIGH, V-11-04-c MEDIUM; DR-413)
+`BlindPeriodService::declare(ctx, body: BlindPeriodDeclaration) -> Result<BlindPeriod, AppError>` is the call of
+`POST /coverage/blind-periods`; phase 30 uses the same service for system periods. In one transaction:
+1. Refuse a `scope` other than `system` or `rail` (422 `scope_invalid`).
+2. Refuse a `started_at` or `ended_at` in the future (`in_future`), a `started_at` before the newest
+   `audit.audit_anchors.anchored_at` (`started_before_anchor`), an `ended_at` before `started_at` or a `business_to`
+   before `business_from` (`range_inverted`), and a `comment` outside 10 to 2,000 characters (`too_short`, `too_long`).
+   A body without `ended_at` fails the schema (422 `E_VALIDATION` at `/ended_at`).
+3. `BlindPeriodRepository::open(tx, &NewBlindPeriod)` inserts the row with its `ended_at`; the partial unique index
+   covers source scope only, so the insert always returns a row.
+4. Audit `blind_period.declared {scope, cause, started_at, ended_at}`.
+A declared period is never open, so the automatic close of section 3.6 stays for source periods only and `akr_app`
+needs no UPDATE grant on `admin.blind_periods`.
+
+=== F19 REP (from fixes/11.txt)
+OLD: | GET | /coverage/blind-periods | dashboard.read |
+NEW: | GET | /coverage/blind-periods | dashboard.read, data.steward |
+
+=== F20 BLOCK (from fixes/11.txt)
+### 7.N Change capture: spool errors, the consumer entry, the first unit and the poll interval (V-11-05-a, V-11-05-b, V-11-05-c, MEDIUM; DR-413)
+1. `SpoolError` has `SequenceGap` (the next segment is not the successor of the last one read, or its first position
+   does not follow the stored position), `HashConflict` (a repeated sequence with another SHA-256), `HashMismatch` (a
+   segment differs from its `.sha256` file) and `Io`. The first two halt the source with `cdc_gap` (section 3.4 change
+   capture step 2). `HashMismatch` ends the unit with a `rejected` receipt of reason `file_hash_mismatch` and nothing
+   written, the outcome of a corrupted extract file. A segment with no `.sha256` file beside it is still being written
+   and `segments_after` does not list it.
+2. `ChangeCaptureConsumer::read_unit(source, table, after: Option<&str>, max_events: u32) -> Result<(Vec<ChangeEvent>,
+   String), SpoolError>` is what `ingest_load` calls for a `cdc_position` table. It calls `segments_after` and
+   `read_segment`, keeps the events of the table and returns them with the last position read. A unit takes whole
+   segments until `ingest.max_unit_rows` events are read; a segment is never split. Overlap, settle and slices do not
+   apply to this kind.
+3. First unit: with no stored position `after` is None and the unit starts at the first segment of the spool. The
+   sidecar's initial snapshot is its first segments; a snapshot event has `op` `r` and is handled as `c`.
+4. Poll interval: `ingest_tick` rule 2 gains a case d: a `cdc_position` table is due at every tick. The 60 minutes of
+   rule 2c would leave an idle table stale under `freshness.f1_lag_seconds` (900 seconds); the 30-second reschedule
+   after a unit that read events stays.
+
+=== F21 REP (from fixes/11.txt)
+OLD: (only with `ingest.cdc_enabled` and a signed agreement)
+NEW: (only with `ingest.cdc_enabled`; the bank's signed agreement is the reason a person turns the flag on, the audited flag change is its record in the product, and no step checks the paper)
+
+=== F22 REP (from fixes/11.txt)
+OLD: use the same path, with `halted_reason` `cdc_gap` or `file_gap`
+NEW: use the same path without the `source.restore_suspected` event (step 4 audits `source.state_changed` with cause `delivery_gap` only, and the receipt of step 5 has reason `cdc_gap` or `file_gap`), with `halted_reason` `cdc_gap` or `file_gap`
+
+=== F23 REP (from fixes/11.txt)
+OLD: pinned in the adapter pack, and checks the row count
+NEW: of the manifest (`columns`; the extract file contract of section 7+), and checks the row count
+
+=== F24 REP (from fixes/11.txt)
+OLD: the columns are the list pinned in the adapter pack (section
+NEW: the columns are the `columns` of the table's newest accepted manifest (the extract file contract of this section, which corrects section
+
+=== F25 BLOCK (from fixes/11.txt)
+### 7.N The extract file contract: file format, columns and the row reader (V-11-07-a HIGH, V-11-07-c, V-11-07-d MEDIUM; DR-413)
+Section 3.4 and section 7.5 said the column list of a `landing_file` table is "pinned in the adapter pack". No pack
+holds one: section 3.9 lists database objects. The contract is:
+1. A data file is UTF-8 CSV as RFC 4180 writes it (comma, double quote, CRLF or LF) with one header row. Each field
+   lands as text under its header name in the raw payload, and an empty field is absent. Types are the mapping's work
+   (phase 10 transforms).
+2. The manifest `akr.extract.v1` gains `columns`, the ordered column names of the table. The header row of every data
+   file must equal it, and every row must have that many fields. Otherwise the batch is `rejected` with reason
+   `column_check_failed` and audited as `file.rejected`; the manifest stays pending and no row of the file lands. It
+   is not a `row_failed` quarantine row, because a quarantine row needs a raw row (`raw_id`). The t24 decode failures
+   stay row failures of section 3.2 step 5.
+3. `ExtractInbox` gains `fn read_rows(&self, m: &ManifestRef, f: &ManifestFile, skip: u64, limit: u32) ->
+   Result<Vec<SourceRow>, InboxError>;`, which parses one verified data file (after `verify_file`) into the row type
+   that `SourceReader::fetch_keyset` returns.
+4. The table is an approved object of the source like any other (phase 05 `source_access`); the manifest's
+   `source_table` is the NAME part of the object. From this phase on, phase 10 compile steps 3 and 4 check `source.key`
+   and every `from` of a `landing_file` mapping against the `columns` of the table's newest receipt (its `manifest`
+   column), which stands in for the profile. A table with no receipt yet is refused with `E_VALIDATION` at
+   `/source/object`, reason `no_delivery_yet`.
+
+=== F26 BLOCK (from fixes/11.txt)
+### 7.N The record column and the `from` grammar of the text formats (V-11-07-b, V-11-08-a MEDIUM, V-11-08-b LOW; DR-413)
+1. The mapping's `source` block gains the key `source.record`, the column that holds the record text
+   (`t24_xmlrecord`, `t24_multivalue`) or the raw message (`iso20022`, `mt`). It is required for these four formats
+   and refused as an unknown key for the others; compile step 3 checks it as it checks `source.key`. The schema
+   `schemas/mapping.v1.json` and DSL.md B.1 gain it.
+2. `from` for `iso20022`: element local names joined by `/`, starting at the child of `Document`, with an optional
+   last step `@Name` for an attribute (`FIToFICstmrCdtTrf/CdtTrfTxInf/IntrBkSttlmAmt/@Ccy`). Namespaces are ignored
+   and the first match in document order is taken.
+3. `from` for `mt`: a field tag of text block 4 with its option letter (`20`, `32A`, `50K`), optionally followed by
+   `/N` for line N of the field, counted from 1. The two names `sender` and `receiver` give the BICs of blocks 1 and
+   2. Splitting inside a line (the date, currency and amount of `32A`) is the mapping's `expr`.
+4. The parser is `parse(format, raw: &str) -> Result<ParsedMessage, ParseError>` with `ParsedMessage::get(&self,
+   from: &str) -> Option<&str>`; an absent element is null and a `ParseError` is the `message_parse_failed` row of
+   section 7.6 step 5. A `from` that does not fit the grammar is refused at compile with `E_VALIDATION` at
+   `/fields/<attr>/from`.
+5. The parser version of section 7.6 step 3 is the key `parser_version` of the `compiled` artefact, so
+   `compiled_sha256` covers it.
+
+=== F27 REP (from fixes/11.txt)
+OLD: plus one day, `statement = {signal, observed,
+NEW: plus one day (`ingest.history_from` when no table of the source has one yet), `statement = {signal, observed,
+
+=== F28 REP (from fixes/11.txt)
+OLD: set `business_from` as the halt path does (the earliest `value_business_date` of the source plus one day)
+NEW: set `business_from` as the halt path does (the earliest `value_business_date` of the source plus one day, or `ingest.history_from` when the source has none yet)
+
+=== F29 REP (from fixes/11.txt)
+OLD: once per table and day, and the alert rule of section 4.3.
+NEW: written by the load unit when the tail grows (the late-arrival block of this section), and the alert rule of section 4.3.
+
+=== F30 BLOCK (from fixes/11.txt)
+### 7.N Who measures late arrivals and who writes the two events (V-11-02-b, V-11-12-c MEDIUM, V-11-12-d LOW; DR-413)
+Section 7.12 named two audit events with no writer, no stored day and no planner input.
+1. `BatchRepository` gains `late_stats(conn, source, table, since: DateTime<Utc>) -> Result<LateStats, RepoError>`
+   with `LateStats { late_days_max: Option<u32>, lookback_days: Option<u32> }`: the largest `manifest.late_days_max`
+   of the table's receipts started since `since`, and the `manifest.lookback_days` of its newest receipt.
+2. `ingest_load` step 2 calls it with `since` 90 days back. The planner (section 3.1 step 3) takes `lookback` (the
+   mapping's value: `auto`, a duration or none), `lag_days` (that `late_days_max`), `ingest.lookback_max_days` and
+   `ingest.sequence_overlap_keys`. Every receipt records the window the planner used as `manifest.lookback_days`.
+3. `ingest.lookback_widened` is written in the transaction of the run's first unit when that window differs from the
+   `lookback_days` of the newest receipt (`from_days`, `to_days`). The first receipt of a table writes none.
+4. `ingest.late_arrival_near_window` is written by the unit, in its transaction, when its own `late_days_max` is above
+   `ingest.late_alarm_pct` percent of the window and above the `late_days_max` read in item 2. A table raises it when
+   its tail grows, and no day is stored. The freshness job writes no late-arrival event; it sets the gauge of the
+   alert rule block below.
+5. The audit table of section 3.10 gains two rows with resource `watermark`: `ingest.late_arrival_near_window` (a unit
+   whose late arrival is a new 90-day maximum near the window) and `ingest.lookback_widened` (a change of the auto
+   window).
+
+=== F31 BLOCK (from fixes/11.txt)
+### 7.N Alert rule and gauge for late arrivals (V-11-12-a, MEDIUM; DR-413)
+Section 4.3 gains the gauge `akr_ingest_late_near_window{source, table}`: the freshness job (section 3.7) sets it to 1
+when the largest `late_days_max` of the last 90 days (`BatchRepository::late_stats`) is above `ingest.late_alarm_pct`
+percent of the table's window, else to 0. The alert rules gain "a table whose `akr_ingest_late_near_window` is 1".
+Its inbox delivery is phase 18, as for the other rules of section 4.3.
+
+=== F32 BLOCK (from fixes/11.txt)
+### 7.N The three settings of sections 7.10 and 7.12 in migration 0035 (V-11-12-b, LOW; DR-413)
+The settings INSERT of section 1.3 gains three rows, all governed:
+```sql
+ ('ingest.sequence_overlap_keys', '10000', 'integer', '{"min": 100, "basis": "research 25 s.7.3 commit order"}', TRUE,
+  '{"ar": "عدد المفاتيح التسلسلية التي تُعاد قراءتها قبل المفتاح المحفوظ", "en": "Sequence keys re-read before the stored key"}'),
+ ('ingest.late_alarm_pct', '80', 'integer', NULL, TRUE,
+  '{"ar": "نسبة إنذار الوصول المتأخر من نافذة إعادة القراءة (بالمئة)", "en": "Late-arrival alarm level (percent of the re-read window)"}'),
+ ('ingest.lookback_max_days', '93', 'integer', NULL, TRUE,
+  '{"ar": "أقصى مدة لنافذة إعادة القراءة التلقائية (أيام)", "en": "Longest automatic re-read window (days)"}')
+```
+
+=== F33 REP (from fixes/11.txt)
+OLD: The fifteen keys of migration 0035
+NEW: The eighteen keys of migration 0035: `ingest.sequence_overlap_keys`, `ingest.late_alarm_pct` and `ingest.lookback_max_days` of sections 7.10 and 7.12, and the fifteen of section 1.3
+
+=== F34 REP (from fixes/11.txt)
+OLD: | 15 settings, 2 flags | rows | 0035 | n/a | n/a |
+NEW: | 18 settings, 2 flags | rows | 0035 | n/a | n/a |
+
+=== F35 REP (from fixes/11.txt)
+OLD: Settings: `make seed` installs 15 settings and 2 flags
+NEW: Settings: `make seed` installs 18 settings and 2 flags
+
+=== F36 REP (from fixes/11.txt)
+OLD: `replay.estimate_max_rows`) change through a change request of class `material`
+NEW: `replay.estimate_max_rows`, `ingest.sequence_overlap_keys`, `ingest.late_alarm_pct`, `ingest.lookback_max_days`) change through a change request of class `material`
+
+=== F37 BLOCK (from fixes/12.txt)
+### 7.N `BlindFilter` (V-12-12-a, LOW; DR-413)
+`BlindFilter` (`BlindPeriodRepository::list`) is `{ open: Option<bool>, source_id: Option<Uuid> }`. The route
+`GET /coverage/blind-periods` takes `source_id?` beside `open?`; the phase 12 panel reads one source's periods with it.
+
+=== F38 BLOCK (from fixes/15.txt)
+### 7.N The business date of the previous mapped batch (V-15-09-a, MEDIUM; DR-413)
+From phase 15 on, `BatchRepository` gains `async fn previous_mapped_business_to(&self, conn: &mut PgConnection, source_table: &str, batch_id: Uuid) -> Result<Option<NaiveDate>, RepoError>;`. It returns the `business_to` of the newest batch of `source_table` with status `mapped`, other than `batch_id`, and `None` for the first mapped batch of a table. Phase 15 section 7.7 step 5 calls it.
+
+=== F39 BLOCK (from fixes/30.txt)
+### 7.N System periods written without a session (phase 30; V-30-07-a, MEDIUM; DR-413)
+Phase 30 extends this phase and owns the extension (phase 30 section 7+): `BlindPeriodService::record_system(tx, started_at, ended_at, statement)`, with two callers, the `ops_probe` job and `akr-ctl ha outage record`. It writes a closed row of scope `system` and cause `akr_outage` through `BlindPeriodRepository::open`, with `declared_by` = the system principal, keeps the anchor rule of section 3.6, refuses an overlap with another such row, and audits `blind_period.opened`. It has no Cedar action. `declare` stays the only call of the steward route.

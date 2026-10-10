@@ -1,0 +1,123 @@
+Fixes for the claims of tools/agent/verify/phase-12.md (drafted from tools/agent/verify/refute-12.md; for lead review).
+
+@@ BLOCK 12
+### 7.N Register writes of a run are audited (V-12-01-a, MEDIUM; DR-413)
+The `recon_break` rows that a run upserts under section 3.1 step 8 are audited with the event of section 3.3 step 4, `dq.recorded {source, batch_id, kinds: {kind: count}}`, counts only. A day run has no batch, so `run_id` takes the place of `batch_id` for it. One event per run that writes at least one row.
+@@ END
+# V-12-01-a | MEDIUM | names used and where they exist: `dq.recorded` phase-12.md:747 and 974; `recon_break` kind phase-12.md:178; `run_id` on `admin.dq_issues` phase-12.md:186; step 8 upserts phase-12.md:679; `recon_run` job phase-12.md:654 | NEW: none (reuses dq.recorded; the other option, recon.completed carrying the register counts, would be a REP to section 3.1 step 9)
+
+@@ REP 12
+`DataQualityRecorder` per batch with issues (kinds and counts)
+@@ WITH
+`DataQualityRecorder` per batch with issues, or `recon_run` per run that writes issues (`run_id` for a day run; kinds and counts)
+@@ END
+# V-12-01-a (audit table row) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `dq.recorded` phase-12.md:974; `recon_run` job phase-12.md:654 | NEW: none
+
+@@ REP 12
+and is signed by the bank (else 422 reason `document_required`).
+@@ WITH
+and is signed by the bank, with kind `exception_signed` (phase 05 `SourceDocumentKind`; else 422 reason `document_required`).
+@@ END
+# V-12-02-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `SourceDocumentKind` and `exception_signed` phase-05.md:503; source-access exceptions are signed with `exception_signed` phase-05.md:1224 | NEW: none. The refuted half (no test) needs nothing: section 6 item 4 has the bank-signed known-adjustment test. Check: `exception_signed` is the only existing kind that is a signed exception (`other` is not signed). A new kind would need a phase 05 CHECK change, not drafted.
+
+@@ REP 12
+`ChangeRequestService::submit` with object kind `known_adjustment`, object key `dq_issue:<id>`, the proposal in the
+@@ WITH
+`ChangeRequestService::create(origin = Dedicated)` with `submit: true` (phase 04 section 3.2 step 6), object kind `known_adjustment`, object key `dq_issue:<id>`, the proposal in the
+@@ END
+# V-12-02-b | LOW | grep -c -F gave 1 | names used and where they exist: `ChangeRequestService::create` phase-04.md:858; `submit: true` phase-04.md:778 and 881; `origin = Dedicated` phase-04.md:963 and 1225 | NEW: none
+
+@@ REP 12
+`ChangeRequestService::submit` with object kind `exclusion`, object key `exclusion:<source>:<unit>:<unit_ref>`.
+@@ WITH
+`ChangeRequestService::create(origin = Dedicated)` with `submit: true` (phase 04 section 3.2 step 6), object kind `exclusion`, object key `exclusion:<source>:<unit>:<unit_ref>`.
+@@ END
+# V-12-03-a | LOW | grep -c -F gave 1 | names used and where they exist: as V-12-02-b (phase-04.md:778, 858, 881, 963) | NEW: none
+
+@@ REP 12
+`excluded`, `open` or `retried` to
+@@ WITH
+`excluded`;
+@@ END
+# V-12-04-b (1 of 2) | LOW | grep -c -F gave 1 | names used and where they exist: none new. The bullet runs over phase-12.md:1236-1237; apply both V-12-04-b entries together | NEW: none
+
+@@ REP 12
+`assigned`; `excluded` to anything is refused;
+@@ WITH
+`excluded` to anything is refused; an assign of an `open` or `retried` row sets its owner and keeps its status;
+@@ END
+# V-12-04-b (2 of 2) | LOW | grep -c -F gave 1 | names used and where they exist: `POST /quarantine/{id}/assign` phase-12.md:944 (row must be open or retried; the owner changes; audit `quarantine.assigned`); quarantine statuses phase-11.md:190 | NEW: none. The card part of the same bullet (phase-12.md:1237) is left as it is; see the DECIDE note for V-12-04-a.
+
+# DECIDE V-12-04-a | option A: a card-guard hit that stops a field's load also writes one quarantine row per affected row, reason `card_guard`, kind `row_failed`; the refusal of section 3.11 then has a row to refuse, and phase 10 section 3.3 and phase 11's load change (not drafted) (evidence: phase-10.md:1867 "in phase 11 it stops the field's load and opens a data incident"; phase-11.md:186 quarantine kinds are `row_failed` and `row_conflict` only) | option B: no card hit writes a quarantine row; the card guard stays a field stop with a dq issue (evidence: phase-12.md:740; DR-97 in research.md:108), so the refusal of section 3.11 (phase-12.md:948), the test at phase-12.md:1237 and the refusal in phase 11 block 7.3 (phase-11.md:1491) have no trigger in this release; the lead then decides whether the test row goes and the refusal stays as a dormant rule. DR-96 (research.md:107) says card reasons are refused, so the refusal is not dropped in this draft.
+
+@@ REP 12
+A reconciliation run for a restore gap is therefore valid as it stands.
+@@ WITH
+Phase 30 section 3.9 queues the `recon_run` job itself (the job behind `POST /recon/runs`), so the checks of section 3.1 step 1 (`source_not_active`, `no_batches`) do not run for it.
+@@ END
+# V-12-07-a (1 of 2) | LOW | grep -c -F gave 1 | names used and where they exist: phase 30 section 3.9 step 5 phase-30.md:288 (the restore check starts at phase-30.md:283); `POST /recon/runs` step 1 phase-12.md:637-639 | NEW: none
+
+@@ REP 12
+shows as a break, which is the intended result: the break is
+@@ WITH
+shows as a break when some of its batches are in, and as `source_anomaly`, `no_batches` (section 3.1 step 2) when none is, which is the intended result: the gap is
+@@ END
+# V-12-07-a (2 of 2) | LOW | grep -c -F gave 1 | names used and where they exist: `source_anomaly`, `no_batches` phase-12.md:659. Not drafted, for the lead: the recon_run job reads no source state, so a restore-gap run goes ahead on a source that phase 11 halts on restore suspicion (phase-11.md:926). Whether that is wanted may need a DECIDE.
+
+@@ REP 12
+signed_document_id, change_request_id, due_at, updated_at, version) ON admin.dq_issues TO akr_app;
+@@ WITH
+signed_document_id, change_request_id, due_at, updated_at, version, detail) ON admin.dq_issues TO akr_app;
+@@ END
+# V-12-10-a | HIGH | grep -c -F gave 1 | names used and where they exist: `detail` on `admin.dq_issues` phase-12.md:195; `detail.accepted_delta` written by activate phase-12.md:1330; the same column is already granted to akr_app on recon_results phase-12.md:139 | NEW: none
+# NOTE, not a claim of this pass and not drafted as a fix: the same akr_app list also lacks `count` and `last_seen`. The step 8 upsert (section 3.3 step 3, run by recon_run, which is akr_app per phase-12.md:63) updates both in its conflict branch, and the grant inventory at phase-12.md:432 says only akr_ingest upserts counts. For the lead: a merged grant would add `count, last_seen` to the same line.
+
+@@ BLOCK 12
+### 7.N The latest recon result of an issue's object and group (V-12-10-b, V-12-10-c, MEDIUM; DR-413)
+`ReconRepository` (section 2) gains one read:
+`async fn latest_result(&self, conn: &mut PgConnection, source_id: Uuid, rung: Rung, object: &str, group_key: &GroupKey) -> Result<Option<ReconResult>, RepoError>;`
+It returns the `recon_results` row with this rung, object and group key from the most recent completed run of the source. Runs are ordered by `finished_at`, as section 3.1 `recon_sweep` step 1 orders day runs. It returns `None` when no completed run has such a row.
+In block 7.5, "the latest recon result for its object and field" means this read. The issue stores its object as `<rung>:<object>` (section 3.1 step 8), so the read takes the rung and the object apart; the field is the group key. An issue of a kind other than `recon_break` has no recon result (section 3.5 step 1 allows those kinds). When the read returns `None`, `activate` writes no `accepted_delta`.
+@@ END
+# V-12-10-b, V-12-10-c | MEDIUM | names used and where they exist: `ReconRepository` phase-12.md:487; `expected_for` phase-12.md:498 (the only result read, by run); `ReconResult`, `Rung`, `GroupKey` phase-12.md:465, 468, 469; `recon_results` `object` and `group_key` phase-12.md:110-111; `finished_at` phase-12.md:85; `recon_sweep` step 1 phase-12.md:647; kinds of section 3.5 step 1 phase-12.md:785 | NEW: `latest_result` (no read returns a result by object and group; expected_for is by run). Choices to check: "latest" is the finished_at order, as the plan orders runs; evaluated_at would give the same answer, since a run evaluates its results before it finishes. With no result, activate writes no accepted_delta, which has no ladder effect because step 7 reads accepted_delta for recon_break issues only. A 422 refusal of such proposals is the other option, not drafted.
+
+@@ REP 12
+`DqIssueRepository::accepted_for` takes the field
+@@ WITH
+`DqRepository::accepted_for` takes the field
+@@ END
+# V-12-10-d | LOW | grep -c -F gave 1 | names used and where they exist: `DqRepository` phase-12.md:522; `accepted_for` phase-12.md:531 | NEW: none
+
+@@ REP 12
+`accepted_for(source, object, kind = recon_break)`
+@@ WITH
+`accepted_for(source, <rung>:<object>, kind = recon_break)`
+@@ END
+# V-12-11-a (1 of 3) | MEDIUM | grep -c -F gave 1 | names used and where they exist: the stored key `<rung>:<object>` phase-12.md:679; `accepted_for` phase-12.md:531 | NEW: none
+
+@@ REP 12
+source table, landed object or the rung of a break
+@@ WITH
+source table, landed object or `<rung>:<object>` of a recon break
+@@ END
+# V-12-11-a (2 of 3) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `dq_issues.object` phase-12.md:174; kind `recon_break` phase-12.md:178 | NEW: none
+
+@@ REP 12
+for an accepted issue of the same object and
+@@ WITH
+for an accepted issue of the same stored object (`<rung>:<object>`, section 3.1 step 8) and
+@@ END
+# V-12-11-a (3 of 3) | MEDIUM | grep -c -F gave 1 | names used and where they exist: block 7.5 phase-12.md:1330-1333; `accepted_for(conn, source_id, object, field, kind)` phase-12.md:1331 | NEW: none
+
+@@ BLOCK 12
+### 7.N Blind periods that cover a date (V-12-12-a, MEDIUM; DR-413)
+`CoverageRepository` (section 2) gains one read, for section 3.7 step 5 and section 3.8 step 2:
+`async fn blind_periods_covering(&self, conn: &mut PgConnection, source: Uuid, as_of: NaiveDate) -> Result<Vec<BlindPeriod>, RepoError>;`
+It reads `admin.blind_periods` (a phase 11 table; `akr_app` has `SELECT`) and returns the periods of scope `system`, and the periods of scope `source` for this source, that cover `as_of` by the rule of block 7.6. `BlindPeriod` is the phase 11 entity. The read changes nothing.
+@@ END
+# V-12-12-a | MEDIUM | names used and where they exist: `CoverageRepository` phase-12.md:506; `BlindPeriod` phase 11 section 2, phase-11.md:520; `admin.blind_periods` phase-11.md:78, with the `akr_app` SELECT at phase-11.md:314; scope `system` phase-11.md:80; block 7.6 phase-12.md:1336 | NEW: `blind_periods_covering` (CoverageRepository has no blind-period read; phase 11's `list` takes a `BlindFilter` that no phase defines). Choice: the read sits in phase 12, so phase 11 changes nothing. The other option is to define `BlindFilter` in phase 11 and call its `list`.
+# NOTE, not drafted, for phase 11's owner: `BlindFilter` (phase-11.md:592, the list of the blind-period GET route) is defined in no phase file. That gap is phase 11's and needs its own fix.
+
+# REFUTED, no fix written: V-12-01-b, V-12-05-a, V-12-08-a.
+# Claims with several REP lines: V-12-04-b (2), V-12-07-a (2), V-12-11-a (3); each is one claim, its parts are numbered in the notes.
+# SUMMARY: fixes written 16 (REP 13, BLOCK 3); DECIDE 1; DROP 0; claims covered: V-12-01-a, V-12-02-a, V-12-02-b, V-12-03-a, V-12-04-a, V-12-04-b, V-12-07-a, V-12-10-a, V-12-10-b, V-12-10-c, V-12-10-d, V-12-11-a, V-12-12-a

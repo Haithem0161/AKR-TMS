@@ -1,0 +1,168 @@
+Phase 06 fixes (lead-reviewed from tools/agent/verify/draft/06.txt; verdicts in tools/agent/verify-verdict.md).
+
+@@ BLOCK 06
+### 7.N The CatalogueQuery method (V-06-01-a, MEDIUM; DR-413)
+`CatalogueQuery` (AppState, section 4) has one method, `list(&self, conn: &mut PgConnection) -> Result<Vec<CatalogueItemView>, RepoError>`, which serves `GET /cbi-catalogue`. It returns each item of `CatalogueRepository::active` with its `scenarios` codes (the `full` and `partial` links whose scenario has `visibility = 'normal'`, as `CatalogueItemView` defines them), ordered by `ref`. It reads no grade, coverage kind or restricted code.
+@@ END
+
+@@ REP 06
+principal.kind == "human" && principal.active };
+@@ WITH
+principal.kind == "human" && principal.status == "active" };
+@@ END
+@@ REP 06
+`delegated_roles`, `kind`, `active`;
+@@ WITH
+`delegated_roles`, `kind`, `status`;
+@@ END
+@@ REP 09
+`principal.roles`, `principal.kind`, `principal.active`;
+@@ WITH
+`principal.roles`, `principal.kind`, `principal.status`;
+@@ END
+@@ REP 12
+Attributes evaluated: role membership, `principal.active`,
+@@ WITH
+Attributes evaluated: role membership, `principal.status`,
+@@ END
+
+@@ BLOCK 06
+### 7.N Required and optional fields of cbi-gap-report.v1.json (V-06-03-b, LOW; DR-413)
+Section 3.5 step 4 names the keys of the document. Required: the six top-level keys `cover`, `summary`, `items`, `bank_request`, `vendor_annex` and `outcomes`, and every key that step 4 names inside them, except these optional keys: an item's `declaration` (present only when its blocking scenarios carry one; its `detail` is null when no `interim_detail` was given), and the `code` and `name` of a `linked` entry (absent for a restricted scenario, which carries `restricted: true`).
+Value types: ids are UUID strings; timestamps are RFC 3339 strings; counts are integers of 0 or more; shares are numbers from 0 to 1; `title`, `text` and labels are `{ar, en}` objects of strings; `items`, `linked`, `bank_request` and `vendor_annex` are arrays. The values of `outcomes` are nullable (null until phases 17 to 21 fill them).
+@@ END
+
+@@ REP 06
+1. `start`; a run that is not `queued` -> done.
+@@ WITH
+1. `start` (a progress marker of the job with no audit event; the lifecycle events of section 3.8 cover the run); a run that is not `queued` -> done.
+@@ END
+
+@@ REP 06
+   - `cover`: bank name (phase 01 settings), catalogue
+@@ WITH
+   - `cover`: bank name (both languages, from the installation file `deploy/branding.json` of phase 08 section 4, which the akr-worker service mounts read-only; an unreadable file is `fail(internal)`), catalogue
+@@ END
+
+@@ REP 06
+`E_STEPUP_REQUIRED` (declaration, download); `E_IDEMPOTENCY_REPLAY`
+@@ WITH
+`E_STEPUP_REQUIRED` (declaration, download); the replay
+@@ END
+
+@@ BLOCK 06
+### 7.N The fields of Grading (V-06-04-a, LOW; DR-413)
+`Grading { scenarios: Vec<GradeUpsert>, items: Vec<ItemGrade> }`. `scenarios` holds one row per scenario and scope: the bank scope and each source scope that has a completed profile run (the rows that section 3.3 step 3 writes). `items` holds one row per catalogue item for the bank scope, `ItemGrade { catalogue_item_id: Uuid, grade: Grade, reasons: Vec<Reason>, missing_fields: Vec<AttributeKey> }`: `reasons` carries `no_scenario` when item rule 1 gives D, and `missing_fields` follows item rule 3. The term follows from the grade (`Term`).
+@@ END
+
+@@ BLOCK 00
+### 7.N Setting change hooks (V-06-04-b, MEDIUM; DR-413)
+`SettingsService::apply` consults a registry of `SettingChangeHook`s, one list per key, empty in this phase and registered by the consuming phase (the pattern of phase 03's `FlagChangeHook`). A hook runs in the caller's transaction after the write, for every `ChangeSource` and for a revert. From phase 06 on, phase 06 registers the hook that enqueues `coverage_grade {reason: "setting"}` when `coverage.maintained_fields` changes; that is the enqueue phase 06 sections 3.3 and 4 give to "the phase 04 activation of the setting".
+@@ END
+
+@@ REP 06
+"state": "missing" | "unpopulated"
+@@ WITH
+"state": "absent" | "unpopulated"
+@@ END
+@@ REP 06
+grades D, as `missing` does.
+@@ WITH
+grades D, as `absent` does.
+@@ END
+@@ REP 10
+phase 06's `missing`, `unpopulated`
+@@ WITH
+phase 06's `absent`, `unpopulated`
+@@ END
+@@ REP 10
+it grades D as `missing` does.
+@@ WITH
+it grades D as `absent` does.
+@@ END
+
+@@ REP 06
+`scenario: {code, family, name}` or the masked form of section 3.8)
+@@ WITH
+`scenario: {code, family, name}`)
+@@ END
+
+@@ BLOCK 03
+### 7.N The masked deny tag (V-06-06-a, V-06-06-b, MEDIUM; DR-413)
+Section 3.2 step 6 names two deny tags. From phase 06 on the policies use a third, `@deny("masked")`, on a `forbid` that hides a record by an attribute other than a branch, pool or tier test (a restricted scenario, a policy pack outside its readers, a report outside its case team). A determining forbid with this tag is classified `DenyReason::Masked`, a new variant for which `masks` returns true whatever the resource kind: the answer is the 404 `E_NOT_FOUND` body of a missing record, and the access event is the `deny` of section 3.6. The kind need not be in `MASKED_KINDS`. A list route that can return such rows filters them in SQL by the same predicate (section 3.6, lists), and the phase that writes the forbid tests the 404.
+Every other tag (`self_approval`, `state`, `aal` and the like) names the reason of a `Forbidden` deny; its problem code is the one the phase that writes the policy gives.
+@@ END
+
+@@ BLOCK 00
+### 7.N Keyset cursor and Page<T> (V-06-06-c, LOW; DR-413)
+The cursor of the `common` module (section 2) is the type `Keyset`: an opaque position on a list's sort columns, sent as the `cursor` query parameter and returned as `next_cursor`, as the pagination rule of docs/API.md states. `Page<T> { items: Vec<T>, next: Option<Keyset> }` is what every keyset list method returns; `next` is `None` on the last page. `Cursor` in the repository signatures of phases 03 and 04 is the same type.
+@@ END
+
+@@ BLOCK 06
+### 7.N The DeclarationService method (V-06-08-a, LOW; DR-413)
+`DeclarationService::declare(&self, ctx: &AuthContext, id: Uuid, input: DeclarationInput, expected_version: i32) -> Result<ReadinessGrade, AppError>` is the service's only method. The handler has checked that `If-Match` is present (428 `E_PRECONDITION_REQUIRED` otherwise) and passes its version; the method consumes the step-up assertion (step 1) and does steps 2 to 5 of section 3.4 in one transaction. The `coverage_sweep` job calls `ReadinessRepository::expire_due` itself and does not go through the service.
+@@ END
+
+@@ REP 06
+as DS -> 403 `E_FORBIDDEN`
+@@ WITH
+as DS -> 403 `E_SCOPE`
+@@ END
+
+@@ REP 06
+event keeps the previous values' hash, and the sealed report
+@@ WITH
+event of the earlier declaration keeps the previous values, and the sealed report
+@@ END
+
+@@ REP 06
+section 4.5's "Phase 01: two step-up action classes"
+@@ WITH
+section 4's "Phase 01: two step-up action classes"
+@@ END
+
+@@ BLOCK 06
+### 7.N The grader's mapping input (V-06-11-a, MEDIUM; DR-413)
+From phase 10 on, `grade` (section 3.2) takes one more parameter after `catalogue_attrs`, `mapping: &[MappingCompleteness]`, with one row per source and monitored attribute, as phase 10 section 3.8 defines the type; section 3.3 step 1 loads these rows with its other inputs. The sentence "this phase reads availability only" in section 3.2 holds until then. Section 7.6 gives the rule.
+@@ END
+
+@@ REP 06
+API.md 3.6
+@@ WITH
+API.md 3.8
+@@ END
+@@ REP 06
+**Complexity:** M (13 routes;
+@@ WITH
+**Complexity:** M (14 routes;
+@@ END
+@@ REP 06
+`catalogue::router()` (3 routes)
+@@ WITH
+`catalogue::router()` (4 routes)
+@@ END
+@@ REP 06
+tags `catalogue` (3 operations)
+@@ WITH
+tags `catalogue` (4 operations)
+@@ END
+@@ REP 06
+13 in all, each with `x-akr-action`
+@@ WITH
+14 in all, each with `x-akr-action`
+@@ END
+@@ REP 06
+Swagger UI lists 13 new operations (119 with
+@@ WITH
+Swagger UI lists 14 new operations (120 with
+@@ END
+@@ REP 07
+lists 9 new operations (128 with
+@@ WITH
+lists 9 new operations (129 with
+@@ END
+@@ REP 06
+with this row of the section 3.8 route table:
+@@ WITH
+with this row of the section 2 route table:
+@@ END

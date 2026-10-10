@@ -1,0 +1,13 @@
+Edits outside the phase files, made by hand when apply-verify.py is run (the script writes phase files only).
+- docs/API.md: rows `GET /goaml/profiles` and `GET /goaml/profiles/{id}`: scope list gains `config.approve` (V-07-01-a).
+- docs/API.md: the row `| GET | /coverage/blind-periods | dashboard.read |` gains `data.steward` in its scope cell (`dashboard.read, data.steward`) (V-11-04-d).
+- docs/DSL.md B.1: a new row `source.record` (string; required for `t24_xmlrecord`, `t24_multivalue`, `iso20022`, `mt`; the column holding the record text or raw message; refused for other formats), and a pointer from the `from` description to phase 11 section 7+ for the `iso20022` path and `mt` tag grammar (V-11-07-b, V-11-08-a).
+- docs/API.md, row `POST /cases/{id}/opened-views`: "Record that a panel or evidence item was opened" becomes "Record that a panel was opened (an evidence item is recorded by its content read)" (V-18-03-a).
+- docs/API.md, QA rows: add `| GET | /qa/findings/{id}/reopen-candidates | qa.review | Cases the closer of a critical finding closed in its 30-day window, for the bulk reopen dialog; M only (phase 19, added) |` after the `POST /qa/bulk-reopen` row (V-19-02-a).
+- docs/API.md: the rows `GET /retention/report`, `GET /retention/runs` and `GET /retention/runs/{id}` gain the scope `admin.system` next to `audit.read`, and "IA and SEC" becomes "IA, SEC and ADM" in the two `held` notes (fixes/23.txt, V-23-01-a).
+- docs/plan/research.md, row DR-377: `retention.period_years.R7` becomes `retention.period_years.r7` (the phase 00 key CHECK allows lower case only; fixes/23.txt, V-23-08-a).
+- docs/API.md: the rows `GET /registers/{kind}`, `GET /registers/{kind}/entries/{id}`, `GET /registers/review-calendar` and `GET /fairness/attributes` gain the scope `model.risk` beside `dashboard.read` (MRO reads the registers and the fairness metrics; phase 24, V-24-08-c).
+- docs/API.md: the release rows gain `POST /admin/releases/{id}/evidence` (admin.system; upload of the `rollout.json` of the apply as evidence of owner kind `release`; IDEM; phase 25, added; V-25-12-a), and the rows `POST /admin/releases/{id}/propose` and `POST /admin/releases/{id}/applied` gain the `If-Match` marker (V-25-04-f).
+- docs/plan/phase-19.md, section 2 route table: the row `GET /api/v1/qa/findings/{id}/reopen-candidates` added after the bulk-reopen row, so the route that the section 7+ block defines has a table row (routecheck; V-19-02-a).
+
+All ten edits above were made by hand on 2026-10-10, after the single run of apply-verify.py.

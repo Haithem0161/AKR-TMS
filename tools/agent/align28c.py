@@ -1,0 +1,22 @@
+p='docs/DATA-MODEL.md'
+s=open(p).read()
+def rep(o,n):
+    global s
+    assert s.count(o)==1,o[:80]
+    s=s.replace(o,n)
+rep("| assistant_drafts | id, case_id, use_case, prompt_template_version, model_version_id, draft (enc), sources jsonb, grounding_result jsonb, accepted_by null, accepted_at null | R6 |\n",
+"| assistant_versions | id, kind (model, template), task (templates only: case_summary, report_narrative), version_no (unique nulls not distinct per kind and task), inventory_item_id (unique; kind `llm_component` or `prompt_template`), status (importing, refused, registered, live, retired), refusal_code, artifact_key (`.gguf`), artifact_sha256 (unique), quantisation, context_tokens, body_text (templates), body_sha256, manifest jsonb (signed GV-51 fields), manifest_sha256, signature (Ed25519), signing_key_version, placeholders jsonb, created_by, created_at, updated_at, live_from, retired_at, version; one live model and one live template per task (phase 28, DR-276) | R11 (retirement) |\n"
+"| assistant_evaluations | id, task, model_version_id, template_version_id, run_id (two stage rows per run, unique run and stage), golden_set_sha256 (HMAC of the sorted golden case ids), result jsonb (counts, rates, verdicts; no ids, no text), passed, data_as_of, created_by, created_at; written once (phase 28) | R11 (age, created_at) |\n"
+"| assistant_kill_state | scope pk (global, task:case_summary, task:report_narrative; seeded), engaged, reason_code (model_error, data_break, red_breach, regulator_request, other), engaged_by, engaged_at, next_drill_due, updated_at, version (phase 28) | R10 (never) |\n")
+rep("scan, model_monitor (phase 27)), source_key","scan, model_monitor (phase 27), assistant_monitor (phase 28)), source_key")
+rep("and widens the `registers.source` and `fairness_metrics.metric` CHECKs; assistant drafts stay P2 (phase 28).",
+"and widens the `registers.source` and `fairness_metrics.metric` CHECKs. Phase 28 (DR-274 to DR-291) adds\n`assistant_versions`, `assistant_evaluations` and `assistant_kill_state`, widens `registers.source` by\n`assistant_monitor`, and puts `assistant_drafts` in `casework` (section 12).")
+rep("low_score_forced, calibration, targeted_repeat), source_kind, source_id,",
+"low_score_forced, calibration, targeted_repeat; assistant_golden and assistant_assisted (phase 28)), source_kind (alert, case, decision, hibernation_hit, pair_memory_suppression; assistant_draft with case_id (phase 28)), source_id,")
+rep("| 25b | assistant_drafts (from 0088) | 28 |\n",
+"| 25b | `admin`: assistant versions, evaluations, kill state, the widened `registers.source` CHECK (0088); `casework`: assistant drafts, the widened `qa_samples` population and source kind CHECKs (0089); guards, grants, the `pack.assistant` flag, settings, classification and retention (0090) | 28 |\n")
+rep("Phase 27 grants:","Phase 28 grants: `akr_app` has SELECT and INSERT on admin.assistant_versions, admin.assistant_evaluations, admin.assistant_kill_state and casework.assistant_drafts, with UPDATE only on column lists of assistant_versions (status, refusal_code, live_from, retired_at, updated_at, version), assistant_kill_state (engaged, reason_code, engaged_by, engaged_at, next_drill_due, updated_at, version) and assistant_drafts (state, output, final text, accept and target columns); no UPDATE on evaluations; `akr_retention` has SELECT and DELETE on all four; no grant to `akr_readonly` (phase-28 section 1.3).\n\nPhase 27 grants:")
+rep("| casework.notes | id, case_id, author_id, body (enc), amends null (a note of the same case), at, created_at; append-only (phase 18) | none | R6 |\n",
+"| casework.notes | id, case_id, author_id, body (enc), amends null (a note of the same case), at, created_at; append-only (phase 18) | none | R6 |\n"
+"| casework.assistant_drafts | id, case_id, report_id (narrative only), task (case_summary, report_narrative), mode (live, evaluation), eval_run_id (evaluation only), language, status (requested, ready, refused, accepted, discarded), refusal_code, template_version_id, model_version_id, input_sha256 (the prompt is never stored), source_ids, cited_panels, output_enc and final_enc (sealed, AAD = id), grounding_result (counts and codes), scan_hits, accept_mode (as_is, edited), edit_distance, edit_ratio, useful, target_kind (note, report), target_id, requested_by, requested_at, accepted_by, accepted_at, created_at, updated_at, version; accepted only in mode live (phase 28, DR-277) | none | R6 (owner) |\n")
+open(p,'w').write(s); print('ok')

@@ -83,14 +83,22 @@ bank signs: it needs Track A's discovery tooling and nothing else.
 
 ### A4. Discovery and the CBI coverage gap report (Track A builds, Track B runs; early piece 1)
 - [ ] `akr-ingestd` connection layer: `SourceReader` port; drivers for PostgreSQL, SQL Server, Oracle (with the ODBC
-      second backend), Db2 and Sybase over ODBC; connection tiers CT1-CT4 including the bank-delivered extract
+      second backend), Db2 and Sybase over ODBC; connection tiers CT1, CT2 and CT4 as a bank landing database in P0
+      (phase 05); CT3 and CT4 file delivery with ingestion in P1 (phase 11, DR-63)
 - [ ] **Read-only conformance suite**: grants checked on every connect and the connection refused on any write
       privilege; every statement parsed with `sqlparser` and proven a single `SELECT` over approved objects; the
-      signed load budget enforced (bounded pool, statement time-out, back-off); "paused by bank" state (C-01, C-13,
-      C-15, SP-87)
+      signed load budget enforced (bounded pool, statement time-out, back-off); "paused by bank" state; the grant
+      check also refuses DBA-class roles and privileges and lists every database link the account can use, refusing
+      the connection unless the bank signs an exception, and the read-only proof states that no statement uses a link
+      (C-01, C-13, C-15, SP-87, DR-40, DR-60, DR-61); the source credential reaches only `akr-ingestd` (DR-59)
 - [ ] Discovery profiling (M5): schema inventory, row counts, field availability, value profiles, code-table capture;
-      `GET /discovery/profiles`, `GET /discovery/field-availability`
-- [ ] Draft mapping (M6) for the first CBS family (ICS BANKS on Oracle, to be confirmed with the first bank)
+      copies, backups and scratch tables are never sources, each mapping names the exact table ranked by liveness,
+      and no table is matched by name alone; a catalogue run first, then profiles of the objects the bank approved
+      by change request, with a signed load budget (DR-62);
+      `GET /discovery/profiles`, `GET /discovery/field-availability`, `GET /discovery/integration-profile`
+- [ ] Draft mapping (M6) for the first CBS family (ICS BANKS on Oracle, to be confirmed with the first bank), built
+      from the discovery profiles, not from reading procedure code (most of it may be wrapped), with code maps
+      pre-filled from the CBS's own code dictionary and confirmed by the bank
 - [ ] CBI catalogue register: the 173 items with their data needs (M11)
 - [ ] Data-readiness grades per scenario and the CBI coverage gap report (M7; S-02, S-03, C-48): each item against
       the bank's data, the gap, an interim route and an owner, the vendor requests written out
@@ -336,6 +344,7 @@ From research file 33 section 6, plus the build risks the DBS recorded.
 | 16 | Small team (bus factor) | Operations and delivery exposure | Everything runbooked in the repository; break-glass on paper; second approver on releases | All |
 | 17 | Scope creep before P1 exit | First bank never goes live | Exit criteria are the gate; new ideas land in P2 or P3 of this file | P1 |
 | 18 | SQLx compile-time coupling during migrations | Broken deploys | Expand-contract migrations; migrate-then-deploy; `.sqlx` offline data in CI | All |
+| 19 | CBS completeness cannot be proven from the CBS alone: no change timestamp, wrapped posting code, possible hard deletes of transfers | Missed or silently changed postings in the load | Trailing re-read window (default 31 days of business date), row hashes, scheduled key reconciliation for deletes, daily control totals against the CBS ledger totals (GL tie-out, M7); DR-37 | P1 |
 
 ## External dependencies (blockers by phase)
 
@@ -347,6 +356,7 @@ From research file 33 section 6, plus the build risks the DBS recorded.
 | National list feed in bulk or by API key (Q9) | The Office | Better P1 screening (Excel stop-gap works) | Open |
 | Read-only access approval and signed load budget | First bank | P0 Track B, then P1 | Not started |
 | CBS vendor field deliveries (mother's name, teller events, depositor IDs) | Each bank and its CBS vendor | P1 scenario and goAML coverage | Per bank |
+| Bank KYC data where the CBS fields are empty at discovery: PEP status, risk level, expected activity, source of funds (empty in the ICS BANKS installation studied, DR-38) | Each bank | P1 risk rating, PEP and profile scenarios (degraded, not blocked) | Open |
 | Hardware, second site, change-board slots | First bank | P1 install | Per bank |
 | Third-party risk data (Q12) and OpenSanctions commercial licence | Each bank; vendor | P1 PEP and adverse-media depth | Open |
 | Doubt policy (Q7), UTR adoption (Q6), retention floor (Q5) | Each bank | P1 configuration (defaults in place) | Per bank |

@@ -1,0 +1,59 @@
+Replacements made in docs/plan/phase-27.md by the first re-check (DR-413). 11 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-27-1]
+WHY: R-27-1 | CONFIRMED LOW (raised LOW) | "the 7.x block on bins" is a placeholder | "section 7.10"
+OLD: `bins` are the ten score counts of the 7.x block on bins.
+NEW: `bins` are the ten score counts of section 7.10.
+
+=== F2 [R-27-2]
+WHY: R-27-2 | CONFIRMED LOW (raised LOW) | a share from 0 to 1 is compared with a setting in per cent | "`model.top_band_percent` / 100"
+OLD: the cumulative share of the reference counts reaches `model.top_band_percent`.
+NEW: the cumulative share of the reference counts reaches `model.top_band_percent` / 100 (the setting is in per cent).
+
+=== F3 [R-27-3]
+WHY: R-27-3 | CONFIRMED LOW (raised LOW) | the 428 and 409 row leaves out shadow | "promote, pin, shadow, engage"
+OLD: | `E_PRECONDITION_REQUIRED` (428), `E_VERSION_CONFLICT` (409) | none | `If-Match` on promote, pin, engage |
+NEW: | `E_PRECONDITION_REQUIRED` (428), `E_VERSION_CONFLICT` (409) | none | `If-Match` on promote, pin, shadow, engage |
+
+=== F4 [R-27-4]
+WHY: R-27-4 | CONFIRMED LOW (raised LOW) | the `E_VALIDATION` row leaves out section 3.10 (pin) | added
+OLD: the owner check is phase 04's own 422 | sections 3.1, 3.3, 3.6, 3.8 |
+NEW: the owner check is phase 04's own 422 | sections 3.1, 3.3, 3.6, 3.8, 3.10 |
+
+=== F5 [R-27-5]
+WHY: R-27-5 | CONFIRMED LOW (raised LOW) | the sweep scores in chunks of 50 and step 6 still writes one transaction per batch | one transaction per chunk; one audit per batch; a stopped batch keeps its committed chunks
+OLD: 6. Insert `alert.model_scores` in one transaction per batch, `ON CONFLICT DO NOTHING`; one audit `model.scored {version_id, role, rows, skipped_missing}` per batch (counts only, no ids).
+NEW: 6. Insert `alert.model_scores` in one transaction per chunk of step 2, `ON CONFLICT DO NOTHING`; one audit `model.scored {version_id, role, rows, skipped_missing}` per batch, written with the last chunk that ran (counts of the committed chunks only, no ids). A batch that an engaged scope stops keeps its committed chunks and scores no further chunk.
+
+=== F6 [R-27-6]
+WHY: R-27-6 | CONFIRMED LOW (raised LOW) | "`revert` is not implemented" leaves the return value open | it returns `ChangeError::NotRevertible`, as in phase 16
+OLD: `revert` is not implemented.
+NEW: `revert` returns `ChangeError::NotRevertible`, as in phase 16 (it is never called, because `emergency_allowed` is false).
+
+=== F7 [R-27-7a]
+WHY: R-27-7 | CONFIRMED HIGH (raised MEDIUM) | section 3.3, 7.3 and test l give 401 to any caller without step-up on a suspicion-tier alert; a caller outside the team then learns that the alert exists, and the phase 03 probe of DR-411 (a caller outside the team gets 404, not 401) fails | the masked 404 comes first for a caller the visibility rule refuses; 401 only for a caller it admits; the two rows of sections 3.11 and 3.14 and test l follow
+OLD: A suspicion-tier row for a caller without `record_open` step-up answers 401 `E_STEPUP_REQUIRED` first (the step-up check runs before the tier answer, phase 17 section 3.10); any other row not visible to the caller answers the masked 404 `E_NOT_FOUND`. A missing id gives the same body and latency floor.
+NEW: A row the caller may not see answers the masked 404 `E_NOT_FOUND`, whatever header is missing: a caller outside the team never gets 401 or 422 (phase 03 section 7.14, DR-411). A caller the rule admits to a suspicion-tier alert, with no fresh `record_open` step-up, answers 401 `E_STEPUP_REQUIRED`. A missing id gives the body and the latency floor of the masked 404.
+
+=== F8 [R-27-7b]
+WHY: R-27-7 | CONFIRMED HIGH (raised MEDIUM) | section 3.3, 7.3 and test l give 401 to any caller without step-up on a suspicion-tier alert; a caller outside the team then learns that the alert exists, and the phase 03 probe of DR-411 (a caller outside the team gets 404, not 401) fails | the masked 404 comes first for a caller the visibility rule refuses; 401 only for a caller it admits; the two rows of sections 3.11 and 3.14 and test l follow
+OLD: A suspicion-tier alert answers 401 `E_STEPUP_REQUIRED` first to a caller without `record_open` step-up (phase 17 section 3.10), and the masked 404 applies only after step-up.
+NEW: A caller outside the team gets that 404 with or without a step-up. Only a caller the visibility rule admits to a suspicion-tier alert gets 401 `E_STEPUP_REQUIRED` for a missing `record_open` step-up (phase 03 section 7.14, DR-411).
+
+=== F9 [R-27-7c]
+WHY: R-27-7 | CONFIRMED HIGH (raised MEDIUM) | section 3.3, 7.3 and test l give 401 to any caller without step-up on a suspicion-tier alert; a caller outside the team then learns that the alert exists, and the phase 03 probe of DR-411 (a caller outside the team gets 404, not 401) fails | the masked 404 comes first for a caller the visibility rule refuses; 401 only for a caller it admits; the two rows of sections 3.11 and 3.14 and test l follow
+OLD: under the alert's visibility and the alert's own purpose rules; suspicion tier answers masked 404 with step-up first |
+NEW: under the alert's visibility and the alert's own purpose rules; a suspicion-tier alert answers the masked 404 outside the team, and a team member needs the `record_open` step-up (401 without it) |
+
+=== F10 [R-27-7d]
+WHY: R-27-7 | CONFIRMED HIGH (raised MEDIUM) | section 3.3, 7.3 and test l give 401 to any caller without step-up on a suspicion-tier alert; a caller outside the team then learns that the alert exists, and the phase 03 probe of DR-411 (a caller outside the team gets 404, not 401) fails | the masked 404 comes first for a caller the visibility rule refuses; 401 only for a caller it admits; the two rows of sections 3.11 and 3.14 and test l follow
+OLD: | `E_STEPUP_REQUIRED` (401) | none | kill engage, pin, route 16 for a suspicion-tier alert without step-up |
+NEW: | `E_STEPUP_REQUIRED` (401) | none | kill engage, pin, route 16 for a team member of a suspicion-tier alert without step-up |
+
+=== F11 [R-27-7e]
+WHY: R-27-7 | CONFIRMED HIGH (raised MEDIUM) | section 3.3, 7.3 and test l give 401 to any caller without step-up on a suspicion-tier alert; a caller outside the team then learns that the alert exists, and the phase 03 probe of DR-411 (a caller outside the team gets 404, not 401) fails | the masked 404 comes first for a caller the visibility rule refuses; 401 only for a caller it admits; the two rows of sections 3.11 and 3.14 and test l follow
+OLD: as `a1` without step-up: 401 `E_STEPUP_REQUIRED`; with step-up and a missing purpose: 422 `E_PURPOSE_REQUIRED`; with step-up and purpose but outside the team: 404 `E_NOT_FOUND` with the body identical to a missing id, and the latency within the phase 03 floor.
+NEW: as an `a1` on the case team without step-up: 401 `E_STEPUP_REQUIRED`; on the team with step-up and a missing purpose: 422 `E_PURPOSE_REQUIRED`; as an `a1` outside the team, with or without the step-up and the purpose: 404 `E_NOT_FOUND` with the body identical to a missing id, and the latency within the phase 03 floor (phase 03 section 7.14).

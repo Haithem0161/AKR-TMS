@@ -1,0 +1,131 @@
+Fixes for the claims of tools/agent/verify/refute-17.md (phase 17).
+@@ REP 17
+GRANT UPDATE (status, resolution_code, resolved_by, resolved_at, released_alert_id, revalidated_at, updated_at, version)
+@@ WITH
+GRANT UPDATE (status, resolution_code, resolved_by, resolved_at, released_alert_id, revalidated_at, reason_detail, updated_at, version)
+@@ END
+# V-17-01-a | HIGH | grep -c -F gave 1 | names used and where they exist: `reason_detail` phase-17.md:215 (column of alert.quarantine, migration 0059); `alert.quarantine` phase-17.md:206 (table, migration 0059) | NEW: none
+
+@@ REP 17
+ResolveQuarantine { reason_code?: String }
+@@ WITH
+ResolveQuarantine { resolution_code?: String }
+@@ END
+# V-17-01-c | LOW | grep -c -F gave 1 | names used and where they exist: `ResolveQuarantine` phase-17.md:795 (the DTO); `resolution_code` phase-17.md:218 (column of alert.quarantine, migration 0059) | NEW: none
+
+@@ REP 17
+Assign to a user or pool; conflict check;
+@@ WITH
+Assign to a user only (a pool target is 422); conflict check;
+@@ END
+# V-17-03-d | HIGH | grep -c -F gave 1 | names used and where they exist: `AssignAlert` phase-17.md:793 (DTO, second REP below); step 3 of section 3.8 phase-17.md:1164 ("the target is a user only") | NEW: none. Two REP entries cover this claim (route row and DTO).
+
+@@ REP 17
+`AssignAlert { to: { user_id } | { pool_id }, reason_code?: String }`; `AssignCase` the same shape.
+@@ WITH
+`AssignAlert { to: { user_id }, reason_code?: String }` (a user only); `AssignCase { to: { user_id } | { pool_id }, reason_code?: String }`.
+@@ END
+# V-17-03-d | HIGH | grep -c -F gave 1 | names used and where they exist: `AssignCase` phase-17.md:1166 (section 3.8 step 4, `assignee_pool_id`, so the pool option stays for cases); `AssignAlert` phase-17.md:793 | NEW: none
+
+@@ REP 17
+created_at, touch_hours)
+@@ WITH
+created_at, casework.touch_by_hours[class])
+@@ END
+# V-17-06-a | LOW | grep -c -F gave 1 | names used and where they exist: `casework.touch_by_hours` phase-17.md:599 (settings key, section 1.6); `touch_by_hours[class]` phase-17.md:1276 (section 3.12, with `BusinessClock::add`) | NEW: none
+
+@@ BLOCK 17
+### 7.N Quarantine repository and service methods (V-17-01-b, MEDIUM; DR-413)
+Section 2, after the `CaseRepository` trait, adds the repository of `alert.quarantine`. The trait is `AlertQuarantineRepository`, because phase 11 already names `QuarantineRepository` for data quality rows. Its methods: `insert(tx, r: &QuarantineRequest, party_id: Option<Uuid>) -> Result<bool, RepoError>` (`ON CONFLICT DO NOTHING`; false on a replay), `lock(tx, id) -> Result<QuarantineRow, RepoError>` (`FOR UPDATE`, with the version) and `update(tx, q: &QuarantineRow, expected: i32) -> Result<QuarantineRow, RepoError>` (version + 1, compare and set).
+Section 3.2 adds the service methods, each returning `Result<_, AlertError>`: `QuarantineService::release(&self, tx: &mut Tx, principal: &Principal, id: Uuid, if_match: i32, stepup_id: Uuid) -> Result<QuarantineRow, AlertError>` (the route consumes the step-up first and passes its id; steps 1 to 3 of release); `reject(&self, tx: &mut Tx, principal: &Principal, id: Uuid, if_match: i32, req: &ResolveQuarantine) -> Result<QuarantineRow, AlertError>`; `retry(&self, pool: &PgPool) -> Result<u32, AlertError>` (the job `quarantine_retry`; it returns the number of rows found valid, and locks each row as the block "Retry locks each row" says).
+@@ END
+# V-17-01-b | MEDIUM | names used and where they exist: `QuarantineRequest` phase-17.md:765; `QuarantineRow` phase-17.md:783; `ResolveQuarantine` phase-17.md:795; `QuarantineService` and `record_standalone` phase-17.md:914 and 938; `AlertError` phase-17.md:1317 (section 3.15); `PgPool` phase-00.md:722; `Principal` phase-01.md:580; `QuarantineRepository` phase-11.md:575 (taken, so not reused) | NEW: `AlertQuarantineRepository` (phase 11 owns `QuarantineRepository`; the table-per-trait style follows `AlertRepository` and `CaseRepository`). The three method names are the headings of section 3.2 (Release, Reject, Retry job), not new words
+
+@@ BLOCK 17
+### 7.N Reject locks the row (V-17-01-d, MEDIUM; DR-413)
+Section 3.2 Reject, before its write: lock the row `FOR UPDATE`; status must be `open`, else 409 `E_NOT_ALLOWED_IN_STATE`; `If-Match` on the row version, as release step 1 does.
+@@ END
+# V-17-01-d | MEDIUM | names used and where they exist: `E_NOT_ALLOWED_IN_STATE` API.md:982 and section 3.15 (`NotAllowedInState`) phase-17.md:1328; release step 1 phase-17.md:947 (same words); the reject route row phase-17.md:847 (`If-Match`) | NEW: none. Note: the 422 part is refuted (phase-17.md:958 and 1702; CHECK at phase-17.md:218), so the block does not touch it. The 409 part was refuted by the refuter, but reject's own text (phase-17.md:958-959) has no open-status check, so the block adds the check in the words of release, as the refuter's fix line asks.
+
+@@ BLOCK 17
+### 7.N Retry locks each row (V-17-01-e, MEDIUM; DR-413)
+Section 3.2 Retry job, for each open row: lock it `FOR UPDATE` in a transaction of its own, as release step 1 does, and skip it when it is no longer `open`. Then run `AlertValidator::check`. When the row is valid, set `reason_detail.valid_now = true` and write audit `alert.quarantine_revalidated` in that same transaction. A row that a person released a moment earlier is therefore never written by the retry.
+@@ END
+# V-17-01-e | MEDIUM | names used and where they exist: `AlertValidator::check` phase-17.md:916; `reason_detail` phase-17.md:215 (column, migration 0059); `alert.quarantine_revalidated` phase-17.md:1349 (section 3.16); release step 1 phase-17.md:947 | NEW: none
+
+@@ BLOCK 17
+### 7.N Alert trail writes (V-17-02-a, MEDIUM; DR-413)
+Section 2, `AlertRepository` gains one method. The caller holds the alert's row lock (`lock`), or has just inserted the row at intake (section 3.1 steps 6 and 10): `append_event(&self, tx: &mut Tx, alert: &Alert, e: NewAlertEvent) -> Result<AlertEvent, RepoError>`. The method sets `seq` and `at` (database time) and inserts the row of `alert.alert_events`.
+`pub struct NewAlertEvent { pub actor: Actor, pub kind: &'static str, pub payload: serde_json::Value }`, where `kind` is `alert.<verb>` (the CHECK of `alert.alert_events.kind`) and the payload carries ids and codes only.
+@@ END
+# V-17-02-a | MEDIUM | names used and where they exist: `AlertRepository` and `lock` phase-17.md:804-811; `Alert` and `AlertEvent` entities phase-17.md:783; `Actor` phase-17.md:743; `alert.alert_events` DDL phase-17.md:190-203 (kind CHECK `^alert\.[a-z_]+$`); intake steps phase-17.md:904. Alert events are not chained (phase-02.md:1238-1241, 7.7), so their kind stays a checked string; the case trail uses the phase 02 catalogue type instead (see V-17-02-c) | NEW: `NewAlertEvent` (no existing name fits; it follows `NewCaseEvent`, `NewCase` and `NewAlert` in the same section)
+
+@@ BLOCK 17
+### 7.N Case event kinds and NewCaseEvent (V-17-02-c, MEDIUM; DR-413)
+Section 2: `CaseEventKind` is phase 02's `EventKind` catalogue type with `stream: Stream::CaseEvent` (phase 02, section 2), so the `kind` field of `CaseEvent` and the `kind` field of `NewCaseEvent` are `&'static EventKind`. This phase appends these case kinds to the catalogue: `case.opened`, `case.linked_prior`, `case.alert_attached`, `case.priority_changed`, `case.tier_changed`, `case.group_set`, `case.screening_attached`, `case.assigned`, `case.alert_triaged`, `case.alert_no_longer_matches`, `case.alert_amended_after_decision`, `case.merged_out` and `case.merged_in`.
+Section 2, after the `CaseEvent` struct: `pub struct NewCaseEvent { pub actor: Actor, pub kind: &'static EventKind, pub payload: serde_json::Value }`. `CaseRepository::append_event` (section 3.7) sets the case, `seq`, `at`, `prev_hash` and `hash`.
+@@ END
+# V-17-02-c | MEDIUM | names used and where they exist: `EventKind` and `Stream { AuditLog, AccessEvent, CaseEvent }` phase-02.md:549-550 and 610 (reused, not added); the case stream is chained per case, phase-02.md:530 and 7.7 (1238-1241); `CaseEvent` and `Actor` phase-17.md:741-743; `NewCaseEvent` in `append_event` phase-17.md:820; `casework.case_events.kind` CHECK phase-17.md:341; trail kinds phase-17.md:1035, 1060, 1070, 1094, 1103, 1151, 1298, 1303 | NEW: none. If the lead wants audit kinds kept out of the catalogue, the same 13 kinds can be a closed Rust enum instead. Note for the lead, outside this claim: section 3.16 (phase-17.md:1366) lists `case.merged` for a merge, but section 3.6 (phase-17.md:1094) writes `case.merged_out` and `case.merged_in`; the list above follows 3.6.
+
+@@ BLOCK 17
+### 7.N Assignment method signatures (V-17-03-a, MEDIUM; DR-413)
+Section 3.8 adds the two entry points of assignment. Each runs in the caller's transaction:
+`AssignmentService::assign_alert(&self, tx: &mut Tx, principal: &Principal, id: Uuid, if_match: i32, req: &AssignAlert) -> Result<AlertView, AlertError>` and `AssignmentService::assign_case(&self, tx: &mut Tx, principal: &Principal, id: Uuid, if_match: i32, req: &AssignCase) -> Result<CaseView, AlertError>`.
+`principal` is the caller, `req.to` is the target (a user only for an alert), and `if_match` is the version the caller sent, checked after the alert lock in the order of 7.12.
+@@ END
+# V-17-03-a | MEDIUM | names used and where they exist: `AssignmentService` phase-17.md:1124 (section 3.8 heading); `AssignAlert` and `AssignCase` phase-17.md:793; `AlertView` and `CaseView` (OpenAPI schema list) phase-17.md:864-865; `Principal` phase-01.md:580; `AlertError` phase-17.md:1317; lock order in 7.12 (phase-17.md:1882-1886) | NEW: `assign_alert` and `assign_case` (method names; the plan names only the routes)
+
+@@ BLOCK 17
+### 7.N Assign accepts queued and claimed alerts (V-17-03-b, MEDIUM; DR-413)
+Section 3.8 Assign step 3, for alerts: the state must be `queued` or `claimed`, because a push may take over another person's claim (7.12). Any other state (`triaged`, `duplicate`, `no_longer_matches`) answers 409 `E_NOT_ALLOWED_IN_STATE`, checked under the alert lock of 7.12 before the write. A `no_longer_matches` alert leaves that state only by a new match (section 3.13).
+@@ END
+# V-17-03-b | MEDIUM | names used and where they exist: `E_NOT_ALLOWED_IN_STATE` phase-17.md:1328 (`NotAllowedInState`, section 3.15); the alert lock of 7.12 (phase-17.md:1882-1886); states and the exit of `no_longer_matches` phase-17.md:1296-1303 (section 3.13); CHECKs on `duplicate_of` and `triaged_at` phase-17.md:168-169 | NEW: none
+
+@@ BLOCK 17
+### 7.N Bulk service method (V-17-04-a, MEDIUM; DR-413)
+Section 3.9 Bulk: `QueueService::bulk(&self, principal: &Principal, network: &str, queue_id: Uuid, req: &BulkRequest) -> Result<BulkResult, AlertError>` serves both runs. The caller is `principal`, the ids are `req.ids`, and `req.dry_run` picks the run. `true` writes nothing and returns `allowed` and the reason for each id. `false` is the real run: one transaction that takes the target's `wip:` lock once and applies each item in its own savepoint (7.12). `network` is the request's network (section 3.10).
+@@ END
+# V-17-04-a | MEDIUM | names used and where they exist: `QueueService` phase-17.md:1176 (section 3.9 heading); `BulkRequest` phase-17.md:794; `BulkResult` phase-17.md:864-865 (OpenAPI schema list); `Principal` phase-01.md:580; `AlertError` phase-17.md:1317; `network` as a string phase-03.md:556; the `wip:` lock phase-17.md:1130 (claim step 3) | NEW: none (`bulk` is the word of the route `POST /queues/{id}/bulk`, phase-17.md:838)
+
+@@ BLOCK 17
+### 7.N Bulk item checks and one reason list (V-17-04-b, V-17-04-c, HIGH; DR-413)
+Section 3.9 Bulk. Each item of a bulk request is checked in this order. The first failing check gives the reason. The list below replaces the reason list of section 3.9 and the list of 7.14.
+1. Target, once for the request: assign step 1 of section 3.8 (`queue.work` and membership of the queue's pool, named by the URL). A failure is 422 `E_VALIDATION` at `/to`, and no item runs.
+2. Visibility: a hidden id is `not_found`.
+3. Lock the alert `FOR UPDATE` (both alerts in ascending `id` for `mark_duplicate`, 7.11) and re-read `claimed_by`: a claim by another person is `claimed_by_other`.
+4. Assign: a state other than `queued` or `claimed` is `not_allowed_in_state`.
+5. `mark_duplicate`: a P0 or P1 alert is `p0_or_p1_duplicate`; a target in state `duplicate` is `target_is_duplicate` (7.11).
+6. Assign: a target at the WIP limit (claim step 6 of section 3.8) is `wip_limit`.
+7. Assign: a declared or detected conflict (assign step 2 and claim step 7 of section 3.8) is `conflict_refused`, and audit `alert.conflict_refused` is written.
+Closed list: `not_found`, `claimed_by_other`, `not_allowed_in_state`, `p0_or_p1_duplicate`, `target_is_duplicate`, `wip_limit`, `conflict_refused`, `lower_refused`. Every reason except `not_found` is given only for a visible id (7.14).
+@@ END
+# V-17-04-b, V-17-04-c | HIGH | names used and where they exist: `E_VALIDATION` API.md section 6; pool membership phase-17.md:1182-1183 and assign steps 1 and 2 phase-17.md:1161-1163; claim steps 6 and 7 phase-17.md:1134-1137; `alert.conflict_refused` phase-17.md:1358 (section 3.16); the base bulk reasons phase-17.md:1208-1211; `not_found` phase-17.md:1210-1211 and 7.14 (phase-17.md:1902-1906); `target_is_duplicate` phase-17.md:1878 (7.11) | NEW: `not_allowed_in_state` and `conflict_refused` (two new reason strings; no bulk reason in the plan covers a wrong state or a conflict). If the lead wants no new names, the two item reasons can be the existing problem codes `E_NOT_ALLOWED_IN_STATE` and `E_FORBIDDEN` (section 3.15). The block keeps 7.11's `target_is_duplicate`, since 7.14 only replaces `not_visible` with `not_found` and says nothing about 7.11.
+
+@@ BLOCK 17
+### 7.N Snapshot service method (V-17-05-a, MEDIUM; DR-413)
+Section 3.3: `SnapshotService::seal(&self, tx: &mut Tx, alert_id: Uuid, d: &DetectionPayload) -> Result<(Uuid, [u8; 32]), AlertSinkError>`. It runs steps 1 to 4 of section 3.3 in `tx` for the alert it seals (the new alert at intake, or the existing alert on an amendment, section 3.13) and returns the object id and the sha256. A `Storage` failure of step 3 is the `AlertSinkError::Storage` of section 2.
+@@ END
+# V-17-05-a | MEDIUM | names used and where they exist: `SnapshotService` phase-17.md:966 (section 3.3 heading); `DetectionPayload` phase-17.md:752 (`emit`) and phase-17.md:765; `AlertSinkError` phase-17.md:756-764 (`Storage`); `EvidenceStore::put_generated` phase-17.md:973 (step 3); amendment phase-17.md:1290 (section 3.13) | NEW: none (`seal` is the plan's word, phase-17.md:761, "the snapshot could not be sealed")
+
+@@ BLOCK 17
+### 7.N Assignment writes the case_acl rows itself (V-17-07-a, MEDIUM; DR-413)
+Section 7.2, second bullet: `AssignmentService` writes the grant and revocation rows itself, in the assignment transaction, under the `case.assign` check of section 3.8 step 4 (A1, A2 and M hold it, section 3.17). It does not call phase 18 `grant()` or `revoke()`. Both need `case.access.change`, which A1 does not hold, so a call would refuse every A1 assignment.
+@@ END
+# V-17-07-a | MEDIUM | names used and where they exist: `case.assign` in the A1, A2 and M permits phase-17.md:1397-1420 (section 3.17); `case.access.change` phase-18.md:653 (`grant`) and phase-18.md:661 (`revoke`); the 7.2 bullet phase-17.md:1795; the actor is the assigner phase-18.md:649 | NEW: none
+
+@@ BLOCK 17
+### 7.N Keyset cursor of the model order (V-17-08-a, MEDIUM; DR-413)
+From phase 27 on, the keyset cursor of the items query (section 3.9 item 3, with the order of 7.5) is the signed cursor of phase 00 (`crates/db/src/cursor.rs`). It carries the sort keys `priority_class, model_rank, score, created_at, id`, in that order. NULLS LAST sorts a null `model_rank` or `score` after every value of its key, so the next-page test treats a null key as the last value of that key.
+@@ END
+# V-17-08-a | MEDIUM | names used and where they exist: `model_rank` and the order of 7.5 phase-17.md:1814-1818; items query item 3 and the base keyset cursor phase-17.md:1192; the signed cursor module `crates/db/src/cursor.rs` phase-00.md:413; `score DESC NULLS LAST` phase-17.md:1192 | NEW: none
+
+# DECIDE V-17-01-f | option A: the revalidation record of release step 2 (`revalidated_at` and audit `alert.quarantine_revalidated`) runs in its own transaction, as phase 00 section 7.17 item 2 allows for rows that record an attempt, so the 422 does not roll it back (phase-00.md:1025; phase-17.md:948; the route carries `Idempotency-Key`, phase-17.md:846). Catch: release step 1 already holds `FOR UPDATE` on that row in the request transaction (phase-17.md:947), so a second transaction that writes the row would wait on it. Option A needs the record written without that row lock (for example, validation before the lock), which changes the order of release step 1 | option B: the 422 path writes nothing (no `revalidated_at`, no audit) and keeps its answer. The record is then written only on the job path (release step 4, phase-17.md:953-956) and by the retry (phase-17.md:962-964). Under phase-00.md:1027 ("Any other outcome rolls the whole transaction back") this is what the plan already implies for step 2.
+
+# DECIDE V-17-02-b | option A: no DDL. `alert_events.seq` is `max(seq) + 1` read under the alert row lock, and every writer takes `FOR UPDATE` on the alert first (claim step 4, phase-17.md:1131; amendments, 7.9 at phase-17.md:1861-1868; intake inserts the row, phase-17.md:904). The existing UNIQUE (alert_id, seq) at phase-17.md:201 catches a missed lock. The reuse rule of the brief favours A, since it adds no column (the seq column is phase-17.md:194) | option B: a column. `last_seq INT NOT NULL DEFAULT 0` on `alert.alerts` in migration 0059 (section 1.2), added to the `alert.alerts` UPDATE column list (section 1.5, phase-17.md:546-550), and `seq = last_seq + 1` under the alert lock. This copies the case precedent: `casework.cases.last_seq` (phase-17.md:312) and the rule of section 3.7 (phase-17.md:1111).
+
+# DECIDE V-17-03-c | option A: the target must hold `queue.work` and be a member of the pool of at least one active queue whose filter admits the alert (filter keys `families`, `min_priority`, `states`, phase-17.md:1178-1180). No request change. An alert in two queues of two pools is then assignable to a member of either pool (phase-17.md:1161, 1164) | option B: `AssignAlert` gains a required `queue_id` (phase-17.md:793), the route row gains it (phase-17.md:844), and step 1 checks that queue's pool and that the alert matches its filter (422 at `/queue_id` otherwise). Bulk already names its queue in the path (`POST /queues/{id}/bulk`, phase-17.md:838, 1207), so option B matches the bulk route.
+
+# DECIDE V-17-05-b | option A: `TxRow` is a fixed struct of canon.txn columns: `id` and `booking_date` (the key of `canon.txn` is `(id, booking_date)`, phase-10.md:951), plus the `txn.*` columns the DSL uses (`txn.branch_id`, `txn.channel_id`, DSL.md:401 and 1273). The snapshot keeps the columns in `evidence.fields`. `tx_rows` keeps its signature (phase-17.md:774). The column list must be closed, and validation must refuse any other field (undeclared inputs, phase-16.md:966-967) | option B: `TxRow { id: Uuid, booking_date: NaiveDate, fields: BTreeMap<String, Canon> }` holds only the columns the scenario declares (phase-17.md:970-971). `tx_rows` then gains a `fields: &[String]` parameter (phase-17.md:774). `Canon` is the phase 02 value type (phase-02.md:554). Option B follows the text of section 3.3 most closely.
+
+# NOTE for the lead (outside the claims): the name `QuarantineService` is used by phase 17 (section 3.2, AppState in 4.3) for the alert quarantine, and by phases 11 and 12 for the data quality quarantine (phase-11.md:1339, phase-12.md:935 and 1107). Two services with one name in one AppState need one renamed. If the name changes, the three method lines of the block "Quarantine repository and service methods" move with it.
+# SUMMARY: fixes written 17 (REP 5, BLOCK 12); DECIDE 4; DROP 0; claims covered: V-17-01-a, V-17-01-b, V-17-01-c, V-17-01-d, V-17-01-e, V-17-01-f, V-17-02-a, V-17-02-b, V-17-02-c, V-17-03-a, V-17-03-b, V-17-03-c, V-17-03-d, V-17-04-a, V-17-04-b, V-17-04-c, V-17-05-a, V-17-05-b, V-17-06-a, V-17-07-a, V-17-08-a

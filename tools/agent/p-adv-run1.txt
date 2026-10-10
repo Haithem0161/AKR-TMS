@@ -1,0 +1,70 @@
+You are drafting part of the ADVERSARIAL CORRECTNESS PASS for the AKR-TMS implementation plan (an AML/KYC
+transaction-monitoring product for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Read first:
+.claude/rules/planning.md (section "Adversarial correctness pass"), tools/agent/b3-conventions.md,
+tools/agent/adv-plan.md.
+
+The plan is complete for coverage (every requirement is placed). This pass attacks the LOGIC: can two people, two
+requests, two jobs or one malicious insider make the planned system do something its rules forbid? You are a red team
+reading a specification, not code. A candidate flaw is a concrete sequence of steps that the phase text permits and
+that breaks a stated rule.
+
+YOUR RUN: run 1 = FOUR-EYES AND SELF-APPROVAL. Targets:
+- Four-eyes races on case decisions and report approval: two approvers acting at once; the maker approving after a
+  second person edits; an approval landing after the item changed (stale approval).
+- A change request approved by its own maker, directly or by a back door: a second role held by the same person, a
+  delegate or acting-for arrangement, a withdraw and re-submit that changes the maker, a bulk route, an emergency
+  route, an automatic activation, a system actor.
+- Any other four-eyes rule in these phases (freeze-list screening decisions, downward overrides, RFI release, freezes,
+  report sign-off) that a race or a role combination can defeat.
+
+Phases to read (grep first, then read the relevant sections in full): phase-01 (step-up classes), phase-03 (roles,
+grants, Cedar conventions), phase-04 (workflows, change requests, approvals; the core), phase-14 sections 3.6 to 3.8,
+phase-15 section 3.5, phase-18 (case decisions, the decision check, four-eyes), phase-19 section 3.2 (RFI release),
+phase-20 (freezes), phase-21 (report approval and sign-off). Also read the "Decisions" and "Open doubts" sections of
+those phases: a doubt already recorded is not a new flaw, but say if it is a real flaw left open.
+
+How to work, for each candidate:
+1. State the rule being attacked and quote where the plan states it (phase-NN.md:LINE, at most 20 words).
+2. Write the attack as numbered steps: who (role), what route or job, in what order, with what concurrency.
+3. Look for the guard that would stop it, in this order: a SQL CHECK constraint, a unique or partial unique index, a
+   guard trigger function (grep "RETURNS trigger"), a row lock or advisory lock and the lock order section, the
+   If-Match version check, a Cedar forbid policy, a service step that re-reads and refuses, a step-up class. Quote the
+   guard you found, or the greps that found none.
+4. Verdict: FLAW (no guard stops it), GUARDED (a guard stops it; quote it), or DOUBT (the text is ambiguous; say
+   exactly which sentence and the two readings).
+5. For a FLAW: severity (CRITICAL: a forbidden decision or filing can happen; HIGH: a four-eyes or masking rule can be
+   bypassed with effort; MEDIUM: a race gives a wrong state that a person would notice; LOW: wording), and a fix as a
+   short section 7 text using the phase's own names (tables, columns, functions, Cedar actions, problem codes). Prefer
+   the smallest fix: one CHECK, one re-read under the lock, one Cedar forbid, one If-Match.
+
+Rules for honesty (the lead verifies every line; unverifiable claims are rejected):
+- Verify every name by grep. Never invent a table, column, route, function, Cedar action, problem code or setting. If
+  no phase names it, it does not exist; say so.
+- Quote the real text. Line numbers in Evidence and Check only, never inside the proposed fix text.
+- A guard in a later phase counts only from that phase on; say "from phase NN on" when relevant.
+- Do not report a GUARDED item as a flaw. Report GUARDED items briefly (one line each) so the lead sees what you
+  checked; the value of this run is in the FLAW and DOUBT items.
+- Never propose a new value for a closed list (step-up class, role code, problem code) when an existing one fits.
+- No suspicion data in canon or feat rows, nor in admin.registers. Suspicion-linked triggers use the neutral
+  `trigger_code` `TRG_REVIEW_REQUESTED`.
+
+Output file: tools/agent/adv-run1.md. Create it at the start with the header line
+"# Adversarial pass, run 1 (four-eyes and self-approval; Haiku draft for lead review)" and append each candidate as
+soon as it is analysed (the machine may crash), in this format:
+
+### ADV-1-NN Short title   (verdict: FLAW | GUARDED | DOUBT; phase PP)
+- Rule: quote and phase-NN.md:LINE
+- Attack: numbered steps
+- Guard search: the guards found (quoted, with file:line) or the greps that found none
+- Severity (FLAW only): CRITICAL | HIGH | MEDIUM | LOW
+- Proposed 7.x text (FLAW only): "### 7.N <title>" and the change stated concretely
+
+Aim for depth over count: 10 to 20 candidates, each traced to the guard. Cover every phase listed above at least once.
+
+At the end append "## Summary": counts by verdict, FLAW items by severity, and the DOUBT items in one line each.
+
+Other rules:
+- Write ONLY tools/agent/adv-run1.md. Do not edit any other file.
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Do not read cbs-discovery/ or test-poc/ (not needed).
+- Your final reply: the counts and the file path, nothing else.

@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-15.md by the second re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-15-1]
+WHY: S-15-1 | CONFIRMED LOW (raised MEDIUM) | the doc comment above `open_or_join` still says "returns (review, created)"; the signature (the R-15-7b text) and the next comment line give three parts | the stale clause is removed
+OLD:     /// Opens a review unless one of the same party and kind is open; returns (review, created). A new event trigger on
+NEW:     /// Opens a review unless one of the same party and kind is open. A new event trigger on

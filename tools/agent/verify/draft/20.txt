@@ -1,0 +1,148 @@
+Fixes for the claims of tools/agent/verify/refute-20.md (phase 20).
+@@ BLOCK 20
+### 7.N Input rows of the repository inserts (V-20-01-a, V-20-02-c, V-20-04-d, V-20-08-c, LOW; DR-413)
+- `NewOpsTask` is `NewOpsTaskSpec` (section 3.1, Creation) plus the values that creation derives: `task_ref` (step 3), `neutral_text_code` (step 2), `state = open` and `version = 1` (step 4).
+- `NewFreeze` holds the `casework.freezes` columns that `FreezeService::start` sets before its insert (section 3.4, Start steps 1 to 4 and the clock table): `freeze_ref`, `screening_alert_id`, `case_id`, `subject_kind`, `subject_id`, `list_id`, `list_code`, `entry_id`, `entry_key`, `listing_decision_at`, `listing_decided_by` (`c.decided_by`), the three clock instants and `state = listed`. `ops_task_id` stays NULL until `set_task` (step 6).
+- `NewRefrain` holds the values of register step 4 (section 3.7): `refrain_ref` from the sequence, `office_reference`, `received_at`, `party_ids`, `target_accounts` (step 2), `case_id`, `refrain_due_at` (step 3), `state = open` and `registered_by = actor`.
+- `NewVerification` holds the values of check step 7 (section 3.3): `kind = canonical_check`, `level = new_level`, `post_order_debits = new_debits`, `accounts_checked`, `holds_matched`, `canon_as_of`, and `actor_id` (the check's `actor`, or NULL for the job).
+@@ END
+# V-20-01-a + V-20-02-c + V-20-04-d + V-20-08-c | LOW | names used and where they exist: `NewOpsTaskSpec` phase-20.md:536; `set_task` phase-20.md:482; `NewVerification` phase-20.md:481; `NewFreeze` phase-20.md:482; `NewRefrain` phase-20.md:483; `refrain_ref` from the sequence phase-20.md:487; register step 4 phase-20.md:738; `refrain_due_at` step 3 phase-20.md:737; check signature with `actor: Option<Uuid>` phase-20.md:587; `accounts_checked` phase-20.md:101; `holds_matched` phase-20.md:102 | NEW: none
+
+@@ BLOCK 20
+### 7.N Completion hooks of both owners (V-20-01-b, LOW; DR-413)
+`RefrainService::on_task_completed(tx, refrain)` records nothing and changes no state, as the freeze hook of section 3.4 does. The refrain row has no completion column. The completion sits on the task row and is audited by section 3.1 step 8. This block gives the refrain hook the definition that section 3.7 lacks. It replaces "both only record that the task is done" in section 3.1 step 7: the level changes only through the check of section 3.3.
+@@ END
+# V-20-01-b | LOW | names used and where they exist: `FreezeService::on_task_completed` phase-20.md:664; `RefrainService::on_task_completed` phase-20.md:552; refrain table with no completion column phase-20.md:168-196; completion audit phase-20.md:553 | NEW: none
+
+@@ REP 20
+lock as in complete; state not `completed`;
+@@ WITH
+lock as in complete (a task claimed by another user is refused 409 `E_CLAIMED`, complete step 3); state not `completed`;
+@@ END
+# V-20-01-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: `E_CLAIMED` phase-20.md:767 (3.9 table); complete step 3 phase-20.md:548 | NEW: none
+
+# DECIDE V-20-01-d | (A) the exit source (`create_ops_task`, phase 15) and the refrain close lift take `due_at` from the phase 09 clock `ops.task.due` (working days, bounds 1 to 10, through `BusinessClock::add`), and phase 24's row stays as written (evidence: docs/plan/phase-09.md:771-772 and phase-24.md:741; phase-09.md:1349 calls the bounds proposals for compliance) | (B) they take the freeze-hours rule that the freeze release lift already uses, `now() + ops.freeze_task_hours` (evidence: phase-20.md:705); `ops.task.due` is then unused, so phase 09's clock entry and phase 24's row go (evidence: phase-20.md:62 says `due_at` mirrors the owner's clock; phase-15.md:1799 names `create_ops_task` with no due rule; phase-20.md:746 gives the refrain close lift no due time; phase-20.md:536 takes `due_at` as an input)
+# NOTE V-20-01-d: settled by the plan and outside the choice: the freeze hold takes `freeze_due_at` (phase-20.md:646, Start step 6) and the refrain hold takes `refrain_due_at` (phase-20.md:737, register step 3).
+
+# DROP V-20-01-e | phase-15.md:1799 "-> `create_ops_task` (phase 20; a no-op until phase 20 is live)." sits in the `exit_decision` definition, and phase-15.md:2031 "### 7.2 exit_decision and create_ops_task (phase 20, DSL E.4)" names it again.
+
+@@ REP 20
+`FreezeError` is phase 14's port error, a variant set of this type
+@@ WITH
+`FreezeError` is phase 14's port error type and is this type (`pub type FreezeError = OpsError;`); the port returns the variants of the table below, and section 3.4 Start step 1 raises `NotFreezeList`
+@@ END
+# V-20-02-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `FreezeError` phase-14.md:773 (named in the trait, not defined there); `OpsError` phase-20.md:758; `NotFreezeList` phase-20.md:773; Start step 1 phase-20.md:641 | NEW: none (the alias keeps phase 14's name)
+# NOTE V-20-02-a: the plan says FreezeError belongs to phase 14 (phase-20.md:758). If the lead wants the definition in phase 14, the same alias line goes to phase-14.md section 2.5 as a BLOCK 14. This draft keeps it where the claim is.
+
+@@ BLOCK 20
+### 7.N Listing decider of a freeze (V-20-02-b, MEDIUM; DR-413)
+Section 3.4, Start: `listing_decided_by` (section 1.1, NOT NULL) is `c.decided_by`, the decider of the true decision. That is the phase 14 `alert.screening_decisions.decider_id` of the decision row, the same column the backfill of this section reads. `c.first_decider` is not stored. The earlier deciders stay in phase 14 `prior_decider_ids`.
+@@ END
+# V-20-02-b | MEDIUM | names used and where they exist: `FreezeCandidate.decided_by` phase-14.md:776; `alert.screening_decisions.decider_id` phase-14.md:309; `prior_decider_ids` phase-14.md:315; decision step 8 passes the candidate phase-14.md:1028; backfill phase-20.md:678; `listing_decided_by` phase-20.md:127 | NEW: none
+
+@@ BLOCK 20
+### 7.N Registry bounds of the freeze task setting (V-20-03-a, MEDIUM; DR-413)
+Section 4.5 item 8: the settings registry (`common::settings_registry`, phase 00) declares the hard bounds 1 to 8 of `ops.freeze_task_hours`, the mechanism DR-34 gives for product limits. The phase 04 setting target checks registry bounds, so a value outside 1 to 8 is refused at change time with `E_VALIDATION`. Section 3.14 keeps the fallback to 8 for a value found outside the bounds.
+@@ END
+# V-20-03-a | MEDIUM | names used and where they exist: `common::settings_registry` phase-00.md:233; `ops.freeze_task_hours` phase-20.md:361; the phase 04 setting target and its registry bounds phase-04.md:956; DR-34 docs/plan/research.md:45; fallback phase-20.md:921 | NEW: none
+# NOTE V-20-03-a: the settings comment at phase-20.md:359 says the service checks the bounds. That stays true as the second check, so no REP is made there.
+
+@@ REP 20
+`a2@` `POST /api/v1/refrain-instructions` with the step-up header and `received_at` on a Monday: 200;
+@@ WITH
+`m@` `POST /api/v1/refrain-instructions` with the step-up header and `received_at` on a Monday: 200 (the same request as `a2@` gets 403 `E_FORBIDDEN`, because Cedar gives `refrain.register` to M alone, section 3.12);
+@@ END
+# V-20-04-a | HIGH | grep -c -F gave 1 | names used and where they exist: `refrain.register` in `ops.refrain.m` phase-20.md:896; `E_FORBIDDEN` phase-20.md:763 (3.9 table); A2 holds `case.decide` docs/API.md:86 | NEW: none
+# NOTE V-20-04-a: the Cedar file is taken as the rule (the fine gate, section 3.12). The other reading is an A2 permit for `refrain.register` in section 3.12 plus an Open doubt for the bank. Not drafted; the lead decides.
+
+@@ BLOCK 20
+### 7.N Close on a closed refrain (V-20-04-b, MEDIUM; DR-413)
+Section 3.7, close: after the lock, a refrain already `closed` is refused before any write, with 409 `E_NOT_ALLOWED_IN_STATE` and sub-code `already_closed`. That is the phase 18 sub-code of the same name, reused here, and section 3.9 gains it through this block. The first `closed_by`, `closed_at` and lift task keep their values. A refer on a `closed` refrain is refused by the state rule of the same section.
+@@ END
+# V-20-04-b | MEDIUM | names used and where they exist: `already_closed` phase-18.md:921 (phase 18 closed sub-code list) and phase-18.md:841 (its use); `closed_by` phase-20.md:183; `E_NOT_ALLOWED_IN_STATE` phase-20.md:766; refer rule phase-20.md:746 | NEW: none (reused, so one word covers a closed case and a closed refrain)
+
+@@ BLOCK 20
+### 7.N Signatures of the refrain, referral and release methods (V-20-04-c, V-20-06-b, V-20-07-d, LOW; DR-413)
+- `RefrainService::register(tx, actor, cmd: RegisterRefrain) -> Result<RefrainInstruction, OpsError>` (section 3.7, Register).
+- `RefrainService::close(tx, actor, refrain_id, cmd: CloseRefrain) -> Result<RefrainInstruction, OpsError>` (section 3.7, Refer, close).
+- `FreezeService::refer(tx, actor, freeze_id)` and `RefrainService::refer(tx, actor, refrain_id)` take no command body. Each makes the letter request and `set_referred` of section 3.6; the refrain one keeps the state rule of section 3.7.
+- `RefrainService::on_level(tx, refrain, level)`: when the level reaches V1 or better and the refrain is `open`, it sets `confirmed` and `confirmed_at = now()`. Any other call changes nothing (section 3.3: check step 7 and Confirm step 5).
+- `FreezeService::propose_release(tx, actor, freeze_id, cmd: ProposeFreezeRelease)` returns the phase 04 instance and its open task (section 3.5, Propose step 6).
+@@ END
+# V-20-04-c + V-20-06-b + V-20-07-d | LOW | names used and where they exist: `RegisterRefrain` phase-20.md:466; `CloseRefrain` phase-20.md:467; `ProposeFreezeRelease` phase-20.md:464; `RefrainInstruction` phase-20.md:441; `OpsError` phase-20.md:758; `set_referred` phase-20.md:482 and 483; refrain `on_level` rules phase-20.md:608 and 742; referral routes phase-20.md:507 and 511; Propose step 6 phase-20.md:690 | NEW: `refer` (the route verb; the plan names no method for the referral routes)
+
+@@ BLOCK 20
+### 7.N Freeze referral: state rule and refusals (V-20-06-a, MEDIUM; DR-413)
+Section 3.6, freeze referral: allowed only in state `listed` or `frozen`, the same states that the propose step of section 3.5 accepts. State `released`: 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `already_released`. A freeze whose `referred_at` is already set: 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `already_referred`, and section 3.9 gains that sub-code through this block. Both refusals come before the letter request and write nothing, so the first `referral_letter_id` and `referred_at` keep their values.
+@@ END
+# V-20-06-a | MEDIUM | names used and where they exist: `already_released` phase-20.md:685; propose states phase-20.md:685; freeze referral and its `set_referred (freeze: referred_at, referral_letter_id)` phase-20.md:730; `E_NOT_ALLOWED_IN_STATE` phase-20.md:766; freeze referral route phase-20.md:507 | NEW: `already_referred` (phase 18 and phase 20 have `already_closed`, `already_released`, `already_completed` and `already_verified`; none covers a second referral)
+
+@@ REP 20
+is frozen by `FreezeWorkflowSubject::start_context` as `freeze.reason_code`
+@@ WITH
+is frozen into the instance context by `FreezeWorkflowSubject::start_context` (`admin.workflow_instances.context`, key `reason_code`)
+@@ END
+# V-20-07-a | HIGH | grep -c -F gave 1 | names used and where they exist: `FreezeWorkflowSubject::start_context` phase-20.md:695; `admin.workflow_instances.context` phase-04.md:328 and 338 (JSONB column); attribute list phase-20.md:694 | NEW: none
+
+# DECIDE V-20-07-b | (A) refuse the proposal of a freeze with no task (`ops_task_id` NULL) with 409 `E_NOT_ALLOWED_IN_STATE` and a new sub-code, until the bank names the accounts (evidence: phase-20.md:537 refuses a task with zero accounts; phase-20.md:647 says such a freeze stays listed until a person acts; phase-20.md:685 lets propose accept a listed freeze) | (B) let the approval record the release with no lift task: the four timers cancel, and the audit `freeze.released` carries no lift task id (evidence: phase-20.md:705 takes the accounts from the freeze task, and phase-20.md:700 runs `release_freeze` on approve in the same transaction, so a failed task creation rolls the approval back; phase-20.md:1121 says no account set is derivable, Open doubts 6; phase-20.md:1088 (DR-158) makes non-party freezes create no task)
+# NOTE V-20-07-b: tools/agent/b3-conventions.md (phase 19 review) says never leave a requirement unusable until the bank decides, and pick a safe default. Under (A) a release of a non-party freeze cannot be approved until Open doubts 6 is closed. Under (B) a release leaves any manual block in the core system in place with no task to lift it. The lead chooses.
+
+@@ BLOCK 20
+### 7.N Propose refuses another release code (V-20-07-c, LOW; DR-413)
+Section 3.5, propose step 4: a `reason_code` that is an active `decision` code other than `DEC_FREEZE_DELISTED` is refused with 422 `E_VALIDATION` at `/reason_code`, sub-code `reason_not_release`, and section 3.9 gains that sub-code through this block. An inactive code, or a code of another family, keeps the phase 18 refusals: sub-code `reason_code_inactive` or `reason_family_mismatch` (section 3.9).
+@@ END
+# V-20-07-c | LOW | names used and where they exist: `DEC_FREEZE_DELISTED` phase-20.md:374 (seed row, family `decision`); propose step 4 phase-20.md:688; `reason_code_inactive` phase-18.md:840; `reason_family_mismatch` phase-18.md:735 (family `decision`); sub-code list phase-20.md:775 | NEW: `reason_not_release` (a valid second release code is in the right family, so `reason_family_mismatch` does not fit, and no other sub-code names the case)
+
+@@ REP 20
+`check_before_decision` (phase 18 section 3.19)
+@@ WITH
+`check_before_decision` (phase 18 section 3.8, item d)
+@@ END
+# V-20-07-e | LOW | grep -c -F gave 1 | names used and where they exist: `CaseWorkflowSubject::check_before_decision` phase-18.md:758 (section 3.8, item d); phase 18 section 3.19 is the Cedar section, phase-18.md:962 | NEW: none. Pointer fix only: the claim is REFUTED (the name exists), and the rules allow the pointer correction.
+
+@@ REP 20
+- Section 3.5: `propose_release` creates one release task per group.
+@@ WITH
+- Section 3.5 step 5, for phase 26 on: `release_freeze` creates one release task per group, on approval and not at proposal (DR-162); a proposal creates no ops task.
+@@ END
+# V-20-07-f + V-20-10-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `release_freeze` phase-20.md:700 (runs on approve); step 5 phase-20.md:705; DR-162 docs/plan/research.md:173 (the release creates the lift task) | NEW: none
+# NOTE V-20-07-f + V-20-10-a: approval is chosen. Base step 5 (phase-20.md:705) and DR-162 (research.md:173) both put the lift task at the recorded release. A task made at proposal would lift a block before the four-eyes decision, and it would stay if the proposal is rejected. The lead's default says a 7.x block wins over base text; this draft departs from it because DR-162 wins over both.
+
+@@ REP 20
+1. Read the task and its owner without a lock;
+@@ WITH
+1. Read the task and its owner without a lock to learn them, then lock the owner and then the task (`FOR UPDATE`, section 3.13) and re-read the task;
+@@ END
+# V-20-08-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: lock order phase-20.md:910 (owner before task); `casework.ops_tasks` `FOR UPDATE` phase-20.md:914 (3.13 step 3) | NEW: none
+# NOTE V-20-08-a: section 3.13 needs no edit. The check is one of its jobs, and its owner-then-task order now applies to the check's step 1.
+
+@@ REP 20
+counted as `holds_matched`.
+@@ WITH
+counted per target account as `holds_matched` (an account counts once, however many matching holds it has); `n` is the number of target accounts, the `accounts_checked` of the row.
+@@ END
+# V-20-08-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `accounts_checked` phase-20.md:101 (DDL); `holds_matched` phase-20.md:102; the V1 row "on every target account" phase-20.md:581 | NEW: none
+# NOTE V-20-08-b: this reading counts accounts, because the V1 row asks for a hold on every target account. The other reading (count holds) has no defined n.
+
+# DROP V-20-08-d | phase-20.md:608 "5. Owner: `on_level(v0)` (freeze: section 3.4; refrain: no change, a refrain is confirmed only at V1)." states the refrain branch; phase-20.md:742 "The check of section 3.3 reaching V1 sets the refrain `confirmed`" states the V1 transition.
+
+@@ REP 20
+shows "Confirm" (V0) when the copy does not show the hold, with the note that the confirmation is flagged;
+@@ WITH
+shows "Confirm" (V0) when `claimed_by_me` is false (the completer is the claimer, section 3.1 step 3); the server's 409 `copy_matches` (section 3.3, Confirm step 3) decides whether the copy shows the hold, and the screen shows that answer; with the note that the confirmation is flagged;
+@@ END
+# V-20-09-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `claimed_by_me` phase-20.md:472 (OpsTaskNeutralView); `copy_matches` phase-20.md:606 (Confirm step 3); completer is the claimer phase-20.md:548 | NEW: none
+
+# DECIDE V-20-09-b | (A) the screen applies the day window: the OPS list asks by `state` only, and the screen shows the completed items whose `completed_at` falls on the bank day, or keeps the completion response of section 3.1 step 8 as the operator's copy; the list then returns older completed items for the screen to skip (evidence: phase-20.md:469 takes `state` and `due_before` only; phase-20.md:472 carries `completed_at`; phase-20.md:557 is the Reads rule) | (B) the server bounds the list: `ListOpsTasks` (section 2) gains a completed-since filter (a new name) and section 3.1 Reads says which completed items the day returns (evidence: phase-20.md:990 states the window; phase-20.md:553 gives the completion response, the operator's copy)
+
+@@ REP 20
+else the first group's;
+@@ WITH
+else the first group's, in the order `freeze`, `restrict`, `hold`;
+@@ END
+# V-20-10-b | LOW | grep -c -F gave 1 | names used and where they exist: `freezes.ops_task_id` phase-20.md:1058; the three groups in that order phase-20.md:1057 | NEW: none
+
+# DECIDE V-20-12-a | (A) read through the port: `LetterRequester` gains a read of the letter's delivery state (a new method, for example `delivered(conn, letter_id) -> Result<bool, LetterError>`); phase 21 implements it, and the section 7.3 deadline handler calls it through the worker's `letters` port (section 4.3); no column and no migration change (evidence: phase-20.md:719 is the only port method, `request`; phase-20.md:958 gives the worker that port only; phase-20.md:1079 reads the letter state) | (B) callback: phase 21 calls `FreezeService::letter_delivered(tx, freeze_id, letter_id, delivered_at)` on delivery, and phase 20 adds `committee_report_delivered_at TIMESTAMPTZ` to `casework.freezes` in migration 0066 (section 1.1), which the section 7.3 rule reads (evidence: phase-21.md:1264 proposes the method only if gap pass 1 decides; phase-21.md:1388 names it in its 7.5 block; phase-21.md:1432 leaves the choice open as its Open doubts 4)
+# NOTE V-20-12-a: this is the HIGH claim and the choice is the lead's. Option (A) is the smaller change: it reuses the existing port and adds no column, under the "reuse before you add" rule. Option (B) matches the 7.5 block of phase 21.
+
+# SUMMARY: fixes written 18 (REP 10, BLOCK 8); DECIDE 4; DROP 2; claims covered: V-20-01-a, V-20-01-b, V-20-01-c, V-20-01-d, V-20-02-a, V-20-02-b, V-20-02-c, V-20-03-a, V-20-04-a, V-20-04-b, V-20-04-c, V-20-04-d, V-20-06-a, V-20-06-b, V-20-07-a, V-20-07-b, V-20-07-c, V-20-07-d, V-20-07-f, V-20-08-a, V-20-08-b, V-20-08-c, V-20-09-a, V-20-09-b, V-20-10-a, V-20-10-b, V-20-12-a; pointer fix only for V-20-07-e (REFUTED claim)

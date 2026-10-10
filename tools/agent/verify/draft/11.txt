@@ -1,0 +1,210 @@
+Fixes for the claims of tools/agent/verify/phase-11.md (drafted from tools/agent/verify/refute-11.md; for lead review).
+# DECIDE V-11-01-a | MEDIUM | option A: the audited `check_id` is the fresh check of step 2 (`ConnectionGuard::connect`), the check that lets the source become active; the route's `check_id` in the payload is then not audited (evidence phase-11.md:938 route enqueues `check_id`; phase-11.md:946-947 step 2 "a fresh grant check"; phase-11.md:959 step 4 audits `check_id`) | option B: the audited `check_id` is the route's latest check from the payload, the check the route read before it enqueued (evidence phase-11.md:937-938 "the route checks the state and the latest grant check, then enqueues"); the fresh check of step 2 then has no audited id (evidence phase-11.md:946-947)
+
+@@ REP 11
+ConnectionGuard::connect(source, Trigger::Resume)
+@@ WITH
+ConnectionGuard::connect(source, CheckTrigger::Resume)
+@@ END
+# V-11-01-c | LOW | grep -c -F gave 1 | names used and where they exist: `CheckTrigger` phase-05.md:527 (the type of a pending check; its `trigger` column takes `resume`, phase-05.md:99) | NEW: none | phase-05.md:1003 has the same slip (`Trigger::Health`); no phase 05 fix is in this draft
+
+@@ REP 11
+Halts are cleared; no watermark
+@@ WITH
+The as-of marker of section 7.13 is written when the halt was `as_of_regressed`. Halts are cleared; no watermark value
+@@ END
+# V-11-01-d | LOW | grep -c -F gave 1 | names used and where they exist: `as_of_marker` phase-11.md:115 (watermark column); section 7.13 phase-11.md:1602-1607 | NEW: none
+
+@@ BLOCK 11
+### 7.N The watermark rows are created before the first unit (V-11-02-a, HIGH; DR-413)
+`ingest_load` step 2 (section 3.1) creates the missing rows before the unit's transaction starts. For each branch in the branch dates that step reads (`*` for a table not kept per branch) it inserts one row with `value` NULL and `kind` from the mapping's `change` block; `freshness_class` keeps its default F3 until the first unit sets it (section 3.7). The insert is `WatermarkRepository::ensure_rows(conn, source, table, branches, kind)`, with `ON CONFLICT (source_id, source_table, branch_code) DO NOTHING`.
+@@ END
+# V-11-02-a | HIGH | names used and where they exist: `WatermarkRepository` phase-11.md:545; `lock_table` phase-11.md:547; `ingest_load` step 2 phase-11.md:755; branch dates `SourceReader::branch_dates` phase-11.md:642; `admin.watermarks` phase-11.md:106-126 (`kind` NOT NULL at line 110, primary key at line 126); INSERT grant for akr_ingest phase-11.md:300 (no new grant needed) | NEW: `ensure_rows` (no existing method inserts watermark rows; the `ensure_` methods cover landing tables and partitions, phase-11.md:607-608) | no audit event of its own: the row is created in the run whose first `batch.recorded` records the move (the housekeeping case of the one-audit-per-mutation rule)
+
+@@ REP 11
+`UnitPlanner::plan(watermarks, kind, overlap, settle, history_from, closed_dates, slice_days, max_unit_rows)`
+@@ WITH
+`UnitPlanner::plan(watermarks, kind, overlap, sequence_overlap_keys, lag_days, lookback_max_days, settle, history_from, closed_dates, slice_days, max_unit_rows)`, where `lag_days` is the largest `late_days_max` of the table over the last 90 days, `None` for a fixed lookback, read the same way as section 7.12 item 2
+@@ END
+# V-11-02-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `ingest.sequence_overlap_keys` phase-11.md:1570 (section 7.10); `ingest.lookback_max_days` phase-11.md:1598 (section 7.12); `late_days_max` phase-11.md:1589 (section 7.12 item 1) | NEW: `lag_days` (a parameter name; the measured lag has no name in the plan)
+
+@@ BLOCK 11
+### 7.N Fields of the watermark port types (V-11-02-c, MEDIUM; DR-413)
+`StaleChange` (section 2, `WatermarkRepository::set_stale`) has `source_id`, `source_table`, `branch_code`, `class: FreshnessClass`, `reason: Option<StaleReason>` (None clears the stale mark) and `data_as_of: Option<NaiveDate>`. `StaleTransition` has the same fields and is returned only when a stored mark changes: with a reason it is `freshness.stale_entered`, with None it is `freshness.recovered`. `WatermarkWithSource` is `{ watermark: Watermark, source_code: String, source_state: SourceState }`, where the state is phase 05's enum, read by rule a2 of section 7.9.
+@@ END
+# V-11-02-c | MEDIUM | names used and where they exist: `set_stale` phase-11.md:556; `list_all_active` phase-11.md:558; `FreshnessClass` and `StaleReason` phase-11.md:530; `freshness.stale_entered` phase-11.md:1032; `freshness.recovered` phase-11.md:1201; `Watermark` entity phase-11.md:518-519; `SourceState` phase-05.md:517; `source_code` is `admin.sources.code` phase-05.md:61 | NEW: none
+
+# DECIDE V-11-03-a | HIGH | option A: akr-api estimates from the receipts, summing `rows_landed` of the table's `admin.batches` rows over the window (akr_app can read batches, phase-11.md:305; phase-11.md:1358 says akr-api reads batches from PostgreSQL), and the job makes the exact count and fails with `cost_guard` (phase-11.md:1090) | option B: akr-ingestd counts the landed rows and answers the POST through a new internal call, which is not in the plan (LandingStore is for akr-ingestd only, phase-11.md:605; the 422 must carry the estimate, phase-11.md:1061-1062) | option C: the POST always returns 202 and the job fails with `cost_guard`, which drops the synchronous 422 of step 3
+
+# DECIDE V-11-03-b | HIGH | option A: a replay of a `files` table is refused at POST step 2 with a new sub-code `table_delivery_not_replayable` under `E_VALIDATION`, beside `table_not_in_version` (phase-11.md:1059-1060), so no replay receipt of a files table exists (new name) | option B: each replay receipt of a files table takes a `file_name` and `file_sha256` that the apply derives, for example from the replay id and the SHA-256 of the page's row hashes; the plan has no such derivation (CHECK at phase-11.md:164; receipt rule at phase-11.md:1119)
+
+@@ REP 11
+`mapping_version_id` set, watermark fields NULL (a replay moves no
+@@ WITH
+`mapping_version_id` set, `status` `mapped` or `partial` (section 3.2 step 6), watermark fields NULL (a replay moves no
+@@ END
+# V-11-03-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: the status rule phase-11.md:805 (section 3.2 step 6); the `mapped` and `partial` values of `admin.batch_status` phase-11.md:73 | NEW: none
+
+@@ REP 11
+the unit machinery of section 3.2 steps 2 to 5 without the
+@@ WITH
+the mapping and writer of section 3.2 step 5, over the landed rows of the window read in `(extracted_at, id)` order (`LandingStore::read_window`; apply lands no raw row, so steps 2 to 4 of section 3.2 do not run) and without the
+@@ END
+# V-11-03-f | MEDIUM | grep -c -F gave 1 | names used and where they exist: `LandingStore::read_window` phase-11.md:617; `(extracted_at, id)` order phase-11.md:629; the writer `CanonicalWriter::write` phase-10.md:1969 (section 3.7) | NEW: none
+
+@@ REP 11
+7. Failure: status `failed` with `error_code`
+@@ WITH
+7. Failure: status `failed` with `error_code` and `finished_at`
+@@ END
+# V-11-03-g | LOW | grep -c -F gave 1 | names used and where they exist: `finished_at` CHECK phase-11.md:390 (migration 0034); `finished_at` column phase-11.md:381 | NEW: none
+
+@@ REP 11
+that port is not in phase 04 today.
+@@ WITH
+phase 04 section 7.5 now adds that port (`approver_ids`), so this doubt is closed.
+@@ END
+# V-11-03-h | LOW | grep -c -F gave 1 | names used and where they exist: `approver_ids` phase-04.md:1681 (section 7.5), which also says it closes this doubt (phase-04.md:1685) | NEW: none
+
+# DECIDE V-11-04-a | HIGH | option A: a close route `POST /coverage/blind-periods/{id}/close` (data.steward, Cedar `blind_period.declare`, calling `BlindPeriodRepository::close`, phase-11.md:589), with `GRANT UPDATE (ended_at, business_to, statement) ON admin.blind_periods TO akr_app` added to migration 0033 (today only akr_ingest has it, phase-11.md:313; akr_app has SELECT and INSERT only, phase-11.md:314); this adds a route to the twelve of section 2 | option B: a declaration must carry `ended_at` (422 `E_VALIDATION`, a new reason `ended_at_required`), so no declared period can stay open (the base text makes it optional, phase-11.md:991-996; the automatic close covers source periods only, phase-11.md:985; the unique index covers source scope only, phase-11.md:98; research.md:101 closes at catch-up only; phase-30.md:230 writes system periods with `ended_at` set)
+
+@@ REP 11
+`scope_invalid`, `started_before_anchor` |
+@@ WITH
+`scope_invalid`, `started_before_anchor`, `started_in_future` (`started_at`), `too_short` or `too_long` (`comment`, pointer `/comment`), and `range_inverted` for `ended_at` before `started_at` and for `business_to` before `business_from` |
+@@ END
+# V-11-04-b | LOW | grep -c -F gave 1 | names used and where they exist: `range_inverted` phase-11.md:1059 and 1173 (existing reason); `too_short` and `too_long` phase-01.md:664 (existing validation codes); the date-order CHECKs phase-11.md:93-94; `ValidationError { pointer, code, params }` phase-00.md:445-446 | NEW: `started_in_future` (same style as `received_in_future`, phase-20.md:737)
+
+@@ BLOCK 11
+### 7.N The declaration call (V-11-04-c, MEDIUM; DR-413)
+`BlindPeriodService::declare(ctx, body: BlindPeriodDeclaration)` is the call of `POST /coverage/blind-periods`, and phase 30 uses the same service for system periods. In one transaction it refuses a `scope` other than `system` or `rail` (`scope_invalid`), a `started_at` in the future (`started_in_future`) or before the newest `audit.audit_anchors.anchored_at` (`started_before_anchor`), an `ended_at` or `business_to` before its start (`range_inverted`) and a `comment` outside 10 to 2,000 characters (`too_short`, `too_long`). It then calls `BlindPeriodRepository::open(tx, &NewBlindPeriod)`, which inserts because the partial unique index covers source scope only, and audits `blind_period.declared {scope, cause, started_at, ended_at}`.
+@@ END
+# V-11-04-c | MEDIUM | names used and where they exist: `BlindPeriodService` phase-11.md:511 and 1339 (no method anywhere); `BlindPeriodDeclaration` phase-11.md:677-678; `NewBlindPeriod` phase-11.md:537; `BlindPeriodRepository::open` phase-11.md:588; `audit.audit_anchors.anchored_at` phase-11.md:407; phase 30 calls the same service phase-30.md:230; reasons `scope_invalid`, `started_before_anchor`, `range_inverted` phase-11.md:1173 | NEW: `BlindPeriodService::declare` (the service exists, the method does not); `started_in_future` is the reason named in the V-11-04-b entry above
+
+@@ REP 11
+| GET | /coverage/blind-periods | dashboard.read |
+@@ WITH
+| GET | /coverage/blind-periods | dashboard.read, data.steward |
+@@ END
+# V-11-04-d | HIGH | grep -c -F gave 1 | names used and where they exist: `data.steward` docs/API.md:97 (role DS); Cedar `blind_period.read` for DS phase-11.md:1214 (section 3.10 table) and section 3.6 "Visibility" phase-11.md:998 | NEW: none | the same change is needed in docs/API.md line 330, which is not a phase file, so the lead applies it: `| GET | /coverage/blind-periods | dashboard.read |` (unique in API.md) becomes `| GET | /coverage/blind-periods | dashboard.read, data.steward |`
+
+@@ BLOCK 11
+### 7.N Spool errors and the consumer entry (V-11-05-a, MEDIUM; DR-413)
+`SpoolError` (section 2, `ChangeSpool`) has three variants: `SequenceGap` (the next segment's sequence is not the successor of the last one read, or its first position does not follow the stored position), `SequenceHashConflict` (a repeated sequence with another SHA-256) and `HashMismatch` (a segment's SHA-256 differs from its `.sha256` file). The first two halt the source with `cdc_gap` (section 3.4 step 2). `HashMismatch` rejects the unit with `file_hash_mismatch`, the outcome that section 6 item 6 gives a corrupted file, and nothing of the segment is written. `ChangeCaptureConsumer::read_unit(source, table, plan)` is the entry that `ingest_load` calls for a `cdc_position` unit; it calls `ChangeSpool::segments_after` and `read_segment`.
+@@ END
+# V-11-05-a | MEDIUM | names used and where they exist: `ChangeSpool` phase-11.md:649-651; `cdc_gap` phase-11.md:875; `file_hash_mismatch` phase-11.md:891-897 and 1450; `ChangeCaptureConsumer` phase-11.md:511 and 1342; `SpoolSegment` and `ChangeEvent` fields in prose phase-11.md:871-877; `HashMismatch` also exists as a phase 02 error variant (phase-02.md:596), same name, different enum | NEW: `SpoolError::SequenceGap`, `SpoolError::SequenceHashConflict`, `SpoolError::HashMismatch` (no variant name exists in the plan), `ChangeCaptureConsumer::read_unit`
+
+# DECIDE V-11-05-b | MEDIUM | option A: the first unit of a `cdc_position` table starts at the first segment the sidecar wrote; rows changed before the sidecar started are not read, since the plan has no initial snapshot | option B: a start position is recorded when `ingest.cdc_enabled` is set (a new column or setting, not in the plan) and the first unit starts there; the unit size can follow the base stop rule of section 3.1 (`ingest.max_unit_rows` events, then reschedule) under either option (evidence phase-11.md:757-761 start rule with `ingest.history_from`; phase-11.md:873 CT3 read; research.md:102 DR-91 names no start)
+
+# DECIDE V-11-05-c | MEDIUM | option A: a `cdc_position` table is due at every `ingest_tick` (every minute, phase-11.md:459) when its last read is older than 60 seconds, which keeps it inside the 900-second F1 limit and the 60-second F1 objective (evidence phase-11.md:740 rule 2c "older than 60 minutes"; phase-11.md:443 `freshness.f1_lag_seconds` with basis "p95 under 60 s"; phase-11.md:1016 rule c) | option B: a new governed setting for the CT3 idle interval (a new key, e.g. 300 seconds), used by rule 2c for `cdc_position` tables only (evidence phase-11.md:881 gives only the 30-second re-poll after a busy unit; phase-11.md:1016)
+
+# DECIDE V-11-05-e | LOW | option A: the audited flag change is the record: `flag.updated` (phase 03 `FlagsAdmin::update`, not gated by a change request, phase-03.md:957) is enough, and its detail names the signed agreement's reference (a new detail key) | option B: a signed document of the source is required before `ingest.cdc_enabled` is set or a CT3 source is created, using the phase 05 document route and kinds (`SourceDocumentKind`, phase-05.md:503-504, `other` being the only generic kind; `POST /sources/{id}/documents`, phase-05.md:750); this is a new refusal not in the plan (the claim sits at phase-11.md:851 and phase-11.md:467)
+
+@@ REP 11
+use the same path, with `halted_reason` `cdc_gap` or `file_gap`
+@@ WITH
+use the same path, with `halted_reason` `cdc_gap` or `file_gap`, but no `source.restore_suspected`: they audit only the `source.state_changed` of step 4 with cause `cdc_gap` or `file_gap`
+@@ END
+# V-11-05-f | LOW | grep -c -F gave 1 | names used and where they exist: `source.state_changed` phase-11.md:926 (step 4 of section 3.5) and phase-05.md:1253 (event with cause); `delivery_gap` cause phase-11.md:935 | NEW: none
+
+@@ BLOCK 12
+### 7.N Gate values of a quarantine row (V-11-06-a, MEDIUM; DR-413)
+The `gate` of a quarantine row (phase 11 section 7.3) is derived when the row is read, from `reason_code` and the `field` in `detail`, and is never stored. Its values are `txn_type` when `reason_code` is `unmapped_code` and `field` is `txn_type`; `card_guard` when `reason_code` is `card_guard` (the card-guard stop of phase 10 section 3.3); and `none` for every other row, so the Cedar attribute is always a string. The refusals of section 3.11 follow the gate: `gate_not_excludable` for `txn_type`, `card_guard_not_excludable` for `card_guard`.
+@@ END
+# V-11-06-a | MEDIUM | names used and where they exist: `gate` phase-11.md:1487-1488 (section 7.3); `unmapped_code` and `txn_type` phase-12.md:739 and DSL.md:635; `card_guard` phase-12.md:740 and phase-10.md:1867; `gate_not_excludable` and `card_guard_not_excludable` phase-12.md:947-948 | NEW: `none` (a gate value, so the attribute is never empty)
+
+# DECIDE V-11-07-a | HIGH | option A: the manifest `akr.extract.v1` names the columns of each data file (name and order, as a new key `columns`), and the parse checks each file against them (section 3.4 extract step 3) | option B: the columns come from the approved object's profile (phase 10 step 4 reads "the latest profile of the object", phase-10.md:1821), which the bank must supply for a file source, since a CT4 source has no CBS connection to profile it (no such step in phase 05) | evidence phase-11.md:888 (manifest keys), phase-11.md:895-897 (columns "pinned in the adapter pack"), phase-11.md:1126 and 1154 (section 3.9 covers ICS BANKS database objects and deny columns only), phase-11.md:1505 (section 7.5), docs/DSL.md:516 (`landing_file` names no columns)
+
+@@ BLOCK 10
+### 7.N Record-text column key (V-11-07-b, MEDIUM; DR-413)
+From phase 11 on (section 7.5 of phase 11), a mapping whose `source.format` is `t24_xmlrecord` or `t24_multivalue` names its record-text column in the `source` block with the key `source.record`, a string that must be a column of the object (checked the way step 3 checks `source.key`). `source.key` keeps naming the key column. For every other format `source.record` is an unknown key and step 1 refuses it.
+@@ END
+# V-11-07-b | MEDIUM | names used and where they exist: `source.key` phase-10.md:1817-1818 (step 3) and DSL.md:517; `source.format` DSL.md:516; unknown keys refused phase-10.md:1813-1814 (step 1); t24 formats phase-11.md:1502-1509 (section 7.5) | NEW: `source.record` (the DSL source block has no key for the record-text column). DSL.md section B.1 needs the same key; the lead applies that edit, since docs/DSL.md is not a phase file
+
+@@ BLOCK 11
+### 7.N Row reader of the extract inbox (V-11-07-c, MEDIUM; DR-413)
+`ExtractInbox` (section 2) gains `fn read_rows(&self, m: &ManifestRef, f: &ManifestFile) -> Result<Vec<SourceRow>, InboxError>;`, which parses one verified data file (after `verify_file`) into the rows of the source read, the type that `SourceReader::fetch_keyset` returns, using the column list of section 3.4 extract step 3. The unit then checks the row count against the manifest.
+@@ END
+# V-11-07-c | MEDIUM | names used and where they exist: `ExtractInbox` phase-11.md:656-660; `verify_file` phase-11.md:659; `ManifestRef` and `ManifestFile` phase-11.md:657-659; `SourceRow` phase-11.md:640 (return type of `fetch_keyset`); `InboxError` phase-11.md:658 | NEW: `read_rows`
+
+@@ BLOCK 11
+### 7.N A landing_file row that does not fit the columns rejects its file (V-11-07-d, MEDIUM; DR-413)
+A row of a `landing_file` table that cannot be read into the columns of section 3.4 extract step 3 rejects the whole data file. The batch is `rejected` with reason `column_check_failed`, audited as `file.rejected {file name, sha256, reason}`; the manifest stays pending and no row of the file lands. It is not a `row_failed` quarantine row, because a quarantine row needs a raw row (`raw_id` NOT NULL, section 1.1) and an unreadable row has none. The t24 decode failures stay row failures of section 3.2 step 5.
+@@ END
+# V-11-07-d | MEDIUM | names used and where they exist: `raw_id` NOT NULL phase-11.md:184; batch `reason` CHECK phase-11.md:155; `file.rejected` phase-11.md:1193; control-total rejection pattern phase-11.md:896-897; t24 row failures phase-11.md:797 | NEW: `column_check_failed`
+
+# DECIDE V-11-08-a | MEDIUM | option A: an XPath-style subset: a `from` for `iso20022` is a path of element local names from the document root, with `@attribute` as the last step; a `from` for `mt` is a field tag with its option letter and a component index (for example `32A.2`); the compiler checks it against that grammar | option B: a closed list of named fields per parser version (for example `payment.amount`), kept with the parser version constant of section 7.6 step 3, so the compiler refuses an unknown name and a parser upgrade changes the list (evidence phase-11.md:1520-1523, section 7.6 steps 1 to 3; docs/DSL.md:516 names the formats only; phase-10.md:1821 covers relational columns only)
+
+@@ BLOCK 10
+### 7.N Parser version in the compiled artefact (V-11-08-b, MEDIUM; DR-413)
+From phase 11 on (section 7.5 and section 7.6 step 3 of phase 11), compile step 3 accepts `source.format` `iso20022` and `mt`, and the compile writes the constant `parser_version` of the parser into the `compiled` artefact (section 3.2). `compiled_sha256` then covers it, and the `mapping_version_id` of every canonical row names the parser version, as research DR-393 requires.
+@@ END
+# V-11-08-b | MEDIUM | names used and where they exist: `compiled` JSONB phase-10.md:106; `compiled_sha256` phase-10.md:107; `store_compiled` phase-10.md:1619; compile step 3 phase-10.md:1817-1818; the parser version rule of DR-393 research.md:404 | NEW: none (`parser_version` is an existing name for the same concept, a column in phase 14, phase-14.md:110)
+
+@@ REP 11
+set `business_from` as the halt path does (the earliest `value_business_date` of the source plus one day)
+@@ WITH
+set `business_from` as the halt path does (the earliest `value_business_date` of the source plus one day, or `ingest.history_from` when the source has none yet)
+@@ END
+# V-11-11-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `ingest.history_from` phase-11.md:435 (setting); the `business_from` column phase-11.md:86; research.md:420 (DR-409) says the period "has a business_from"; phase-12.md:1337-1338 covers from that date | NEW: none | NULL was the other option: phase-12.md:1337 accepts it, but phase-12.md:1338 says phase 11 sets `business_from` on every automatic open
+
+@@ BLOCK 11
+### 7.N Alert rule for late arrivals (V-11-12-a, HIGH; DR-413)
+Section 4.3 alert rules gain one rule: a table whose late arrivals pass `ingest.late_alarm_pct` percent of its window raises an alert, which is the audit event of section 7.12 item 2, `ingest.late_arrival_near_window`, evaluated by the freshness job of section 3.7. Its inbox delivery is phase 18, as for the other rules of section 4.3.
+@@ END
+# V-11-12-a | HIGH | names used and where they exist: `ingest.late_alarm_pct` phase-11.md:1598 (section 7.12); `ingest.late_arrival_near_window` phase-11.md:1593-1594; the alert rule list phase-11.md:1356-1357; freshness job phase-11.md:1001 (section 3.7) | NEW: none
+
+@@ BLOCK 11
+### 7.N Settings of section 7+ in migration 0035 (V-11-12-b, MEDIUM; DR-413)
+The settings INSERT of section 1.3 gains these three rows, all governed. Labels are Arabic then English, as in section 1.3.
+('ingest.sequence_overlap_keys', '10000', 'integer', '{"min": 100, "basis": "research 25 s.7.3 commit order"}', TRUE, '{"ar": "عدد المفاتيح التسلسلية التي تُعاد قراءتها قبل المفتاح المحفوظ", "en": "Sequence keys re-read before the stored key"}'),
+('ingest.late_alarm_pct', '80', 'integer', NULL, TRUE, '{"ar": "نسبة إنذار الوصول المتأخر من نافذة إعادة القراءة (بالمئة)", "en": "Late-arrival alarm level (percent of the re-read window)"}'),
+('ingest.lookback_max_days', '93', 'integer', NULL, TRUE, '{"ar": "أقصى مدة لنافذة إعادة القراءة التلقائية (أيام)", "en": "Longest automatic re-read window (days)"}')
+@@ END
+# V-11-12-b | MEDIUM | names used and where they exist: `admin.settings` INSERT of phase-11.md:434-465 (section 1.3); `ingest.sequence_overlap_keys` phase-11.md:1570 (section 7.10); `ingest.late_alarm_pct` and `ingest.lookback_max_days` phase-11.md:1598 (section 7.12) | NEW: none; the floor of the two new keys is NULL because the claim names none (the lead may add one)
+
+# DECIDE V-11-12-c | MEDIUM | option A: a column `late_alarm_on DATE` (new name) on `admin.watermarks` (migration 0033, section 1.1: `ALTER TABLE admin.watermarks ADD COLUMN IF NOT EXISTS late_alarm_on DATE;`, written by akr_ingest, which already has UPDATE on the table, phase-11.md:300) holds the day of the last near-window audit of each table; the caller of `ingest.lookback_widened` is the job that calls `UnitPlanner::plan` (the planner is pure, phase-11.md:757), and its "from" value needs the previous effective lookback, which no table holds (option: `manifest.lookback_days` on the receipt, a new key, no DDL) | option B: no column; the near-window audit is written on every freshness run while the condition holds (every five minutes, phase-11.md:463), which drops the "once per table and day" rule of section 7.12 item 2 (evidence phase-11.md:1593-1596)
+
+@@ BLOCK 11
+### 7.N Audit rows for the section 7.12 kinds (V-11-12-d, MEDIUM; DR-413)
+The audit table of section 3.10 gains two rows. Each gives its severity and SIEM flag, as phase 02 section 7.5 requires; the values are proposals, since the phase 11 table has no severity column.
+| `ingest.late_arrival_near_window` | the freshness job, once per table and day (section 7.12 item 2); severity Warning, SIEM no; detail `source_id`, `source_table`, `late_days`, `window_days` | watermark |
+| `ingest.lookback_widened` | a change of the auto lookback (section 7.12 item 3); severity Notice, SIEM no; detail `source_id`, `source_table`, `from_days`, `to_days` | watermark |
+@@ END
+# V-11-12-d | MEDIUM | names used and where they exist: `Severity { Info, Notice, Warning, Critical }` and the `siem` flag, phase-02.md:549-552; resource `watermark` as in the freshness rows phase-11.md:1201; detail keys phase-11.md:1593-1596 | NEW: none
+
+@@ BLOCK 10
+### 7.N A duration lookback is not narrower than the overlap (V-11-12-e, MEDIUM; DR-413)
+Compile step 11 (section 3.2) gains one check: a `lookback` that is a duration must be at least the mapping's `overlap`. Otherwise the compile answers `E_VALIDATION` at path `/change/lookback` with reason `lookback_narrower_than_overlap`. A `lookback` of `auto` needs no compile check, because the planner never plans narrower than the overlap (phase 11 section 7.12 item 3).
+@@ END
+# V-11-12-e | MEDIUM | names used and where they exist: `lookback` and `overlap` DSL.md:534 and DSL.md:531 (B.2 table; the "never narrower" rule is in the `lookback` row); compile step 11 phase-10.md:1839-1841; `E_VALIDATION` phase-00.md:499 | NEW: `lookback_narrower_than_overlap`
+
+@@ REP 11
+The fifteen keys of migration 0035
+@@ WITH
+The eighteen keys of migration 0035, of which three are in section 7+ (`ingest.sequence_overlap_keys`, `ingest.late_alarm_pct`, `ingest.lookback_max_days`) and fifteen are named here
+@@ END
+# V-11-12-f (1 of 4) | LOW | grep -c -F gave 1 | names used: the three keys of section 7+ (V-11-12-b; sections 7.10 and 7.12) | NEW: none
+
+@@ REP 11
+| 15 settings, 2 flags | rows | 0035 | n/a | n/a |
+@@ WITH
+| 18 settings, 2 flags | rows | 0035 | n/a | n/a |
+@@ END
+# V-11-12-f (2 of 4) | LOW | grep -c -F gave 1 | names used: the same three keys | NEW: none
+
+@@ REP 11
+Settings: `make seed` installs 15 settings and 2 flags
+@@ WITH
+Settings: `make seed` installs 18 settings and 2 flags
+@@ END
+# V-11-12-f (3 of 4) | LOW | grep -c -F gave 1 | names used: the same three keys | NEW: none
+
+@@ REP 11
+`replay.estimate_max_rows`) change through a change request of class `material`
+@@ WITH
+`replay.estimate_max_rows`, `ingest.sequence_overlap_keys`, `ingest.late_alarm_pct` and `ingest.lookback_max_days`) change through a change request of class `material`
+@@ END
+# V-11-12-f (4 of 4) | LOW | grep -c -F gave 1 | names used: the same three keys, all governed (phase-11.md:1570 and 1598) | NEW: none
+
+# SUMMARY: fixes written 28 (REP 15, BLOCK 13); DECIDE 10; DROP 0; claims covered: V-11-01-a, V-11-01-c, V-11-01-d, V-11-02-a, V-11-02-b, V-11-02-c, V-11-03-a, V-11-03-b, V-11-03-c, V-11-03-f, V-11-03-g, V-11-03-h, V-11-04-a, V-11-04-b, V-11-04-c, V-11-04-d, V-11-05-a, V-11-05-b, V-11-05-c, V-11-05-e, V-11-05-f, V-11-06-a, V-11-07-a, V-11-07-b, V-11-07-c, V-11-07-d, V-11-08-a, V-11-08-b, V-11-11-a, V-11-12-a, V-11-12-b, V-11-12-c, V-11-12-d, V-11-12-e, V-11-12-f

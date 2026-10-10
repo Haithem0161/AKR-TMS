@@ -1,0 +1,57 @@
+Replacements made in docs/plan/phase-10.md by the first re-check (DR-413). 8 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-10-1a]
+WHY: R-10-1 | CONFIRMED HIGH | the fact insert of section 3.7 step 5 names the conflict target `(source key, partition key)`; six fact tables have no unique index on it (`txn_event`, `cash_event`, `balance_snapshot`, `payment_message_party`, `payment_link`, `account_hold`), and PostgreSQL refuses such a target | step 5 names the target per table; two unique constraints are added in migrations 0030 and 0031
+OLD: 5. **Facts.** `INSERT ... ON CONFLICT (source_id, source_table, source_pk, <partition key>) DO NOTHING`; a
+NEW: 5. **Facts.** `INSERT ... ON CONFLICT <target> DO NOTHING`, where the target is a unique constraint of the table
+   (PostgreSQL refuses a target that no unique index matches): the source key with the partition key where a
+   `uq_*_source` constraint holds it (`txn`, `payment_message`, `payment_message_party`, `card_txn`, `fx_deal`,
+   `locker_access`, `cbs_user_activity`), the source key alone for `account_hold`, `(txn_id, booking_date, kind)` for
+   `txn_event`, `(txn_id, booking_date)` for `cash_event`, `(account_id, business_date, source)` for
+   `balance_snapshot` and `(message_id, txn_id)` for `payment_link`; a
+
+=== F2 [R-10-1b]
+WHY: R-10-1 | CONFIRMED HIGH | the fact insert of section 3.7 step 5 names the conflict target `(source key, partition key)`; six fact tables have no unique index on it (`txn_event`, `cash_event`, `balance_snapshot`, `payment_message_party`, `payment_link`, `account_hold`), and PostgreSQL refuses such a target | step 5 names the target per table; two unique constraints are added in migrations 0030 and 0031
+OLD:     PRIMARY KEY (id, received_at),
+    CONSTRAINT fk_pmp_message FOREIGN KEY (message_id, received_at)
+NEW:     PRIMARY KEY (id, received_at),
+    CONSTRAINT uq_payment_message_party_source UNIQUE (source_id, source_table, source_pk, received_at),
+    CONSTRAINT fk_pmp_message FOREIGN KEY (message_id, received_at)
+
+=== F3 [R-10-1c]
+WHY: R-10-1 | CONFIRMED HIGH | the fact insert of section 3.7 step 5 names the conflict target `(source key, partition key)`; six fact tables have no unique index on it (`txn_event`, `cash_event`, `balance_snapshot`, `payment_message_party`, `payment_link`, `account_hold`), and PostgreSQL refuses such a target | step 5 names the target per table; two unique constraints are added in migrations 0030 and 0031
+OLD:     CHECK (end_at IS NULL OR end_at > start_at),
+    CHECK ((amount IS NULL) = (currency IS NULL))
+);
+NEW:     CHECK (end_at IS NULL OR end_at > start_at),
+    CHECK ((amount IS NULL) = (currency IS NULL)),
+    CONSTRAINT uq_account_hold_source UNIQUE (source_id, source_table, source_pk)
+);
+
+=== F4 [R-10-2]
+WHY: R-10-2 | CONFIRMED LOW (raised MEDIUM) | section 3.3 says a card-guard hit "stops the field's load and opens a data incident" in phase 11; 7.16 and phase 12 make it a quarantine row and a data-quality issue | 3.3 reworded to the same rule
+OLD: in phase 11 it stops the field's load and opens a data incident.
+NEW: in phase 11 the row is not written: it becomes a quarantine row with reason `card_guard` (7.16), and phase 12 opens a `card_guard` data-quality issue for the field, which is the data incident.
+
+=== F5 [R-10-3]
+WHY: R-10-3 | CONFIRMED MEDIUM | `RowFailure` (called closed) has no code for a row the `txn_type` gate holds, which phase 11 writes with reason `unmapped_code` | code added; `unmapped_codes` counts values
+OLD: `card_guard` (section 3.3) and `rule_rejected` (a validation rule with `on_fail = quarantine`).
+NEW: `card_guard` (section 3.3), `unmapped_code` (a row that the gate of section 3.4 step 5 holds for a `txn_type` value with no entry; its `field` is `txn_type`) and `rule_rejected` (a validation rule with `on_fail = quarantine`). `unmapped_codes` of `MappedBatch` counts the unknown values; the rows held by the gate are in `rejected`.
+
+=== F6 [R-10-4]
+WHY: R-10-4 | CONFIRMED LOW (raised MEDIUM) | 7.17 gives every `CurrentRow` the bi-temporal columns, which facts do not have | wording
+OLD: holds `id`, `recorded_from`, `valid_from` and `row_hash`; for `canon.payment_message`
+NEW: holds `id` and `row_hash`, and for a bi-temporal entity also `recorded_from` and `valid_from` (a fact has neither column and is read by its source key with no `recorded_to` filter); for `canon.payment_message`
+
+=== F7 [R-10-5]
+WHY: R-10-5 | CONFIRMED LOW (raised MEDIUM) | the folded form cites steps N1 to N6; the pipeline has N1 to N11 | range corrected
+OLD: (research file 22 section 6.4, N1 to N6)
+NEW: (research file 22 section 6.4, N1 to N11)
+
+=== F8 [R-10-6]
+WHY: R-10-6 | CONFIRMED LOW | backticks inside a code span break the formula | inner backticks removed
+OLD: phase 11's `admin.batches.business_to`>,
+NEW: phase 11's admin.batches.business_to>,

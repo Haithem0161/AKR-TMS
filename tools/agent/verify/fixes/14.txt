@@ -1,0 +1,106 @@
+Phase 14 fixes (verification pass, lead-reviewed 2026-10-10). Source: tools/agent/verify/draft/14.txt, refute-14.md.
+Lead decisions: a failed list version is the incident (audit event plus a metric alarm; no phase 20 incident row);
+pair memory may name a freeze-list entry (DR-102), only the header was wrong; the revoke of a good-guy rule goes
+through the same proposal route; N-44 is carried in part (labels stored; corpus stays synthetic and grows by release
+only; TELL THE USER with the goAML corpus decision); no feed format carries a delisting date; the once-only marks of
+the list alarms are one JSONB column on `ref.lists`.
+
+@@ REP 14
+A mixed selection is refused for the whole batch (422 `E_VALIDATION`, `bulk_not_identical`).
+@@ WITH
+A mixed selection is refused for the whole batch (422 `E_VALIDATION`, `bulk_not_identical`), and so is a batch on a freeze list (422 `E_VALIDATION`, `freeze_list_excluded`, as in section 3.8).
+@@ END
+
+@@ REP 14
+(422 `E_VALIDATION`, `freeze_list_excluded`; the table CHECK and the Cedar forbid `screening.goodguy_no_freeze` repeat it)
+@@ WITH
+(422 `E_VALIDATION`, `freeze_list_excluded`: the service check runs first and is the answer of this route; the table CHECK repeats it at the insert; the Cedar forbid `screening.goodguy_no_freeze` is a third guard that matches only a `GoodGuyRule` resource, so it does not fire on this route, whose resource is System, and the policy tests alone exercise it)
+@@ END
+
+@@ BLOCK 14
+### 7.N Step-up actions of this phase (V-14-01-d, LOW; DR-413)
+Section 4.5 (the phase 01 row): each step-up route of this phase declares one `StepUpAction { name, class }` constant (phase 01), whose `name` is the Cedar action of its route row in section 2.8 and whose `class` is the SU class of that row. `StepUpAction::Decision` is `{ name: "screening.alert.decide", class: decision }`; the bulk decision uses the same constant.
+@@ END
+
+@@ BLOCK 14
+### 7.N A failed list version is the incident; count mismatch (V-14-02-a, V-14-02-b, MEDIUM; DR-413)
+Section 3.2 `list_parse`: every failure (steps 1, 2, 4 and 5, and the gate of section 3.9) sets the version `failed` with its `failure_code`, writes `list.failed {list, version, failure_code}` (section 3.13) and leaves the last good version active. That audit event is the incident of step 2 and of U-02. No row of `casework.ops_incidents` is written (phase 20: that table holds the failures of the MLRO's orders). Step 4: a parsed row count, taken before identical rows are removed, that differs from a non-null `expected_count` fails the version with `count_mismatch`. Section 4.4 gains the counter `akr_list_version_failed_total{list, failure_code}` and the alert "a list version failed" (critical for a freeze list, warning otherwise).
+@@ END
+
+@@ BLOCK 14
+### 7.N Fields of the filter, input and result types (V-14-03-a, LOW; DR-413)
+- `VersionFilter` and `PairFilter` are empty in this phase: `GET /lists/{id}/versions` and `GET /screening/pair-memory` take the keyset page only. The masking predicate of section 3.15 applies in SQL to the pair list.
+- `AlertFilter { view: AlertView }`; `AlertView` is `Open`, `Potential`, `NeedsMoreData` or `Mine`, the four saved views of S2 (query parameter `view`, default `open`).
+- `HarnessFilter { list_version_id: Option<Uuid> }` (query parameter `list_version_id`).
+- `IdentifierInput` is the raw form of `Identifiers` (section 2.1), hashed on receipt and never stored: `{ birth: Vec<{ year, month?, day? }>, documents: Vec<{ doc_type, number }>, nationality: Vec<IsoCountry>, gender?, mother_chain?, family_no? }`.
+- The `components` of `ScoreResult` are `MatchComponents { name_score: f32, identifier_adjustment: f32, risk_modifier: f32, threshold: f32, threshold_source: ThresholdSource }` (section 3.4 rules 4, 6 and 8); `ThresholdSource` is `NameOnly` or `WithIdentifiers`. The name `ScoreComponents` is left to phase 17, whose type of that name has other fields.
+- `FeedError` is `Transport { status: Option<u16>, reason: String }` (writes `list.feed_failed`, section 3.2 step 2), `NotAllowed` (host or path outside the allow-list of `source_ref`) or `TooLarge` (body above `screening.feed_max_bytes`).
+- `BankListRow` is one mapped row of the bank's list: `entry_key` and the identifying fields of `list_parse` step 6, each from the bank column that the approved mapping document names.
+@@ END
+
+@@ REP 14
+components: ScoreComponents,
+@@ WITH
+components: MatchComponents,
+@@ END
+
+@@ REP 14
+pair memory and good-guy rules with approver, expiry and the QA sample; never on freeze lists
+@@ WITH
+pair memory and good-guy rules with approver, expiry and the QA sample; good-guy rules never on freeze lists (DR-102), and pair memory on a freeze-list entry is allowed, four-eyes approved and always in the weekly QA sample (sections 3.7 and 7.3)
+@@ END
+
+@@ REP 14
+A revoke is a CR whose proposal is `{"action": "revoke", "rule_id": …}`; it sets
+@@ WITH
+A revoke is a CR proposed through the same route, `POST /screening/good-guys`, with the body `{"action": "revoke", "rule_id": …, "reason_codes": […], "reason_text": …}` (the second form of `GoodGuyProposal`; the rule must be open, else 409 `E_NOT_ALLOWED_IN_STATE`; the checks of a new rule do not apply); it sets
+@@ END
+
+@@ REP 14
+- **Feedback** (N-44): every closed alert becomes a labelled pair for the threshold review and the hard-negative set; the MLRO accepts entries into the corpus.
+@@ WITH
+- **Feedback** (N-44, carried in part): every decided alert is a labelled pair as stored: its `alert.screening_decisions` rows, with outcome and reason codes, joined to the alert (ids, codes and scores only; no second store). A threshold review reads these tables; no route or report of this phase is added for it. The corpus stays synthetic (N-38), so no real pair enters it: it grows by release only, and a bank-side intake accepted by the MLRO and the bank-specific variant table (N-57) are P2.
+@@ END
+
+@@ REP 14
+audit `setting.changed` from phase 00
+@@ WITH
+audit `setting.updated` from phase 00
+@@ END
+
+@@ REP 14
+`setting.changed`, `list_setting.changed`, `screening_policy.changed`, `good_guy_rule.activated` | CR activation
+@@ WITH
+`setting.updated`, `list_setting.changed`, `screening_policy.changed`, `good_guy_rule.activated` | CR activation
+@@ END
+
+@@ REP 14
+when the publisher's file carries a delisting date.
+@@ WITH
+when the publisher's file carries a delisting date. No feed format of this release carries one (section 3.2 `list_parse` step 3), so the column stays NULL and every delisting is by absence.
+@@ END
+
+@@ BLOCK 14
+### 7.N Registry entry of the name search (V-14-08-a, MEDIUM; DR-413)
+This phase registers its one sensitive operation, `POST /api/v1/screening/search` (it carries `x-akr-access: screening_search`, section 7.9), in `api::access::SENSITIVE`, as phase 02 section 3 asks of each phase that adds a sensitive route. Its fixture request is that route as `ss@bank.test` with `X-Access-Purpose: assigned_work` and a name of the synthetic corpus of section 3.9 in the body. The fixture writes exactly one access event: action `search_hit`, resource type `screening_search`, tier `restricted`, no `subject_party`.
+@@ END
+
+@@ BLOCK 14
+### 7.N Once-only marks of the list alarms (V-14-09-a, MEDIUM; DR-413)
+`list.stale` (section 3.2) and `list.rescreen_late` (section 7.10 step 3) are written once because the sweep keeps a mark. `ref.lists` gains `alarm_marks JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(alarm_marks) = 'object')` in migration `0045`; migration `0048` adds it to the column list of the `GRANT UPDATE ... ON ref.lists TO akr_app` line, and `0049` to the `internal` row of `ref.lists` in `admin.column_classification` (as section 7.7 does for `feed_checked_at`). `list_stale_sweep` is its only writer, in the transaction of the audit event:
+- `stale_at`: when the list is stale and the key is absent, the sweep writes `list.stale` and sets the key to the current time; when the list is fresh and the key is present, it removes the key. One event is written per transition to stale.
+- `rescreen_late_version`: when the active version meets the test of section 7.10 step 3 and the key does not hold its id, the sweep writes `list.rescreen_late` and sets the key to that version id.
+The gauges are set from the computed state at every sweep and need no mark.
+@@ END
+
+@@ REP 14
+No table, column, job, timer or route is added.
+@@ WITH
+No table, job, timer or route is added; the once-only mark of step 3 is the `alarm_marks` column of `ref.lists` (section 7+, verification pass).
+@@ END
+
+@@ REP 14
+5. The S3 list status shows the re-screen time of the active version (from its look-back run) next to the list lag
+@@ WITH
+5. `ListVersionView` carries `rescreen_seconds` (null until the run of step 1 completes; the run's `finished_at` minus the version's `activated_at`, computed when the view is built), and the S3 list status shows it for the active version next to the list lag
+@@ END

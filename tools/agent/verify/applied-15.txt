@@ -1,0 +1,65 @@
+Fixes applied to docs/plan/phase-15.md by the verification pass (DR-413). 13 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 BLOCK (from fixes/15.txt)
+### 7.N record_decision for the three KYC workflows (V-15-01-d, HIGH; DR-413)
+Phase 04 leaves `record_decision` to later phases and phase 18 registers it for `case` only, so this phase registers its own: `KycRecordDecisionEffect` (`TerminalEffect`, kind `record_decision`, resource kinds `change_request`, `kyc_review` and `exit_decision`; not deferrable). `run` branches on the resource kind of the instance:
+- `change_request` (route `kyc_override_down`): it calls the phase 04 activation of the change request, as `activate_change` does, so `OverrideTarget::activate` runs in the approval transaction (section 3.5 step 6).
+- `kyc_review` (`kyc_edd_signoff`): it runs section 3.4 step 7 sub-steps 7 to 9 with the approver as completer.
+- `exit_decision`: it stores the approved outcome in the instance context and writes nothing else (section 3.4 step 8).
+With it the three shipped definitions of section 4.2 publish in this phase.
+
+=== F2 BLOCK (from fixes/15.txt)
+### 7.N The workflow subjects of kyc_review and exit_decision (V-15-06-a, V-15-01-b, HIGH; DR-413)
+This phase registers one `WorkflowSubject` (phase 04) for each of its two resource kinds. Neither declares parties; `check_before_decision` keeps its default.
+- `KycReviewWorkflowSubject`: `resource_kind` `kyc_review`, `attribute_prefix` `review`, attributes `kind` (text) and `level_at_open` (integer). `start_context` freezes both, sets `maker_id` to the reviewer, and sets `classification` to `restricted` when the party's tier is `restricted` or `suspicion`, else `internal`. `visible_to` and `visibility_sql` apply the masking of section 3.6 to the review's party. `on_ended` changes nothing: the review completes only through `record_decision` (section 3.4 step 7).
+- `ExitDecisionWorkflowSubject`: `resource_kind` `exit_decision`, `attribute_prefix` `exit`, no attributes. `start_context` freezes `review_id` (the completed review whose outcome `exit_candidate` opened the instance, section 3.4 step 7 sub-step 6) and `party_id`, sets `maker_id` to that review's reviewer and `classification` to `restricted`. `visible_to` and `visibility_sql`: role M only, as the exit register. `on_ended` changes nothing.
+Section 3.4 step 8: the `review_id` of the `kyc.exit_register` row is read from the instance context, never from the body; `NewExitEntry` keeps its fields.
+
+=== F3 REP (from fixes/15.txt)
+OLD: `exit_decision`: `approve` per the authority matrix (phase 09) -> `record_decision`
+NEW: `exit_decision`: one step `approve` role M (decision type `kyc.decision` of the phase 09 matrix, whose roles include M), not the reviewer who completed the review -> `record_decision`
+
+=== F4 REP (from fixes/15.txt)
+OLD: records the register entry, 3.4 step 8) -> `create_ops_task` (phase 20; a no-op until phase 20 is live).
+NEW: records the register entry, 3.4 step 8). Version 1 ends there; phase 20 seeds version 2, which adds `create_ops_task` (section 7.2).
+
+=== F5 BLOCK (from fixes/15.txt)
+### 7.N The exit register's repository (V-15-01-a, MEDIUM; DR-413)
+Section 2 gains the trait `ExitRepository` for `kyc.exit_register`: `async fn insert(&self, tx: &mut Tx, e: &NewExitEntry, review_id: Uuid, by: Uuid) -> Result<ExitEntry, RepoError>;` (section 3.4 step 8; the unique `workflow_instance_id` gives the 409 of that step) and `async fn list(&self, conn: &mut PgConnection, page: Keyset) -> Result<Page<ExitEntry>, RepoError>;` (`GET /exit-register`). `ExitService` has two methods, `record(ctx, body: NewExitEntry)` and `list(ctx, page)`, which call them.
+
+=== F6 REP (from fixes/15.txt)
+OLD: `exit: Arc<ExitQuery>`
+NEW: `exit: Arc<ExitService>`
+
+=== F7 REP (from fixes/15.txt)
+OLD: parties whose nationality, residence or registration country, or a beneficial owner's residence, is `iso2`
+NEW: parties whose nationality or residence country, or a beneficial owner's residence, is `iso2` (the registration country joins when a canonical column holds it, Open doubts 10)
+
+=== F8 BLOCK (from fixes/15.txt)
+### 7.N The country fan-out: page query, effective date and trigger (V-15-02-b, V-15-02-c, V-15-02-d, MEDIUM; DR-413)
+Section 3.3 row 2.
+- Section 2, the port `PartyFactsSource` gains `async fn parties_for_country(&self, conn: &mut PgConnection, iso2: &str, page: Keyset) -> Result<Page<Uuid>, RepoError>;`. It returns one keyset page of party ids in id order, sized by `rating.country_fanout_page`: parties with a current row (`recorded_to IS NULL`) whose `nationality` or `residence_country` is `iso2`, and the `owned_party_id` of each open `kyc.ownership_inputs` row (`valid_to IS NULL`) whose `owner_party_id` is a party with `residence_country` equal to `iso2`.
+- `effective_at` of `rating_country_fanout` is the `created_at` of the outbox row the handler runs for. Phase 09 writes that row in the transaction that changes the level, so it is the moment the level took effect. The event payload does not change.
+- The topic `ref.country_level_changed` is the DSL event `country_table.changed`, the `on` value of TR-10 (DSL.md C.5). TR-10's action is `rescore`, and the fan-out is that action: it opens no review and does not run the trigger path of section 7.7.
+
+=== F9 REP (from fixes/15.txt)
+OLD: display name from `ref.list_entry_names` (the list entry, not the customer);
+NEW: display name from `ref.list_entry_names` (the list entry, not the customer: `ar` is the `raw` of the entry's `primary` row with `script = 'ar'` and `en` that of its `primary` row with `script = 'lat'`, the lowest `name_slot` first; a script with no such row takes the other script's text, since the CHECK needs both keys);
+
+=== F10 BLOCK (from fixes/15.txt)
+### 7.N Response types of the coverage and analytics reads (V-15-07-a, V-15-08-a, LOW; DR-413)
+`GET /api/v1/ownership/coverage` (section 7.4) answers `OwnershipCoverageView`: one row per current level with `parties_rated`, `parties_with_result`, `results_unknown`, `results_loops`, `results_depth_truncated` and `results_stale`, and no party id. `GET /api/v1/rating/overrides/analytics` (section 7.5) takes the query parameters `from` and `to` (dates; a window above 366 days is 422 `E_VALIDATION`) and answers `OverrideAnalyticsView` with `by_proposer`, `by_branch` and `overall`, in the order of the steps of section 7.5. Both types join the utoipa list of section 2.
+
+=== F11 BLOCK (from fixes/15.txt)
+### 7.N The due instant of an event review (V-15-09-b, LOW; DR-413)
+Section 7.7 step 3: `review_within` is a number of business days (DSL.md C.5). The call is `BusinessClock::add(now, review_within.value, BusinessUnit::WorkingDays)` on the bank calendar, and `due_at` is the `fire_at` of the returned `ClockResult`.
+
+=== F12 REP (from fixes/15.txt)
+OLD: DO UPDATE SET trigger_code = EXCLUDED.trigger_code RETURNING
+NEW: DO UPDATE SET trigger_code = EXCLUDED.trigger_code, due_at = CASE WHEN r.kind = 'event' AND NOT r.date_unknown THEN LEAST(r.due_at, EXCLUDED.due_at) ELSE r.due_at END RETURNING
+
+=== F13 BLOCK (from fixes/15.txt)
+### 7.N The absorb statement moves the deadline (V-15-11-a, MEDIUM; DR-413)
+Section 2 `open_or_join`: the insert names the table `AS r`, and its conflict update sets `due_at` to the earlier of the two dates for an event review, as section 7.10 requires; a `date_unknown` review keeps `due_at` NULL (the CHECK of section 1.2), and the other kinds keep their `due_at`. The method returns the old and the new `due_at`, and the caller moves the timer as section 7.10 says when the date moved. No audit kind is added: `rating.trigger_applied` (section 7.7 step 3) names the review.

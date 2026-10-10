@@ -1,0 +1,163 @@
+Phase 21 fixes (lead review of tools/agent/verify/draft/21.txt against docs/plan/phase-21.md, 2026-10-10).
+27 claims stood at the refuter. Lead result: 24 confirmed (3 HIGH, 13 MEDIUM, 8 LOW), 1 rejected, 2 duplicates.
+Lead changes to the draft: links are written at submit from the frozen content, not at draft creation (a PATCH may
+change `earlier_reports` and the table is append only); V-21-03-c is two REPs on the state list, MEDIUM; the row
+types go into one block; V-21-07-a is decided (rule parameters with shipped defaults, phase 07 pattern); the four
+letter id columns get NOT VALID foreign keys with no VALIDATE step (akr_app does not own the tables); V-21-12-a and
+V-21-12-f repeat V-20-12-a (fixes/20.txt already sends four REPs to phase 21); V-21-12-d is rejected, because no
+freeze write exists once the handler reads the letter state.
+
+@@ REP 21
+AND OLD.status NOT IN ('draft', 'validated') THEN
+@@ WITH
+AND OLD.status NOT IN ('draft', 'validated') AND NOT (OLD.status IN ('rejected', 'returned') AND NEW.status = 'draft') THEN
+@@ END
+
+@@ REP 21
+- `signed` to `packaged`: the package job (section 3.8).
+@@ WITH
+- `signed` to `packaged`: the package job (section 3.8). For a CTR file, `validated` to `packaged` in the `ctr_package` job (section 3.14 step 3).
+@@ END
+
+@@ REP 21
+- `acknowledged` to `returned`: a poor grade (section 3.12).
+@@ WITH
+- `acknowledged` or `filed` to `returned`: a poor grade (section 3.12 steps 1 and 2).
+@@ END
+
+@@ REP 21
+Lock the filing. `ack_at IS NULL`
+@@ WITH
+Read the filing's `report_id` without a lock, lock the report, then the filing (section 3.24 step 3). `ack_at IS NULL`
+@@ END
+
+@@ REP 21
+`EvidenceStore::stage` of the receipt (kind `upload`, owner kind `filing`, owner id = the filing)
+@@ WITH
+`EvidenceStore::stage` of the receipt (kind `upload`, owner kind `filing`, owner id = the filing, retention class R6)
+@@ END
+
+@@ REP 21
+(`facts`, `suppressed_cells`, `evidence_id`, `generated_by`)
+@@ WITH
+(`facts`, `suppressed_cells`, `evidence_id`; `generated_by` is set at the insert of step 1 and has no UPDATE grant)
+@@ END
+
+@@ REP 21
+The row is inserted as `draft` with the period bounds, and
+@@ WITH
+The row is inserted as `draft` with the period bounds and `generated_by` = the requesting user, and
+@@ END
+
+@@ REP 21
+computes whole months from the newest booking date of the report's transactions to `filed_at`.
+@@ WITH
+computes whole months from the newest booking date of the report's transactions to `filed_at`; a report with no transaction gets NULL and is left out of the share of section 3.17 item 3.
+@@ END
+
+@@ REP 21
+Write the findings (`insert_run`, one row per finding, `source = validation`, typed `params`) and `set_validated(run, summary, now)`.
+@@ WITH
+Lock the report, then the version (section 3.24 step 3). When the version is no longer the current one, is frozen, or its `content_sha256` differs from the hash of the content this run read, the job completes with `superseded` and writes nothing. Otherwise write the findings (`insert_run`, one row per finding, `source = validation`, typed `params`) and `set_validated(run, summary, now)`.
+@@ END
+
+@@ REP 21
+and a new version of the content only when the version is not frozen.
+@@ WITH
+and the content of the current version is replaced in place while that version is not frozen (`set_content`); only revise (section 3.5a) creates a new version.
+@@ END
+
+@@ REP 21
+When the owner is a freeze, its service is told the delivery time through phase 20's `FreezeService` method named in section 4.5 item 10 (Open doubts 4).
+@@ WITH
+No owner is told: when the owner is a freeze, the phase 20 deadline handler reads the letter state through `LetterRequester::delivered` (section 4.5 item 9; 7.5).
+@@ END
+
+@@ REP 21
+(CONS-04, new in phase 21 for the RP-30 account rule)
+@@ WITH
+(`CONS-05`, warn, new in phase 21 for the RP-30 account rule; `CONS-04` is phase 07's chronological-order rule)
+@@ END
+
+@@ REP 21
+rule codes `CONS-04`, `NAME-01`
+@@ WITH
+rule codes `CONS-05`, `NAME-01`
+@@ END
+
+@@ REP 21
+New rule codes (`CONS-04`, `NAME-01`
+@@ WITH
+New rule codes (`CONS-05`, `NAME-01`
+@@ END
+
+@@ REP 21
+(info). CTR-01 and CTR-02 are block, CTR-03 warn (phase 07 section 7+).
+@@ WITH
+(info, chronological order); the account rule of section 3.4 step 7 is `CONS-05` (warn). CTR-01 and CTR-02 are block, CTR-03 warn (phase 07 section 7+).
+@@ END
+
+@@ REP 21
+CTR-03 amount sanity (an extreme or non-round amount is a warn)
+@@ WITH
+CTR-03 amount sanity (an extreme or non-round amount is a warn; the bounds are the rule's parameters `max_usd` and `round_unit_iqd`, phase 07 section 7+)
+@@ END
+
+@@ REP 07
+| CTR-03 | an extreme or non-round amount in a CTR transaction | warn | |
+@@ WITH
+| CTR-03 | a CTR transaction whose amount is above `max_usd` in USD, or is not a whole multiple of the cash unit (`round_unit_iqd` for IQD, 1 for every other currency) | warn | `max_usd` 1000000, `round_unit_iqd` 250 (integers) |
+| CONS-05 | a transaction whose account is not among the accounts of the report's subjects (RP-30) | warn | |
+@@ END
+
+@@ BLOCK 21
+### 7.N Links are written at submit (V-21-01-a, MEDIUM; DR-413)
+No step wrote `rpt.report_links`. Section 3.5 step 3, in the same transaction as the freeze: for each `earlier_reports` entry of the frozen content whose `goaml_ref` equals the `goaml_reference` of a filing of another report of this install (`FilingRepository::by_reference(conn, goaml_reference: &str) -> Result<Option<Filing>, RepoError>`, new), `ReportRepository::insert_link` writes one row from this report to that report; a row that `uq_report_links` already holds is skipped. The relation is `escalated_from_utr` when this report is an STR or a SAR and the related report is a UTR, and `previous` otherwise. Each new row is audited `report.linked {report_id, related_report_id, relation}` (section 3.20). An entry with no matching filing stays in the content only. The table is append only, so a link written for an earlier version stays. No act of this phase writes `amending` or `superseding` (Open doubts 6 and 12).
+@@ END
+
+@@ BLOCK 21
+### 7.N Row types of section 2 (V-21-01-b, V-21-02-a, V-21-06-b, V-21-10-b, LOW; DR-413)
+Section 2 gains the fields of the rows its traits name.
+- `ReportLink { id, report_id, related_report_id, relation: ReportLinkRelation, created_by: Option<Uuid>, created_at }` and `NewReportLink { id, report_id, related_report_id, relation: ReportLinkRelation, created_by: Option<Uuid> }`.
+- `RelatedRef { goaml_ref: String, date: NaiveDate, type: ReportType }`, the fields of the phase 18 `EarlierReport`.
+- `SealedContent { content_enc: Vec<u8>, content_sha256: [u8; 32] }` (sealed with AAD = the version id; the hash is of the plaintext canonical JSON) and `NewReportVersion { id, report_id, version: i32, content: SealedContent, created_by: Option<Uuid> }`.
+- `ReportVersionSummary { version: i32, created_by: Option<Uuid>, created_at, validated_at: Option<DateTime<Utc>>, frozen_at: Option<DateTime<Utc>> }`, the row of `summaries` and of `GET /reports/{id}/versions`.
+- `NewFiling { id, report_id, report_version: i32, package_id, goaml_reference: GoamlReference, filed_by, filed_at, portal_capture_evidence_id, activity_age_months: Option<i32> }`.
+- `NewPeriodic { id, kind: PeriodicKind, period: PeriodKey, period_start: NaiveDate, period_end: NaiveDate, template_version: String, generated_by: Uuid }` and `PeriodicFilter { kind: Option<PeriodicKind>, period: Option<PeriodKey> }`.
+- Every other `New*` row of section 2 (`NewReport`, `NewReportFinding`, `NewFeedback`, `NewReportTask`, `NewCtrBatch`, `NewCtrItem`, `NewLetter`) carries the columns of its section 1 table that the insert sets: every column without a default, and each nullable column that the step of section 3 names.
+@@ END
+
+@@ BLOCK 21
+### 7.N The approval binds to the frozen content hash (V-21-03-b, MEDIUM; DR-413)
+RP-34 asks that the approval be bound to the manifest hash. The manifest holds the PDF hash and is built after the sign (section 3.8 steps 4 and 5), so the sign binds to the frozen version instead: its `content_sha256` cannot change once the version is frozen (trigger of section 1.3). Both `report.signed` events of section 3.7 (the release and the correction) also carry `content_sha256` of the signed version. The package job checks the content against that hash before it builds (section 3.8 step 1), and the manifest names `report_version` and `validation_run_id`.
+@@ END
+
+@@ BLOCK 21
+### 7.N Generate: one at a time, and the supersede is audited (V-21-05-c, V-21-05-d, MEDIUM; DR-413)
+Section 3.16 step 1: the transaction of `POST /reports/periodic` takes `pg_advisory_xact_lock(hashtext('periodic:' || kind || ':' || period))` before it reads the live pack, so two requests for the same kind and period run one after the other and the second supersedes the draft of the first. The lock is taken before any row of `rpt.periodic_reports`. A live draft that is replaced writes `periodic.superseded {periodic_id, kind, period, superseded_by}` in the same transaction (new; section 3.20 gains the row, resource periodic pack). The `periodic_build` job of a pack that is no longer `draft` completes and writes nothing.
+@@ END
+
+@@ BLOCK 21
+### 7.N Periodic service methods (V-21-05-e, MEDIUM; DR-413)
+Section 2, services: `PeriodicReportService::generate(&self, tx: &mut Tx, principal: &Principal, req: &GeneratePeriodic) -> Result<PeriodicReport, ReportError>` (section 3.16 step 1), `PeriodicReportService::sign(&self, tx: &mut Tx, principal: &Principal, id: Uuid, if_match: i32, stepup_id: Uuid) -> Result<PeriodicReport, ReportError>` (step 3; the handler consumes the step-up of `periodic.sign` first) and `PeriodicReportService::build(&self, pool: &PgPool, periodic_id: Uuid) -> Result<(), ReportError>` (step 2, the body of the job `periodic_build`).
+@@ END
+
+@@ BLOCK 21
+### 7.N Draft edits are audited (V-21-08-c, MEDIUM; DR-413)
+Section 3.2 and 7.2: each `PATCH /reports/{id}` writes `report.edited {report_id, version, field_keys}` in the transaction of the write (new; section 3.20 gains the row, resource report). `field_keys` lists the builder field keys the PATCH wrote and never a value: `suspicion_formed_on` appears as its key only.
+@@ END
+
+@@ BLOCK 21
+### 7.N The drafter, the authors and the submitter are refused by the subject check (V-21-10-a, MEDIUM; DR-413)
+Section 3.6 step 3 and 7.4 item 1 name people the `sign` task excludes, but the phase 04 engine computes `excluded` from the instance maker and the earlier deciders only. The rule is therefore carried by the subject: `CaseWorkflowSubject::check_before_decision` (section 4.5 item 1), for an instance of `case_report_approval`, and `ReportWorkflowSubject::check_before_decision` (section 3.7), refuse the sign with 403 `E_SELF_APPROVAL` when the actor, or the user the actor acts for, is the report's `created_by`, the `created_by` of any version (`ReportVersionRepository::summaries`) or the report's `submitted_by`. The Cedar forbid of 7.4 item 2 and the two database CHECKs stay.
+@@ END
+
+@@ BLOCK 21
+### 7.N Foreign keys on the letter id columns of phase 20 (V-21-12-b, MEDIUM; DR-413)
+Phase 20 leaves its letter id columns without a foreign key until this phase. Migration `0070` (section 1.3) adds four, each as `ALTER TABLE <table> DROP CONSTRAINT IF EXISTS <name>;` followed by `ALTER TABLE <table> ADD CONSTRAINT <name> FOREIGN KEY (<column>) REFERENCES rpt.letters (id) ON DELETE RESTRICT NOT VALID;`: `fk_freezes_committee_letter` on `casework.freezes (committee_report_letter_id)`, `fk_freezes_second_letter` on `casework.freezes (second_report_letter_id)`, `fk_freezes_referral_letter` on `casework.freezes (referral_letter_id)` and `fk_refrain_referral_letter` on `casework.refrain_instructions (referral_letter_id)`. `NOT VALID` is kept, because the stub ids of phase 20 have no letter row until the backfill of section 3.15 runs; the constraint still checks every row written from then on. The backfill ends by counting the ids in these four columns that have no `rpt.letters` row, and it fails when the count is not zero.
+@@ END
+
+@@ BLOCK 21
+### 7.N CTR-03 bounds and the account rule code (V-21-07-a, V-21-07-b, MEDIUM; DR-413)
+Lead decision. CTR-03 had no bounds: it takes two rule parameters in the phase 07 catalogue (phase 07 section 7+), `max_usd` (shipped 1000000) and `round_unit_iqd` (shipped 250, the smallest note; every other currency must be a whole amount). They are shipped defaults of the profile, and a bank changes them by a `goaml_profile` change request, as for every rule parameter. The RP-30 account rule had the code of another rule: it is `CONS-05` (warn), and `CONS-04` stays phase 07's chronological-order rule (info). DR-171 named `CONS-04` for the account rule; this block replaces that name.
+@@ END

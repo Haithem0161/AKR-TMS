@@ -1,0 +1,158 @@
+Fixes for the claims of tools/agent/verify/refute-31.md (phase 31; drafts for lead review, not applied).
+# DECIDE V-31-01-a | option A: "passed on first attempt" means at least one case was passed on its first attempt. The view keeps `bool_or(f.passed) AS passed_first` (phase-31.md:83), and section 5.5 (phase-31.md:952) and section 3.2 rule 4 (phase-31.md:503) say so beside the count. | option B: "passed on first attempt" means every case of the course was passed on its first attempt. The view changes `bool_or` to `bool_and` (phase-31.md:83); the label and the count stay. Evidence for B: a pass is per case (DR-340, phase-31.md:1049, "a pass needs `train.pass_pct`"); no text defines a course-level pass, and research.md DR-339 (line 350) scores first attempts per case only.
+
+@@ BLOCK 31
+### 7.N ClassAggregate fields (V-31-02-a, MEDIUM; DR-413)
+Section 2.1, after the `CapacitySnapshot` line: `ClassAggregate { pool_id: Uuid, work_kind: WorkKind, class_code: String, arrivals: i64, decided: i64, handling_minutes_sum: i64 }`. Each field is the sum over the window of the snapshot column of the same name, for pool rows only, grouped by pool, work kind and class. It holds no person field. It is the return type of `CapacityRepository::window_aggregate` (section 2.2) and the input of step 1 of section 3.4.
+@@ END
+# V-31-02-a | MEDIUM | names used and where they exist: `CapacitySnapshot` and `WorkKind` phase-31.md:420 (2.1); `CapacityRepository::window_aggregate` phase-31.md:430 (2.2); snapshot columns `arrivals`, `decided`, `handling_minutes_sum` phase-31.md:126-128 (1.2 DDL); forecast step 1 reads them phase-31.md:534 | NEW: none
+
+# DECIDE V-31-02-b | option A: the hourly upsert of `casework.capacity_snapshots` is a derived rebuild and writes no audit event, as phase 02 does for anchors. Section 3.3 step 3 says so in its own text (phase-31.md:526, "A re-run replaces the values of the bucket and does nothing else."), and phase 02 has the precedent (phase-02.md:777, "Anchoring writes no `audit_log` row per anchor"). The housekeeping exemption of the planning rule (sweeps, timers, heartbeats) does not name snapshots, so the text of section 3.3 would have to say it. | option B: one run-level kind per hourly run, NEW `capacity.snapshot_refreshed {bucket_start, rows}` (SIEM false), added to the section 3.14 table, as the "one per mutation" heading asks (phase-31.md:722). The table at phase-31.md:728-740 has no snapshot row.
+
+@@ REP 31
+`forecast(ctx, query: ForecastQuery { handling_pct, arrivals_pct })`
+@@ WITH
+`forecast(ctx)`
+@@ END
+# V-31-02-c | HIGH | grep -c -F gave 1 | names used and where they exist: `CapacityService::forecast` phase-31.md:437 (2.3, the line being fixed); "Sensitivity (fixed grid, not a user input)" phase-31.md:540 (3.4 step 7); route row `GET /capacity/forecast` phase-31.md:458 has no query parameter; `ForecastQuery` has no other occurrence | NEW: none. Alternative not drafted: user multipliers as a named input of step 7 and of the route row. The plan says "not a user input" at phase-31.md:540, so this draft follows the plan.
+
+@@ REP 31
+subject: ('pool', pool_id), stage: NULL
+@@ WITH
+subject_kind: pool, subject_id: pool_id, stage: NULL
+@@ END
+# V-31-02-d | LOW | grep -c -F gave 1 | names used and where they exist: `casework.alarms` columns `subject_kind`, `subject_id` phase-19.md:303-304; subject `pool` added by 0097 (`alarms_subject_kind_check`, phase-31.md:169, and section 4.5 item 8); `NewAlarm { kind, subject_kind, subject_id, stage, payload }` phase-22.md:564; `AlarmService::raise(tx, NewAlarm)` phase-19.md:1299 | NEW: none
+
+@@ REP 31
+per list in `ref.lists`, the versions activated in the period, and for each the hours from `loaded_at` to `activated_at` (phase 14)
+@@ WITH
+per list in `ref.lists`, the versions of `ref.list_versions` activated in the period, and for each version the hours from its `loaded_at` to its `activated_at` (phase 14)
+@@ END
+# V-31-03-a | LOW | grep -c -F gave 1 | names used and where they exist: `ref.lists` phase-14.md:65 (registry); `ref.list_versions` phase-14.md:92; `loaded_at` phase-14.md:115 and `activated_at` phase-14.md:116, both columns of `ref.list_versions` | NEW: none
+
+@@ BLOCK 31
+### 7.N Request body of POST /packs for the two new kinds (V-31-03-b, LOW; DR-413)
+Section 3.7, "Kinds and build": the body of `POST /packs` for `correspondent` and `validator` is `{kind, scope: {period}}`, the phase 06 `PackRequest` with `lang` left out, because both languages are rendered. The answer is the phase 06 202 (`PackAccepted`).
+@@ END
+# V-31-03-b | LOW | names used and where they exist: `PackRequest` (`kind`, `scope`, `lang?`) phase-06.md:469; `PackAccepted` phase-06.md:471; route row `POST /packs` with 202 phase-06.md:488; body example `{"kind", "scope"}` phase-06.md:954 | NEW: none
+
+@@ REP 31
+Cedar: create for M only (section 3.16, E2).
+@@ WITH
+Cedar: create for M only (section 3.17, E2).
+@@ END
+# V-31-03-c | LOW | grep -c -F gave 1 | names used and where they exist: section 3.16 "Settings used" phase-31.md:755; section 3.17 "Cedar: the three files" phase-31.md:761, with `E2_exposure_packs.cedar` | NEW: none
+
+@@ REP 31
+The pack has kind `correspondent` or `validator`, status built, and a period that has ended (422 sub-code `pack_not_ready`).
+@@ WITH
+The pack has kind `correspondent` or `validator`, a row in `admin.packs` (a row is inserted only when the build publishes the pack: phase 02 `PackService::publish`, step 3), and a period that has ended. A pack that fails any of the three is refused with 422 sub-code `pack_not_ready`, the same sub-code for a pack of another kind.
+@@ END
+# V-31-04-a (MEDIUM) and V-31-04-d (LOW) | grep -c -F gave 1 | names used and where they exist: `admin.packs` phase-02.md:423-438 (no status column; kind CHECK lists both kinds); `PackService::publish` step 3 inserts the pack phase-02.md:920; build job status `queued`, `ready`, `failed` phase-06.md:470 (the other option for 04-a: the build job's `ready`); `pack_not_ready` already in the PackError row phase-31.md:718, so no row change | NEW: none. For 04-d the other option is a NEW sub-code for a pack of another kind; this draft reuses `pack_not_ready` under the reuse rule.
+
+@@ BLOCK 31
+### 7.N Repository methods and parameters of the RFI pack links (V-31-04-b, MEDIUM; DR-413)
+Section 2.2 gains `RfiPackRepository` (new in phase 31; it owns `casework.rfi_packs`, section 1.2) with two methods. `insert_link(tx, rfi_id, pack_id, linked_by, at)` writes the link; a repeat of the pair is a no-op (section 3.9 step 5). `correspondent_page(conn, direction: Option<RfiDirection>, cursor) -> Vec<CorrespondentRfiRow>` reads the RFIs of `kind = 'correspondent'` with their attached pack ids and kinds, and applies the phase 19 `visibility_sql` as `RfiRepository::desk` does. Section 2.3: `RfiService::attach_pack(ctx, rfi_id, body: AttachPackBody, if_match, idem)` and `RfiService::correspondent_list(ctx, direction: Option<RfiDirection>, cursor)`.
+@@ END
+# V-31-04-b | MEDIUM | names used and where they exist: `casework.rfi_packs` (rfi_id, pack_id, linked_by, linked_at) phase-31.md:153; `CorrespondentRfiRow`, `AttachPackBody` phase-31.md:425 (2.1); `RfiDirection` phase-19.md:961; `RfiRepository::desk` (status filter and `visibility_sql`) phase-19.md:996; attach step 5 phase-31.md:636; `RfiService::attach_pack` and `correspondent_list` phase-31.md:444 (2.3) | NEW: `RfiPackRepository`, `insert_link`, `correspondent_page` (the claim is that no method inserts `casework.rfi_packs` or lists correspondent RFIs, so these names are new; `desk` takes a status filter and cannot serve the list)
+
+@@ BLOCK 19
+### 7.N Recipient of a correspondent RFI (V-31-04-e, LOW; DR-413)
+From phase 31 on, `recipient_ref` of an RFI of kind `correspondent` is the `canon.account` id of the correspondent (phase 31 section 3.9; DR-347 of phase 31). The column comment in section 1.1 (`branch, staff or unit id`) describes the other recipient kinds. The `branch_info` rule of section 3.1 is unchanged.
+@@ END
+# V-31-04-e | LOW | names used and where they exist: column `recipient_ref` phase-19.md:104 (section 1.1, the comment); correspondent rule phase-19.md:1071 (direction only, nothing on `recipient_ref`); the account id meaning phase-31.md:629 (3.9 list) and phase-31.md:1063 (DR-347 of phase 31); research.md DR-347 (line 358) does not decide the column | NEW: none
+
+# DECIDE V-31-05-a | option A: the event row keeps the local outcome `applied`, because the disable is committed in the same transaction as the row (section 3.11 step 6, phase-31.md:666). The deferred Kratos step is recorded by an audit event of its own (one NEW kind, for example `directory.disable_deferred {directory_user_id}`, SIEM false). Then `deferred` with reason `disable_deferred` leaves section 3.11 step 5 (phase-31.md:663), section 3.12 step 3 (phase-31.md:699) and the lead correction (phase-31.md:1081). | option B: the event row is inserted once, after the Kratos step, in its own transaction, so `deferred` is known when it is written. Section 3.11 step 6 and section 3.12 step 3 swap their order, and the "never updated" comment stays true (phase-31.md:225). Evidence for why the order decides it: phase 03 runs the Kratos step after commit and enqueues `offboard_finalize` on failure (phase-03.md:843-844), so the deferral cannot be known inside the disable transaction.
+
+@@ REP 31
+ctx: DirectoryCtx
+@@ WITH
+ctx: Ctx
+@@ END
+# V-31-05-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `Ctx` with field `via` phase-03.md:553; the `Ctx.via` value list with `webhook_hmac` phase-03.md:1310 (7.5 block); the verified principal and `Ctx.via = "webhook_hmac"` phase-31.md:656 (section 3.11 step 1); DR-352 phase-31.md:1073 | NEW: none. The type is the phase 03 `Ctx`; no new struct is named.
+
+@@ REP 31
+outcome `disable_deferred`)
+@@ WITH
+outcome `deferred` with reason `disable_deferred`)
+@@ END
+# V-31-05-c | LOW | grep -c -F gave 1 | names used and where they exist: `admin.directory_events.outcome` CHECK (applied, ignored, refused, deferred) phase-31.md:233; `reason_code` CHECK lists `disable_deferred` phase-31.md:234-235; section 3.11 step 5 "deferred with reason disable_deferred" phase-31.md:663 | NEW: none. If DECIDE V-31-05-a is taken as option A, this REP changes again.
+
+@@ BLOCK 16
+### 7.N Daily would-alert counts of a replay (V-31-06-a, MEDIUM; DR-413)
+From phase 31 on, the `ReplayRepository` trait (section 2) gains `daily_would_alert(conn, replay: Uuid) -> Result<Vec<(NaiveDate, i64)>, RepoError>`. It returns, for each `business_date` of the replay's rows of `scn.replay_results`, the number of rows with `would_alert = TRUE`. It reads the columns `business_date` and `would_alert` only (no `entity_id`, `detection_key` or `segment_ref`). The capacity harness of phase 31 (section 3.5) is its only caller.
+@@ END
+# V-31-06-a (part 1 of 2) | MEDIUM | names used and where they exist: `ReplayRepository` phase-16.md:774 (section 2); `ReplayRepository::get` phase-16.md:780; `results` phase-16.md:781-782 (entity rows, which phase 31 step 2 forbids, phase-31.md:561); `summary_cells` phase-16.md:783 (`SummaryCells` has no field list anywhere in docs/plan); `scn.replay_results` columns `business_date` and `would_alert` phase-16.md:252-268; DR-342 research.md:353 (daily would-alert counts, no entity id) | NEW: `daily_would_alert` (no existing method returns per-date would-alert counts; the block sits in phase 16 because phase 16 owns the table and the trait)
+
+@@ BLOCK 31
+### 7.N Reads of the simulation job (V-31-06-a, MEDIUM; DR-413)
+Section 3.5, job step 1: the re-read of the replay uses phase 16 `ReplayRepository::get`. Step 2: the daily counts come from `ReplayRepository::daily_would_alert` (added by phase 16 from phase 31 on), not from the entity rows that `ReplayRepository::results` returns.
+@@ END
+# V-31-06-a (part 2 of 2) | MEDIUM | names used and where they exist: `ReplayRepository::get` phase-16.md:780; `ReplayRepository::results` phase-16.md:781-782; job step 1 phase-31.md:560; job step 2 phase-31.md:561 (forbids `entity_id` and `detection_key`) | NEW: none in this block; the new method is named in the phase 16 block above
+
+@@ BLOCK 31
+### 7.N The move of a run to running (V-31-06-c, MEDIUM; DR-413)
+Section 3.5, job step 1: the change of `casework.capacity_runs.status` to `running` writes no audit event of its own. The run-level pair of section 3.14, `capacity.simulation_requested` (request step 3) and `capacity.simulation_completed` (job step 8, also for a failed run), brackets the run and covers that change.
+@@ END
+# V-31-06-c | MEDIUM | names used and where they exist: `status` CHECK with `running` phase-31.md:142 (1.2); job step 1 phase-31.md:560; 3.14 rows phase-31.md:729-730; request step 3 phase-31.md:557; job step 8 phase-31.md:567; the exemption applies only when the item's own text says a run-level event covers the write, and this block says so | NEW: none
+
+@@ REP 31
+`class_mix` (shares of P0 to P3 that sum to 1; default: the measured mix of section 3.4)
+@@ WITH
+`class_mix` (shares of P0 to P3 that sum to 1; required, with no default: the mix is stated by the requester, DR-342)
+@@ END
+# V-31-06-d | LOW | grep -c -F gave 1 | names used and where they exist: DR-342 "splits by a stated class mix" research.md:353; Open doubts 5 "the class split is an input of the request" phase-31.md:1089; 3.5 step 3 "the split is the input" phase-31.md:562; the 3.4 forecast computes per-class rates only (step 1, phase-31.md:534) | NEW: none. The other option (keep a default and define it as the per-class share of `arrivals` in section 3.4 step 1) would contradict "stated" in DR-342, so it is not drafted.
+
+@@ REP 31
+(partition pruning by business date and by creation month)
+@@ WITH
+(the BRIN index `idx_txn_business_brin` on `business_date`, phase 10, because `canon.txn` is partitioned by `booking_date`; `alert.alerts` is pruned by creation month)
+@@ END
+# V-31-07-a | LOW | grep -c -F gave 1 | names used and where they exist: `canon.txn` PARTITION BY RANGE (booking_date) phase-10.md:998; `business_date` is a plain column with BRIN index `idx_txn_business_brin` phase-10.md:1129; `alert.alerts` PARTITION BY RANGE (created_at) phase-17.md:172 | NEW: none
+
+@@ BLOCK 31
+### 7.N ExposureRunSummary fields (V-31-07-b, MEDIUM; DR-413)
+Section 2.1: `ExposureRunSummary { period_month, rows, suppressed_rows }`. These are the three values of the audit detail of section 3.8 step 3 (`exposure.computed`): the month computed, the number of `rpt.typology_exposure` rows upserted, and the number of those rows with `suppressed = TRUE`.
+@@ END
+# V-31-07-b | MEDIUM | names used and where they exist: `compute(period_month) -> ExposureRunSummary` phase-31.md:439 (2.3); audit `exposure.computed {period_month, rows, suppressed_rows}` phase-31.md:621 (3.8 step 3) and 3.14 row phase-31.md:731; `TypologyExposureRow` with `suppressed` phase-31.md:422 (2.1) | NEW: none
+
+@@ BLOCK 31
+### 7.N E-mail mismatches counted by the reconciliation (V-31-08-b, MEDIUM; DR-413)
+Section 3.11, reconciliation: a new check after item 3. It counts the linked rows whose directory e-mail (`user_name_enc`, section 1.4, decrypted) differs from `admin.users.email` of `linked_user_id`, compared case-insensitively as the link step 4 does. It audits `directory.mismatch {count}` (SIEM true, section 3.14) with that count. The e-mail is not applied (conflicts rule of section 3.11). Counts only: no name or e-mail is written (DR-351).
+@@ END
+# V-31-08-b | MEDIUM | names used and where they exist: `user_name_enc` phase-31.md:208 (section 1.4, "the directory e-mail, sealed"); `admin.users.email` phase-31.md:673 (link step 4); reconciliation item 3 phase-31.md:683; conflicts rule phase-31.md:692; 3.14 row `directory.mismatch` with `count` phase-31.md:738; DR-351 research.md:362, "an e-mail change is a recorded mismatch; daily reconciliation with counts only" (a DR in research.md wins over the plan text, so this is not a DECIDE) | NEW: none
+
+@@ REP 31
+(phase 03 `POST /admin/users/{id}/grants`
+@@ WITH
+(phase 04 `POST /admin/users/{id}/grants`
+@@ END
+# V-31-08-c | LOW | grep -c -F gave 1 | names used and where they exist: route row `POST /admin/users/{id}/grants` phase-04.md:806 (cr_access, 202); phase-03.md:524 names phases 04 and 09 as the owners | NEW: none
+
+@@ BLOCK 31
+### 7.N Section 3.12 and the directory link port (V-31-10-a, LOW; DR-413)
+Section 3.12 gains one sentence: phase 03's `DirectoryLinkQuery` port (phase 03 section 7.10) is implemented here as `PgDirectoryLinkQuery`, defined in section 7.2 of this phase.
+@@ END
+# V-31-10-a | LOW | names used and where they exist: `DirectoryLinkQuery` and `NoDirectory` phase-03.md:1349-1350 (7.10 block); `PgDirectoryLinkQuery` phase-31.md:1027 (7.2 block); section 3.12 heading phase-31.md:694 | NEW: none
+
+@@ REP 31
+`directory_verifier: Arc<DirectoryWebhookVerifier>`
+@@ WITH
+`directory_verifier: Arc<DirectoryWebhookVerifier>`, `directory_link: Arc<dyn DirectoryLinkQuery>` (`PgDirectoryLinkQuery` while `pack.polis` is on, phase 03 `NoDirectory` while it is off)
+@@ END
+# V-31-10-b | LOW | grep -c -F gave 1 | names used and where they exist: `akr-api` AppState list phase-31.md:883 (4.3); `Arc<dyn Trait>` convention for ports phase-03.md:1124-1125; `DirectoryLinkQuery` and `NoDirectory` phase-03.md:1349-1350; 7.2 block says "wired into AppState when pack.polis is on" phase-31.md:1029 | NEW: none
+
+@@ REP 31
+`akr_retention` deletes practice attempts only through the retention run (a direct `DELETE` by `akr_app` fails with `insufficient_privilege`).
+@@ WITH
+`akr_retention` holds SELECT only on `train.practice_attempts` in this release (section 7.3), so no deletion path exists yet. A direct `DELETE` by `akr_app` fails with `insufficient_privilege`.
+@@ END
+# V-31-11-a | LOW | grep -c -F gave 1 | names used and where they exist: GRANT SELECT only phase-31.md:283 (0100); section 7.3 "gets SELECT only until a period and its handler exist" phase-31.md:1034; DR-386 research.md:397 (DELETE only on the tables whose handler deletes rows) | NEW: none
+
+@@ BLOCK 19
+### 7.N Base of the surge floor in the QA sampler (V-31-12-a, MEDIUM; DR-413)
+From phase 31 on, the "rate" of section 7.5 is the sampled share of the population: the sample size `n` of the draw of section 3.8 (step 2), divided by `N`. While `capacity.surge_active` is true, the draw sets `n = min(N, max(n, ceil(N * capacity.surge_qc_percent / 100)))`. The surge percent is a share of the population, not a defect rate, so `qa.expected_defect_rate` is unchanged.
+@@ END
+# V-31-12-a | MEDIUM | names used and where they exist: `QaSampler::sample_size` phase-19.md:1236 (section 3.8); draw step 2 "n = min(N, requested or QaSampler::sample_size)" phase-19.md:1256; `qa.expected_defect_rate` phase-19.md:829; `capacity.surge_qc_percent` phase-31.md:329 (decimal, 15, a percent); phase 31 section 4.5 item 9 phase-31.md:906; DR-343 research.md:354 ("a higher QC sample") | NEW: none
+
+# SUMMARY: fixes written 23 (REP 12, BLOCK 11); DECIDE 3; DROP 0; claims covered: V-31-01-a, V-31-02-a, V-31-02-b, V-31-02-c, V-31-02-d, V-31-03-a, V-31-03-b, V-31-03-c, V-31-04-a, V-31-04-b, V-31-04-d, V-31-04-e, V-31-05-a, V-31-05-b, V-31-05-c, V-31-06-a, V-31-06-c, V-31-06-d, V-31-07-a, V-31-07-b, V-31-08-b, V-31-08-c, V-31-10-a, V-31-10-b, V-31-11-a, V-31-12-a

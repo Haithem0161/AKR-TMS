@@ -1,0 +1,88 @@
+Fixes for phase 28 (lead-reviewed from tools/agent/verify/draft/28.txt). 11 claims: 11 confirmed.
+
+@@ REP 28
+`visibility`, `model`, `output`, `grounding`)
+@@ WITH
+`visibility`, `model` (with `input_too_large`), `output`, `grounding`)
+@@ END
+
+@@ BLOCK 19
+### 7.N Assistant golden items in the QA draw (V-28-02-b, V-28-02-c, MEDIUM; DR-413)
+From phase 28 on, `DrawQaSample` (section 2) gains `eval_run_id: Option<Uuid>`. It is required for population
+`assistant_golden` and refused with 422 `E_VALIDATION` for any other population. The population is then the
+`casework.assistant_drafts` rows whose `eval_run_id` is that value; each becomes an item with `source_kind`
+`assistant_draft`, `source_id` the draft id, `case_id` the draft's case and `source_at` the draft's `requested_at`, and
+the sample row keeps the run in `casework.qa_samples.eval_run_id` (the column phase 28 adds). Step 7 of the draw
+(section 3.8) also applies to an `assistant_draft` item: the same time-boxed read grant on the draft's case, reason
+`qa_review`, so `GET /qa/samples/{id}/item` can show the verified output and the records it cites.
+@@ END
+
+@@ BLOCK 28
+### 7.N The QA sample keeps its evaluation run (V-28-02-b, MEDIUM; DR-413)
+Migration `0089` (section 1.2), next to the two constraint changes on `casework.qa_samples`: `ALTER TABLE
+casework.qa_samples ADD COLUMN IF NOT EXISTS eval_run_id UUID;` with its classification row (`internal`). The table
+grant of phase 19 covers the column. The draw of section 3.6 step 4 passes the run as `eval_run_id` (phase 19 section
+7+).
+@@ END
+
+@@ REP 28
+(requirement on phase 19, section 4.5)
+@@ WITH
+(phase 19 section 3.8 step 7 and its section 7+ block)
+@@ END
+
+@@ REP 28
+`EngageKillRequest`, `ReleaseKillAccepted`
+@@ WITH
+`EngageAssistantKill`, `ReleaseAssistantKillRequest`, `ReleaseKillAccepted`
+@@ END
+
+@@ BLOCK 28
+### 7.N Provenance on the draft view (V-28-04-a, MEDIUM; DR-413)
+`GET /assistant/drafts/{id}` and `DraftView` gain a `provenance` object, null unless the draft carries its text
+(section 3.4, the case team only): `requested_by`, `requested_at`, `model_version_id` and `template_version_id` (each
+with its `version_no` from `admin.assistant_versions`), and `source_ids`. These are the DR-277 fields the draft row
+already keeps; the case, the output and the edits are left out because the view shows them.
+@@ END
+
+@@ REP 28
+Draft `FOR UPDATE` (lock 4): status must be `ready`;
+@@ WITH
+For `report_narrative`, first the report row `FOR UPDATE` (lock 3 of section 3.15; `report_id` is read from the draft without a lock). Then the draft `FOR UPDATE` (lock 4): status must be `ready`;
+@@ END
+
+@@ REP 28
+The engine deletes a case's drafts in its own `record_purge` before a case row is removed;
+@@ WITH
+No handler deletes a case's drafts in this release (7.2, DR-386: they are `report_only` with their case);
+@@ END
+
+@@ REP 28
+The engine must delete a case's drafts before its case row; the foreign key is `RESTRICT`. Phase 23 has no rule for a child of a case that holds a sealed text yet (requirement; phase 23 owner to confirm).
+@@ WITH
+Settled by 7.2 (DR-386): no handler deletes a case's drafts in this release. They are `report_only` with their case (phase 23: a child of a `report_only` owner is `report_only` too), and the foreign key stays `RESTRICT`.
+@@ END
+
+@@ REP 23
+| R11 | `age` | kept | 10 years | `report_only` | `kyc.rating_shadow_runs`, `kyc.rating_shadow_items` |
+@@ WITH
+| R11 | `age`, `retirement` | kept | 10 years | `report_only` | `kyc.rating_shadow_runs`, `kyc.rating_shadow_items`; on the `retirement` clock (never due): `admin.models`, `admin.model_versions` (phase 27) and `admin.assistant_versions` (phase 28) |
+@@ END
+
+@@ REP 28
+`llama` | `akr/llama-server` (pinned, signed) | `z2_model` | internal only, no egress.
+@@ WITH
+`llama` | `akr/llama-server` (pinned, signed) | `z2_model` | internal only, no egress; `llama-eval` | `akr/llama-server` (same image, profile `assistant-eval`) | `z2_model` | internal only, no egress.
+@@ END
+
+@@ REP 28
+The manifest's canonical bytes hash to `manifest_sha256`
+@@ WITH
+The manifest's canonical bytes (the canonical form of phase 27 section 3.3 step 2) hash to `manifest_sha256`
+@@ END
+
+@@ REP 28
+has every `<` replaced by `<` before serialisation
+@@ WITH
+is serialised with every `<` written as the JSON escape `<`, so the block text holds no `<`
+@@ END

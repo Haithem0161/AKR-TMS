@@ -1,0 +1,42 @@
+Replacements made in docs/plan/phase-17.md by the first re-check (DR-413). 7 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-02-1a]
+WHY: R-02-1 | CONFIRMED HIGH (raised HIGH) | the verifier reads as `akr_readonly`, and step 2 for the `case_event` stream reads `casework.case_events`, on which that role has no grant | phase 17 grants SELECT on the four columns `(case_id, seq, at, hash)` to `akr_readonly`; 7.17 names the grant
+OLD: -- No grant to akr_readonly, akr_ingest, akr_audit_writer or akr_monitor: these tables are personal and are read through the API.
+NEW: GRANT SELECT (case_id, seq, at, hash) ON casework.case_events TO akr_readonly;   -- the phase 02 verifier rebuilds the anchored heads; no payload and no actor column
+-- No other grant to akr_readonly, and none to akr_ingest, akr_audit_writer or akr_monitor: these tables are personal and are read through the API.
+
+=== F2 [R-17-1]
+WHY: R-17-1 | CONFIRMED MEDIUM (raised MEDIUM) | section 3.2 says the retry job sets `revalidated_at`, and no retry step writes it | 7.19 sets it with `valid_now`; a still-invalid row is not written
+OLD: When the row is valid, set `reason_detail.valid_now = true` and write audit `alert.quarantine_revalidated` in that transaction.
+NEW: When the row is valid, set `reason_detail.valid_now = true` and `revalidated_at = now()` and write audit `alert.quarantine_revalidated` in that transaction. A row that is still invalid is not written.
+
+=== F3 [R-17-2]
+WHY: R-17-2 | CONFIRMED MEDIUM (raised MEDIUM) | no test for a pool target of a case | the pool must be that of an active `alerts` queue that admits the case, or the case's own pool; else 422 at `/to`
+OLD: or of the pool of an active `alerts` queue whose filter admits the case's family and class (the routing test of section 3.5). The bulk route tests the pool of the queue in its URL.
+NEW: or of the pool of an active `alerts` queue whose filter admits the case's family and class (the routing test of section 3.5). A pool target of a case (`to: { pool_id }`) must be the case's own `assignee_pool_id` or the pool of such a queue; else 422 `E_VALIDATION` at `/to`. The work limit and the conflict check of step 2 are for a user target only. The bulk route tests the pool of the queue in its URL.
+
+=== F4 [R-17-3a]
+WHY: R-17-3 | CONFIRMED MEDIUM (raised MEDIUM) | the bulk `mark_duplicate` checks omit the same-case rule of triage | check 5 gains `not_same_case` (one answer for a missing and a hidden target), added to the closed list
+OLD: 5. `mark_duplicate`: a P0 or P1 alert is `p0_or_p1_duplicate`; a target in state `duplicate` is `target_is_duplicate` (7.11).
+NEW: 5. `mark_duplicate`: a P0 or P1 alert is `p0_or_p1_duplicate`; a target that is missing, hidden, the item itself or not an alert of the item's case is `not_same_case` (the rule of triage in section 3.8; a missing and a hidden target get the same answer); a target in state `duplicate` is `target_is_duplicate` (7.11).
+
+=== F5 [R-17-3b]
+WHY: R-17-3 | CONFIRMED MEDIUM (raised MEDIUM) | the bulk `mark_duplicate` checks omit the same-case rule of triage | check 5 gains `not_same_case` (one answer for a missing and a hidden target), added to the closed list
+OLD: `target_is_duplicate`, `wip_limit`, `conflict_refused`, `lower_refused`. Every reason
+NEW: `not_same_case`, `target_is_duplicate`, `wip_limit`, `conflict_refused`. `lower_refused` leaves the list: it belongs to the single triage `raise_class`, which is not a bulk action. Every reason
+
+=== F6 [R-17-5]
+WHY: R-17-5 | CONFIRMED MEDIUM (raised HIGH) | 7.25 skips step 3 of the phase 18 grant, so an A1 second worker would get `decide` | a second worker must hold A2 or M (422 `role_cannot_decide`); A2 or M assignee gets `decide`, A1 gets `work` // R-17-6 | CONFIRMED MEDIUM (raised HIGH) | an assignee who already holds an active grant breaks the unique index `uq_case_acl_active` | a grant of the same or wider access is kept; a narrower one is revoked and replaced; a reassignment revokes only grants of reason `assignment` or `second_review` (same replacement as R-17-5) // R-17-7 | CONFIRMED LOW (raised LOW) | `case.assign` is of section 3.17, not 3.8 | pointer fixed (same replacement as R-17-5)
+OLD: under the `case.assign` check of section 3.8. It does not call the phase 18 `grant` or `revoke`: both need `case.access.change`, which A1 does not hold, and their steps 3 to 5 are for manual grants.
+NEW: under the `case.assign` check of section 3.17. It does not call the phase 18 `grant` or `revoke`: both need `case.access.change`, which A1 does not hold, and step 5 of `grant` is for manual grants. It applies steps 3 and 4 of `grant` in its own way. Step 3: a second worker must hold `A2` or `M`, else 422 `E_VALIDATION` at `/to` with the phase 18 sub-code `role_cannot_decide`; an assignee who holds `A2` or `M` gets `decide`, and one who holds only `A1` gets `work`. Step 4: the index `uq_case_acl_active` allows one active grant per case and principal, so when the target already holds one (a manual grant, or the `mlro_desk` grant of escalation), a grant of the same or a wider access (`read`, then `work`, then `decide`) is kept and no row is written; a narrower one is revoked and the new row is inserted in the same transaction. A reassignment revokes the previous assignee's grant only when its reason is `assignment` or `second_review`.
+
+=== F7 [L-17-1]
+WHY: L-17-1 | CONFIRMED LOW (lead) | section 3.10 says the step-up answer comes "before any tier answer"; read literally that gives 401 to a caller outside the team, which DR-411 (phase 03 section 7.14) forbids, and it misled a fix in phase 27 | the sentence names the admitted caller (401) and the refused caller (masked 404)
+OLD: the step-up answer is 401
+`E_STEPUP_REQUIRED` before any tier answer, so a caller without step-up learns nothing about the row.
+NEW: a caller the rules above admit gets 401
+`E_STEPUP_REQUIRED` when the assertion is missing. A caller they refuse gets the masked 404 whatever header is missing, so a caller outside the team learns nothing about the row (phase 03 section 7.14, DR-411).

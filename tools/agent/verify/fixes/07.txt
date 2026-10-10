@@ -1,0 +1,164 @@
+Phase 07 fixes (lead-reviewed from tools/agent/verify/draft/07.txt; verdicts in tools/agent/verify-verdict.md).
+docs/API.md rows for GET /goaml/profiles and GET /goaml/profiles/{id} gain config.approve at apply time (MANUAL.txt).
+
+@@ REP 07
+| GET | /goaml/profiles | report.prepare, config.author |
+@@ WITH
+| GET | /goaml/profiles | report.prepare, config.author, config.approve |
+@@ END
+@@ REP 07
+| GET | /goaml/profiles/{id} | report.prepare, config.author |
+@@ WITH
+| GET | /goaml/profiles/{id} | report.prepare, config.author, config.approve |
+@@ END
+@@ REP 07
+because the configuration author proposes profile changes and must read what they change (aligned in the same change).
+@@ WITH
+because the configuration author proposes profile changes and must read what they change (aligned in the same change). The two profile reads also take `config.approve`, because the checker reads the version it decides (section 6); Cedar still limits them to A2, M, CFG and CHK.
+@@ END
+
+@@ REP 07
+(no DTD; a `<!DOCTYPE` refuses the file).
+@@ WITH
+(no DTD; a `<!DOCTYPE` refuses the file as `xsd_unparseable`).
+@@ END
+@@ REP 07
+100 and bands descend.
+@@ WITH
+100 and bands descend (else `params_invalid`).
+@@ END
+@@ REP 07
+`profile_not_usable`, `corpus_failed`, `rule_unknown`, `params_invalid`, `pattern_invalid`, `limit_out_of_bounds`,
+@@ WITH
+`profile_not_usable`, `corpus_failed`, `corpus_not_run`, `rule_unknown`, `params_invalid`, `pattern_invalid`, `limit_out_of_bounds`,
+@@ END
+
+@@ REP 07
+`NewFinding`, `NewWatchRun`.
+@@ WITH
+`NewFinding`, `NewWatchRun`. In `NewProfileVersion` the loader fills `lookups` and `schema_summary` (section 3.1 step 2); the caller, which holds the bytes, computes `xsd_sha256`, stores both XSDs as evidence and passes `xsd_evidence_id` and `effective_xsd_evidence_id` (section 3.1).
+@@ END
+
+@@ REP 07
+OR NEW.rejection_patterns <> OLD.rejection_patterns OR NEW.xsd_sha256 <> OLD.xsd_sha256
+@@ WITH
+OR NEW.rejection_patterns <> OLD.rejection_patterns OR NEW.open_questions <> OLD.open_questions
+            OR NEW.lookups <> OLD.lookups OR NEW.schema_summary <> OLD.schema_summary
+            OR NEW.xsd_sha256 <> OLD.xsd_sha256
+@@ END
+
+@@ REP 07
+permit (principal, action in [Akr::Action::"goaml_profile.read", Akr::Action::"goaml_watch.read"], resource)
+@@ WITH
+permit (principal, action == Akr::Action::"goaml_profile.read", resource)
+@@ END
+@@ REP 07
+when { principal.roles.containsAny(["A2", "M", "CFG", "CHK"]) };
+@@ WITH
+when { principal.roles.containsAny(["A2", "M", "CFG", "CHK"]) };
+
+@id("goaml.watch_readers") @role("A2,M,CFG")
+permit (principal, action == Akr::Action::"goaml_watch.read", resource)
+when { principal.roles.containsAny(["A2", "M", "CFG"]) };
+@@ END
+@@ REP 07
+changes but holds no `goaml_watch.read` beyond the profile (the policy grants both to the readers' set; the route
+@@ WITH
+changes and holds no `goaml_watch.read`; the watch routes refuse CHK at the scope gate (section 6, 403 `E_SCOPE`).
+@@ END
+@@ REP 07
+scope keeps CHK off the watch routes). Bundle tests:
+@@ WITH
+Bundle tests:
+@@ END
+
+@@ REP 07
+the target is a `candidate` of this code with `corpus_result` present;
+@@ WITH
+the target is a `candidate` of this code with `corpus_result` present (else 422 `corpus_not_run`);
+@@ END
+
+@@ BLOCK 07
+### 7.N A corpus run that dies, and how the corpus grows (V-07-03-a, V-07-03-b, V-07-07-a, MEDIUM; DR-413)
+When `goaml_corpus` goes dead (phase 00, `job.dead`), `corpus_result` stays NULL. A promote is then refused with 422 `corpus_not_run`, and an amendment request cannot be decided because its `validation_run` evidence is missing: the maker withdraws it (the candidate becomes `rejected`, section 3.6 Closed) or an operator retries the job (phase 03 job administration).
+The corpus is release data (section 3.6): the files under `corpus/` and `cases.json`. A profile amendment adds rejection patterns, rule settings and limits; it adds no case file, and no table or route stores one. A rejection the bank meets becomes a corpus case when the bank gives the anonymised file, the codes it must produce and the Office message to the vendor, and the case ships in a later release, as the rule codes of section 7.2 do; `packs seed` then queues `goaml_corpus`. The header's RP-06 and RP-83 lines, the last paragraph of section 3.3 ("plus the cases a profile amendment adds", "Phase 21 adds the bank's own anonymised rejection cases") and section 3.7 ("and, from phase 21, a corpus case") read this way. Phase 21 adds no corpus.
+@@ END
+
+@@ BLOCK 07
+### 7.N Rule parameter types (V-07-05-a, LOW; DR-413)
+The parameter schema of each rule (section 3.1 step 4) takes these JSON types for the Parameters column of section 3.3. `report_codes` (BR-03: STR, SAR, TFR), `placeholders` (BR-14: the five words quoted in that row), `currencies` (BR-18: IQD, USD) and `domestic` (BR-13, CTR-02: IQ) are arrays of strings. `days` (BR-08: 31; CONS-02: 7), `min_chars` (CONS-03: 400) and `threshold_usd` (BR-13: 10000) are integers. `tolerance` (CONS-01: 1) is a number. The shipped `profile.json` holds these values.
+@@ END
+
+@@ REP 07
+file, at most 8 MiB);
+@@ WITH
+file, at most 8 MiB, else `file_too_large`);
+@@ END
+@@ REP 07
+(at most 20,000 characters; only with exactly one file)
+@@ WITH
+(at most 20,000 characters, else `file_too_large` at `/rejection_text`; only with exactly one file)
+@@ END
+
+@@ REP 07
+1. `start`; a run not `queued` -> done.
+@@ WITH
+1. `start` returns the run when it moved it from `queued` to `running` or when it is already `running` (a retry, which goes on from its first file without a recorded result, section 4), and `None` for a `completed` or `failed` run -> done.
+@@ END
+@@ REP 07
+11. Insert findings in batches; record the file result (`report_code`, transaction count, outcome, score, grade,
+@@ WITH
+11. In one transaction per file: insert its findings in batches and record the file result in the run's `files` entry with `GoamlCheckRepository::record_file(tx, id, n, &FileResult)`, so a retry never repeats a file's findings (`report_code`, transaction count, outcome, score, grade,
+@@ END
+
+@@ REP 07
+| `goaml_check.use_candidate` | GoamlProfile | M, CFG |
+@@ WITH
+| `goaml_check.use_candidate` | GoamlProfile | M |
+@@ END
+@@ REP 07
+permit (principal, action in [Akr::Action::"goaml_check.read", Akr::Action::"goaml_check.read_all"], resource)
+@@ WITH
+permit (principal, action in [Akr::Action::"goaml_check.read", Akr::Action::"goaml_check.read_all", Akr::Action::"goaml_check.use_candidate"], resource)
+@@ END
+@@ REP 07
+permit (principal, action in [Akr::Action::"goaml_watch.run", Akr::Action::"goaml_check.use_candidate"], resource)
+@@ WITH
+permit (principal, action == Akr::Action::"goaml_watch.run", resource)
+@@ END
+
+@@ REP 07
+12. One transaction: `complete` with the files and the summary;
+@@ WITH
+12. One transaction: `complete` with the files and the summary (`CheckSummary`: counts per layer and per severity, block, warn and info; outcome counts; grade counts, good, moderate, acceptable and poor; the blocks and warns totals);
+@@ END
+@@ REP 07
+`EvidenceStore::stage_transient(purpose = "goaml", owner = run_id, n)`
+@@ WITH
+`EvidenceStore::stage_transient(purpose = "goaml", owner = run_id, n: u8, stream)` (`n` is 1 to 50 for a file and 0 for the rejection text; `stream` is the part as `Stream<Item = Result<Bytes, io::Error>>`, never collected)
+@@ END
+@@ REP 07
+outcome. The upload path does not change.
+@@ WITH
+outcome, which holds the `FileResult` of the file (section 3.2 step 11), its findings as `NewFinding` rows (section 2) and its `CheckSummary` (section 3.2 step 12). The upload path does not change.
+@@ END
+@@ REP 07
+profile: &ProfileVersion, layers
+@@ WITH
+profile: &GoamlProfile, layers
+@@ END
+@@ REP 07
+| NAME-01 | an apostrophe, dot, comma, parenthesis or slash removed from a person name | warn | `removed_count` |
+@@ WITH
+| NAME-01 | an apostrophe, dot, comma, parenthesis or slash removed from a person name (raised only by the phase 21 builder, never on an uploaded file) | warn | `removed_count` |
+@@ END
+@@ REP 07
+| CTR-02 | a CTR transaction whose two countries are not both domestic | block | |
+@@ WITH
+| CTR-02 | a CTR transaction whose two countries are not both in `domestic` | block | `domestic` [IQ] |
+@@ END
+
+@@ BLOCK 07
+### 7.N BR-13 beside CTR-01 and CTR-02 (V-07-12-b, MEDIUM; DR-413)
+CTR-01 and CTR-02 block what DR-368 says is not a CTR. BR-13 keeps its warn for the amount: on a transaction for which CTR-01 or CTR-02 raised a finding, BR-13 raises none, so one fault gives one finding. A profile without the two CTR rules (before phase 21's release) keeps BR-13 as section 3.3 states it.
+@@ END

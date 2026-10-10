@@ -1,0 +1,149 @@
+Fixes applied to docs/plan/phase-29.md by the verification pass (DR-413). 34 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/29.txt)
+OLD: Per-payment decisions are **not** audited in `audit.audit_log`: the decision row is the record (DR-296).
+NEW: Per-payment decisions are **not** audited in `audit.audit_log`: the decision row is the record (DR-296). The hold and hold-candidate rows that step 16 of section 3.1 inserts belong to that record (the hold row names its decision) and write no audit row either; every later change of a hold has its kind below. Operational writes are not audited: the node heartbeat (section 3.13), the release checkpoint (section 3.14 step 7), the replay ledger and the daily roll-up rows change no business decision.
+
+=== F2 BLOCK (from fixes/29.txt)
+### 7.N Adding a rail and its first mode (V-29-02-a, HIGH; DR-413)
+`akr-ctl assess rail add --code C --label-ar T --label-en T --formats mt103,pacs008,canonical` (an operator with `admin.users`, as `keys generate`) inserts one `assess.rails` row in one transaction and audits `assess.rail_added {rail}` (resource `assess_rail`, SIEM false; a new kind in the table of section 3.17). It writes no mode row: the guard of section 1.3 refuses a `rail_modes` row without a change request.
+The first mode row comes from `PUT /api/v1/assess/modes/{rail}` with `mode: shadow` on a rail that has no row. It is the one move besides those of section 3.7. The base version of a mode change is the number of `rail_modes` rows of the rail, so it is 0 here; `prepare` sets `volume_effect` to `neutral`, and no entry criterion applies. `check_before_decision` requires the same row count (409 `E_STALE_BASE` otherwise). `activate` inserts the row with the readiness snapshot `{}` and supersedes nothing. A first proposal with another mode is 422 `E_VALIDATION` at `/mode`. The common rules of section 3.11 apply unchanged, the approved inventory item included. Until that activation the rail is not assessed (section 3.1 step 4).
+
+=== F3 REP (from fixes/29.txt)
+OLD: the open mode row id (mode)
+NEW: the number of `rail_modes` rows of the rail (mode; an integer, as phase 04 `base_version` is, and 0 for a rail with no row yet)
+
+=== F4 REP (from fixes/29.txt)
+OLD: `check_before_decision` re-computes the criteria and refuses a move that does not meet them (422 `E_VALIDATION` with the failed criterion key).
+NEW: `prepare` computes the criteria too and refuses a proposal that does not meet them (422 `E_VALIDATION`, `errors[].code = criterion_not_met` with the failed criterion key), so the PUT is refused as API section 5 says; `check_before_decision` re-computes them at approval with the same refusal.
+
+=== F5 REP (from fixes/29.txt)
+OLD: is refused at `check_before_decision` with 422 `E_VALIDATION` and `criterion_not_met`.
+NEW: is refused at the PUT (`prepare`) with 422 `E_VALIDATION` and `criterion_not_met`; `check_before_decision` repeats the check at approval.
+
+=== F6 BLOCK (from fixes/29.txt)
+### 7.N Band sets and the matrix are replaced whole and kept by set version (V-29-03-a, HIGH; DR-413)
+The primary key of `assess.amount_bands` is `(currency, band_code, set_version)` (section 1.2). A policy activation (section 3.11) inserts the whole band set of the proposal with the new `set_version` and updates no band row, so a band that the new set drops or renames stops applying without a DELETE, which the guard of section 1.3 refuses. The current bands (`PolicyRepository::current_bands`, step 7 of section 3.1 and the policy export) are the rows whose `set_version` is the greatest in the table. The older sets stay as the history that the guard text and the retention row of section 1.4 name, and the bands a decision used are the rows with the greatest `set_version` at or below its `policy_version`.
+The matrix follows the same rule: the activation supersedes every current row of `assess.fail_policies`, not only the keys the new set names, and inserts the whole proposed matrix, so the current rows share one `set_version` (section 3.6).
+
+=== F7 REP (from fixes/29.txt)
+OLD:     PRIMARY KEY (currency, band_code)
+NEW:     PRIMARY KEY (currency, band_code, set_version)   -- band sets are kept: one row per band and set (section 7+)
+
+=== F8 REP (from fixes/29.txt)
+OLD: policy: supersede the current rows of the keys in the set and insert the new rows with `set_version + 1` and the change request id; bands: update or insert by key with the same set version
+NEW: policy: supersede every current row and insert the whole proposed matrix with `set_version + 1` and the change request id; bands: insert the whole proposed band set with the same set version (no band row is updated)
+
+=== F9 REP (from fixes/29.txt)
+OLD: supersedes the rows of the same keys in the same transaction
+NEW: supersedes every current row in the same transaction
+
+=== F10 REP (from fixes/29.txt)
+OLD: `PolicySetProposal { matrix: Vec<FailPolicyRow>, bands: Vec<AmountBand>, basis: String }`
+NEW: `PolicySetProposal { matrix: Vec<FailPolicyRow>, bands: Vec<AmountBand>, basis: String }` with `FailPolicyRow { rail, corridor, currency, amount_band, on_failure }` (the `set_version` of a proposed band is ignored; the activation sets it)
+
+=== F11 REP (from fixes/29.txt)
+OLD: `criterion_not_met`, `reason_codes_unknown`, `purpose_required`
+NEW: `criterion_not_met`, `wildcard_row_missing`, `reason_codes_unknown`, `purpose_required`
+
+=== F12 BLOCK (from fixes/29.txt)
+### 7.N The register link and the closure of a release exception (V-29-04-a, V-29-04-b, HIGH; DR-307; DR-413)
+- **Link** (section 3.14 step 5). The warning of the run's rail and `run_date` is written before the exceptions, and every exception of that rail takes its id as `register_id`. When `RegisterWriter::warn` returns `None` (the key exists), the run reads the row with `RegisterRepository::find_by_source_key` (phase 24). When that row is already `closed`, the run writes a second warning whose key adds `':' || <run instant, RFC 3339>`, so a new exception always hangs on an open warning.
+- **Closure** (step 6). The closing move of phase 24's register route on a row of source `assess_control` (phase 24 section 7.3) calls `ReleaseRepository::close_for_register(tx, register_id, closed_by, at)` in its own transaction: `closed_by` is the caller, `closed_at` the closing instant and `close_reason` `explained`, written together as the CHECK of section 1.2 needs. Each closed exception audits `assess.release_exception_closed`. The job `assess_release_match` closes nothing, and this phase adds no route. The values `bank_confirmed_manual` and `false_match` of the CHECK have no writer in this version.
+
+=== F13 REP (from fixes/29.txt)
+OLD: when its register finding is closed by the phase 24 finding route with one of the recorded decisions. The job performs the closure; there is no route for it.
+NEW: when the register warning of step 5 is closed by the phase 24 register route. That route performs the closure in its own transaction through `ReleaseRepository::close_for_register` (phase 24 section 7.3), with the caller as `closed_by`; the job closes nothing, and this phase adds no route.
+
+=== F14 BLOCK (from fixes/29.txt)
+### 7.N The internal reference of the match key (V-29-04-d, MEDIUM; DR-413)
+`ParsedPayment.internal_ref` (section 3.2) is field `20` of an `mt103`, `GrpHdr/MsgId` of a `pacs008` and `internal_ref` of a `canonical` body. On the canonical side the key `internal_ref` of `canon.payment_message.message_refs` holds the same reference: the bank's mapping of the payment source writes it (phase 10 section 7+) from the column of the gateway database that carries the reference the gateway sends. The bank's gateway team names that column at onboarding. A source whose mapping does not fill the key gives `no_match_key` for every payment without a UETR (section 3.14 step 3), so the gap shows in the exception counts and is never silent.
+
+=== F15 REP (from fixes/29.txt)
+OLD: the hold becomes `rejected` (section 3.8).
+NEW: the hold becomes `rejected` (section 3.8). `decided_by` and `decided_at` take the `decider_id` and the time of the alert's latest decision in `alert.screening_decisions` (phase 14), so a sync names the person who moved the alert. Each sync transition writes `assess.hold_decided` (`outcome` `release` or `reject`, `state_to`) in its own transaction.
+
+=== F16 REP (from fixes/29.txt)
+OLD: Then `HoldRepository::set_alert`.
+NEW: Then `HoldRepository::set_alert`, in the same transaction. The link needs no kind of its own: the alert insert writes phase 14's `screening.alert_created`, and the run's `trigger_ref` is the hold id.
+
+=== F17 REP (from fixes/29.txt)
+OLD: `prepare` validates the grammar and the `basis` (a CBI order or an internal policy reference, at most 500 characters).
+NEW: `prepare` validates the grammar and the `basis` (a CBI order or an internal policy reference, 1 to 500 characters after trimming; otherwise 422 `E_VALIDATION` at `/basis`).
+
+=== F18 REP (from fixes/29.txt)
+OLD: `domain/assess::rules` evaluates the condition as a pure function.
+NEW: `domain/assess::rules` evaluates the condition as a pure function: `first_match(active: &[ProhibitedRule], rail: &str, corridor: Option<&str>, currency: &str, amount: Decimal) -> Option<&str>` returns the `rule_id` of the first rule in slice order whose keys all match (the caller passes the active rules in `rule_id` order; a missing corridor matches no `corridor_in`).
+
+=== F19 REP (from fixes/29.txt)
+OLD: the rule set is tested with the golden fixtures of section 6 before its activation.
+NEW: the rule path is tested with the example rule of section 3.9 (section 6, items 4 and 20) before a bank rule is activated.
+
+=== F20 BLOCK (from fixes/29.txt)
+### 7.N When the fallback limiter answers (V-29-09-a, MEDIUM; DR-413)
+For section 7.1 and step 3 of section 3.1, Valkey "does not answer" when the limiter call returns a connection error or no reply within 5 ms (a constant of `GatewayRateLimiter`, not a setting). That request is decided by `LimiterFallback` (phase 30 section 3.6) and counted in `akr_assess_limiter_fallback_total`; the next request tries Valkey again. No request is refused or delayed further because Valkey is slow.
+
+=== F21 REP (from fixes/29.txt)
+OLD: `assess.rate_burst`; per node, DR-292 and section 3.10)
+NEW: `assess.rate_burst`; one bucket per gateway, shared by the nodes, section 3.10)
+
+=== F22 REP (from fixes/29.txt)
+OLD: enforced per node. With two nodes behind the bank's balancer the bank's effective limit is twice the per-node figure; API 4.2 states the target per node and the bank confirms the balancing (Open doubts 10).
+NEW: held in the shared Valkey, so the nodes draw on one bucket per gateway and the setting is that gateway's total rate whatever the node count (API 4.2: 50 requests a second per bank). The phase 30 fallback divides it by the replica count (section 7.1). The bank confirms the figure (Open doubts 10).
+
+=== F23 REP (from fixes/29.txt)
+OLD: 10. **Per-node rate limits.** The 50 requests per second and the 500 burst are per node (section 3.10). The bank confirms the balancing and whether the limit is per bank.
+NEW: 10. **Gateway rate limit.** The 50 requests per second and the 500 burst are one gateway's total across the nodes (section 3.10). The bank confirms the figure, and whether one limit per gateway is right for a bank with several gateways.
+
+=== F24 BLOCK (from fixes/29.txt)
+### 7.N Source keys of the roll-up warnings (V-29-10-a, MEDIUM; DR-413)
+Section 3.12 step 3 writes each warning with one of these keys, where `day` is the roll-up day (`YYYY-MM-DD`), so one condition raises at most one warning a day:
+- `AssessKeyAge`: `'assess:key_age:' || version || ':' || day` (the active decision key's version);
+- `AssessCertificateExpiry`: `'assess:cert_expiry:' || gateway_id || ':' || day`;
+- `AssessFallbackStale`: `'assess:fallback_stale:' || day`;
+- `AssessControlTestStale`: `'assess:control_test:' || rail || ':' || day`;
+- `AssessRepeatAttempts`: `'assess:repeat:' || rail || ':' || day`, one warning per rail and day whose body holds the number of payment keys above the limit and no payment key;
+- `AssessBlindPeriod`: the key of section 3.13 step 1 (`'assess:blind:' || started_at`), so the roll-up and the outage watch raise one warning per period.
+
+=== F25 REP (from fixes/29.txt)
+OLD: `ReleaseReason { NoDecision, NoMatchKey, DecisionNotPass }`
+NEW: `ReleaseReason { NoDecision, NoMatchKey, DecisionNotPass, PassExpired }`
+
+=== F26 REP (from fixes/29.txt)
+OLD: phase 14 section 3.5 item 9
+NEW: phase 14 section 3.4 item 9
+
+=== F27 REP (from fixes/29.txt)
+OLD: The canonical response is signed with the active decision key.
+NEW: The canonical response is signed with the active decision key. A failed signature (`SignError`) is answered as a failure of step 16: no decision row is written, the in-flight ledger row is deleted, and the answer is 503 `E_UNAVAILABLE` with no pass issued.
+
+=== F28 REP (from fixes/29.txt)
+OLD: each rail has a row for `*`, `*`, `*`;
+NEW: each rail has a row for `*`, `*`, `*` (otherwise 422 `E_VALIDATION` with `errors[].code = wildcard_row_missing`);
+
+=== F29 REP (from fixes/29.txt)
+OLD: async fn record_exception(&self, tx: &mut Tx, e: &NewReleaseException) -> Result<bool, RepoError>;   // ON CONFLICT DO NOTHING on (payment_message_id, payment_received_at)
+NEW: async fn record_exception(&self, tx: &mut Tx, e: &NewReleaseException) -> Result<bool, RepoError>;   // ON CONFLICT DO NOTHING on (payment_message_id, payment_received_at)
+    async fn close_for_register(&self, tx: &mut Tx, register_id: Uuid, closed_by: Uuid, at: DateTime<Utc>) -> Result<Vec<Uuid>, RepoError>;   // closes the open exceptions of that register row (closed_at, closed_by, close_reason 'explained'); returns their ids
+
+=== F30 REP (from fixes/29.txt)
+OLD: or a decision in `advisory` mode (advisory releases are expected)
+NEW: or an `advisory` `hold` (the gateway does not wait for it, so its release is expected)
+
+=== F31 REP (from fixes/29.txt)
+OLD: `volume_effect` is `decrease` for an activation (fewer releases) and `increase` for a retirement; a rule change is material.
+NEW: `volume_effect` is `decrease` for an activation (fewer releases) and `increase` for a retirement; a rule change is material. A retirement is a rule proposal whose `status` is `retired` (the CHECK of section 1.2); its activation inserts that version with `status = 'retired'` and `retired_at` set, and retires the previous active version (section 3.11).
+
+=== F32 REP (from fixes/29.txt)
+OLD: Phase 16 (scenario register `phase2_candidate`, read only as described in section 3.9)
+NEW: Phase 06 (scenario column `phase2_candidate`, read only as described in section 3.9)
+
+=== F33 REP (from fixes/29.txt)
+OLD: (phase 06 line 84, phase 16 S-26)
+NEW: (the column of phase 06 section 1; the item S-26 of phase 16)
+
+=== F34 REP (from fixes/29.txt)
+OLD: are stored in `inventory_items.tier_basis` for the two inventory items
+NEW: are stored in `inventory_items.tier_basis` for the two inventory items, and the create call of each item (phase 04, `tier_basis`) carries all seven answers

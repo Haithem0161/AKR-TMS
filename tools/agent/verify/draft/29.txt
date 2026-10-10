@@ -1,0 +1,164 @@
+Fixes for the claims of tools/agent/verify/refute-29.md (phase 29; fix drafter, for lead review).
+@@ REP 29
+The canonical response is signed with the active decision key.
+@@ WITH
+The canonical response is signed with the active decision key. A failed signature (`SignError`) is answered as a failure of step 16: no decision row is written, the in-flight ledger row is deleted, and the answer is 503 `E_UNAVAILABLE` with no pass issued.
+@@ END
+# V-29-01-a | LOW | grep -c -F gave 1 | names used and where they exist: `SignError` phase-29.md:902; `E_UNAVAILABLE` phase-29.md:1174 (3.16 row); the failure rule of step 16 phase-29.md:930; the in-flight cleanup phase-29.md:968 (3.3) | NEW: none
+# One answer covers every SignError variant, so the variants stay unnamed. If the lead prefers the refuter's reading, the answer is `Internal` (E_INTERNAL, 500, phase-29.md:1175) instead.
+
+@@ BLOCK 29
+### 7.N Audit kind for hold creation (V-29-01-b, MEDIUM; DR-413)
+Section 3.17 gains the kind `assess.hold_created {hold_id, decision_id, mode, state}` (resource `assess_hold`, SIEM false). It is written once for each hold row that step 16 of section 3.1 inserts, in the same transaction as that row. The decision row stays unaudited (DR-296), and later changes of a hold keep their own kinds.
+@@ END
+# V-29-01-b | MEDIUM | names used and where they exist: `assess_hold` resource type phase-29.md:1190 (3.17 table); `assess.hold_decided` phase-29.md:1191 (same table, same pattern); step 16 phase-29.md:930; DR-296 research.md:307 | NEW: `assess.hold_created` (no kind records a hold's creation; the decision row is unaudited under DR-296)
+# Volume: one row per hold, written inside the decision transaction, so the lock argument of section 3.17 (phase-29.md:1179) reaches shadow review holds too. If the lead prefers DR-296 to cover holds, drop this block and say that the decision row records the hold (`decision`, `hold_id`).
+
+@@ BLOCK 29
+### 7.N The first mode of a rail and `akr-ctl assess rail add` (V-29-02-a, HIGH; DR-413)
+`akr-ctl assess rail add` does two things, in this order. (1) One transaction inserts the `assess.rails` row (`code`, `label`, `payload_formats`; `active` takes its default) and audits `assess.rail_added {rail}`, a new kind (resource `assess_rail`, SIEM false, added to the table of section 3.17). (2) It opens the `assess_mode` change request that moves the rail to `shadow`, as `PUT /api/v1/assess/modes/{rail}` does, because that route is the only creation path of the object kind (section 3.11). The change request has no base row, its `volume_effect` is `neutral` (shadow touches no gateway, section 3.7), and every rule of section 3.11 applies, including the approved inventory item.
+The guard of section 1.3 refuses a `rail_modes` row without an approved or effective change request of kind `assess_mode`. So `rail add` writes no mode row: the first row is written by the activation of that change request, as every mode row is. Until then the rail has no open row and is not assessed (section 3.1 step 4).
+@@ END
+# V-29-02-a | HIGH | names used and where they exist: `assess.rails` phase-29.md:33 (1.1); `PUT /api/v1/assess/modes/{rail}` phase-29.md:875 (route table); `assess_mode` creation path phase-29.md:1086 (3.11 table, generic_create false); `assess.require_change` phase-29.md:437 and the `rail_modes` guard phase-29.md:520-538 (1.3); no-open-row rule phase-29.md:918 (3.1 step 4); shadow touches no gateway phase-29.md:1035 (3.7); common rules phase-29.md:1089 (3.11) | NEW: `assess.rail_added` (the rail row is a new write and section 3.17 names no rail insert; style of `assess.gateway_registered` phase-29.md:1183)
+# The rule that holds is the change request rule of the guard (section 1.3), which the 3.7 sentence "The first mode of a rail is `shadow`" already assumes.
+
+# DECIDE V-29-02-b | option A: the entry criteria are checked at approval only, as section 3.7 "Change" (phase-29.md:1050), `check_before_decision` (phase-29.md:1091) and item 29 (phase-29.md:1429) say; then docs/API.md:800 must change (lead; it is not a phase file) | option B: the PUT also checks them in `prepare` (section 3.11, phase-29.md:1090) and refuses with 422 `criterion_not_met`, and approval checks them again, as docs/API.md:800 says
+
+# DECIDE V-29-03-a | option A: keep the band history: the key of `assess.amount_bands` gains `set_version` (DDL phase-29.md:217), activation keeps the superseded band set, and the guard text (phase-29.md:564) and the retention row (phase-29.md:802) stand | option B: keep current bands only: the key (phase-29.md:217) and the in-place activation (phase-29.md:1092) stand, the guard text (phase-29.md:564) and the retention label (phase-29.md:802) change, and a decision cannot be explained against the bounds it used (it carries `amount_band` and `policy_version`, phase-29.md:823)
+
+@@ REP 29
+matrix: Vec<FailPolicyRow>
+@@ WITH
+matrix: Vec<FailPolicy>
+@@ END
+# V-29-03-b | LOW | grep -c -F gave 1 | names used and where they exist: `FailPolicy` phase-29.md:823 (entity); `PolicyRepository::current_matrix` returns `Vec<FailPolicy>` phase-29.md:852; `set_version` filled by activation phase-29.md:1026 (3.6 matrix) | NEW: none
+# A proposal row has no set_version until its activation fills it (section 3.6), so the entity serves as the row type. The lead may prefer a separate DTO; the entity is the smaller fix.
+
+@@ REP 29
+each rail has a row for `*`, `*`, `*`;
+@@ WITH
+each rail has a row for `*`, `*`, `*` (otherwise 422 `E_VALIDATION` with `errors[].code = wildcard_row_missing`);
+@@ END
+# V-29-03-c (part 1 of 2) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `E_VALIDATION` phase-29.md:1171 (3.16); the field-path convention phase-29.md:920 (3.1 step 6); `no_change` phase-29.md:1027 (same bullet) | NEW: `wildcard_row_missing` (no code in the 3.16 list or in DSL section 7 names a missing catch-all row; `rail_not_configured` covers an unknown rail)
+# The code is added to the 3.16 list by the next entry, which also covers V-29-06-b.
+
+@@ REP 29
+`criterion_not_met`, `reason_codes_unknown`, `purpose_required`
+@@ WITH
+`criterion_not_met`, `wildcard_row_missing`, `basis_invalid`, `reason_codes_unknown`, `purpose_required`
+@@ END
+# V-29-03-c (part 2 of 2), V-29-06-b (part 1 of 2) | MEDIUM (the higher of V-29-03-c MEDIUM and V-29-06-b LOW) | grep -c -F gave 1 | names used and where they exist: `E_VALIDATION` `errors[]` list phase-29.md:1171 (3.16 Validation row, the list this REP extends) | NEW: `wildcard_row_missing` (V-29-03-c) and `basis_invalid` (V-29-06-b); both are snake_case sub-codes like `bands_gap`, and no existing sub-code fits either case
+
+@@ BLOCK 29
+### 7.N The register link and the closer of a release exception (V-29-04-a, HIGH; DR-307; DR-413)
+Section 3.14 step 5: each exception sets `register_id` to the warning of its rail and `run_date`, and that warning is written before the first exception of the pair. When `RegisterWriter::warn` returns `None` (phase 24 section 7.7), the row with the same `source_key` is used.
+Section 3.14 step 6: `closed_by` is the `closed_by` of that register row in phase 24 (`admin.registers`), a user id.`closed_at`, `closed_by` and `close_reason` are written together, which keeps the CHECK of section 1.2.
+@@ END
+# V-29-04-a | HIGH | names used and where they exist: `register_id` phase-29.md:354 and `closed_at`, `closed_by` phase-29.md:355-356 (1.2 DDL); CHECK `(closed_at IS NULL) = (closed_by IS NULL)` phase-29.md:360; step 5 `source_key` and `run_date` phase-29.md:1137; `admin.registers` phase-24.md:42 with `closed_by` phase-24.md:57; `RegisterWriter::warn` phase-24.md:1296 (section 7.7); warnings reach `closed` phase-24.md:652 | NEW: none
+# The closure trigger is not decided here (DECIDE V-29-04-b). Step 6 still says "its register finding"; once the warning link above is applied, the base text should say "its register row (the warning of step 5)". Align that with the V-29-04-b decision.
+
+# DECIDE V-29-04-b | option A: each run of `assess_release_match` closes the open exceptions whose register row is closed; no change to phase 24; closure within 15 minutes; step 6 (phase-29.md:1138) and item 7 (phase-29.md:1354) keep "the job performs the closure" | option B: the phase 24 register route enqueues `assess_release_match` when it closes a row that carries exceptions (one call added to phase 24); Open doubts 17 (phase-29.md:1553) says the route "must trigger" the closure, so item 7 (phase-29.md:1354) and step 6 (phase-29.md:1138) change to match
+
+@@ REP 29
+async fn record_exception(&self, tx: &mut Tx, e: &NewReleaseException) -> Result<bool, RepoError>;   // ON CONFLICT DO NOTHING on (payment_message_id, payment_received_at)
+@@ WITH
+async fn record_exception(&self, tx: &mut Tx, e: &NewReleaseException) -> Result<bool, RepoError>;   // ON CONFLICT DO NOTHING on (payment_message_id, payment_received_at)
+    async fn close_for_register(&self, tx: &mut Tx, register_id: Uuid, closed_by: Uuid, at: DateTime<Utc>) -> Result<Vec<Uuid>, RepoError>;   // closes the open exceptions of that register row (closed_at, closed_by, close_reason 'explained'); returns their ids
+@@ END
+# V-29-04-c | LOW | grep -c -F gave 1 | names used and where they exist: `ReleaseRepository` phase-29.md:859 (the trait, same block); `NewReleaseException` phase-29.md:862; closure columns and `close_reason` values phase-29.md:355-357 (1.2 DDL); `Tx`, `Uuid`, `DateTime<Utc>`, `RepoError` as in `AssessDecisionRepository` phase-29.md:829 | NEW: `close_for_register` (no port writes the closure; `record_exception` is the naming model)
+
+# DECIDE V-29-04-d | option A: phase 10's canonical copy writes `message_refs.internal_ref` from the gateway database's internal reference, the value the gateway sends as `internal_ref` (phase-29.md:954; canonical copy from the gateway database, phase-29.md:950; match key phase-29.md:958) | option B: it writes the sender's reference of the message (MT103 field 20, in the subset at phase-29.md:952; the pacs.008 subset at phase-29.md:953 names no payment-reference field, so its choice is open too); phase 10 keeps `message_refs` an open object (phase-10.md:1033)
+
+@@ REP 29
+Per-payment decisions are **not** audited in `audit.audit_log`: the decision row is the record (DR-296).
+@@ WITH
+Per-payment decisions are **not** audited in `audit.audit_log`: the decision row is the record (DR-296). Operational writes are not audited either: the node heartbeat (section 3.13) and the release checkpoint (section 3.14 step 7) change no business data.
+@@ END
+# V-29-04-e | LOW | grep -c -F gave 1 | names used and where they exist: `assess.node_status` heartbeat phase-29.md:1115 (3.13); `assess.control_state.release_checkpoint_at` phase-29.md:338 (1.2 DDL); section 3.14 step 7 phase-29.md:1139 | NEW: none
+# This adds one exemption to section 3.17 and names its two operational writes; any other housekeeping write would need its own sentence.
+
+@@ REP 29
+or a decision in `advisory` mode (advisory releases are expected)
+@@ WITH
+or an `advisory` `hold` (the gateway does not wait for it, so its release is expected)
+@@ END
+# V-29-04-f | HIGH | grep -c -F gave 1 | names used and where they exist: the advisory no-wait rule and "A `reject` is answered as a reject in advisory and enforcing" phase-29.md:928 (3.1 step 14); the next sub-bullet "only a `reject` ... `decision_not_pass`" phase-29.md:1136; the `hold_release` pass phase-29.md:1134 (same bullet); DR-307 phase-29.md:1522 | NEW: none
+
+@@ REP 29
+the hold becomes `rejected` (section 3.8).
+@@ WITH
+the hold becomes `rejected` (section 3.8). `decided_by` takes the `decider_id` of the alert's latest decision in `alert.screening_decisions` (phase 14), so a sync names the person who moved the alert.
+@@ END
+# V-29-05-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `decided_by` column phase-29.md:290 (1.2 DDL, nullable); `alert.screening_decisions.decider_id` phase-14.md:309; `HoldRepository::apply_outcome(..., by: Uuid, ...)` phase-29.md:846 | NEW: none
+# The other half of V-29-05-b (the Proposal type) is refuted and is not touched.
+
+@@ BLOCK 29
+### 7.N Audit kinds of the hold sync and the alert link (V-29-05-c, MEDIUM; DR-413)
+Section 3.17 gains the kind `assess.hold_alert_linked {hold_id, alert_id}` (resource `assess_hold`, SIEM false), written in the transaction of `HoldRepository::set_alert` (section 3.5, sweep step 2). The sync transitions of section 3.5 step 7 (a `held` hold to `released` or `rejected`) write the existing kind `assess.hold_decided {hold_id, outcome, state_to}` in the transaction of that transition, with `outcome` `release` or `reject`. The audit actor is the sweep job; the person is the hold's `decided_by`.
+@@ END
+# V-29-05-c | MEDIUM | names used and where they exist: `assess.hold_decided` phase-29.md:1191 (3.17 table); `HoldRepository::set_alert` phase-29.md:847; sweep step 2 phase-29.md:1016; sync step 7 phase-29.md:1011; `decided_by` phase-29.md:290 | NEW: `assess.hold_alert_linked` (no kind records a hold's alert link; the sync reuses `assess.hold_decided`, whose detail keys already fit)
+
+@@ REP 29
+`volume_effect` is `decrease` for an activation (fewer releases) and `increase` for a retirement; a rule change is material.
+@@ WITH
+`volume_effect` is `decrease` for an activation (fewer releases) and `increase` for a retirement; a rule change is material. A retirement is a rule proposal whose `status` is `retired` (the CHECK of section 1.2); its activation inserts that version with `status = 'retired'` and `retired_at` set, and retires the previous active version (section 3.11).
+@@ END
+# V-29-06-a | LOW | grep -c -F gave 1 | names used and where they exist: `status` CHECK `IN ('active', 'retired')` phase-29.md:262 and the retired-state CHECK phase-29.md:268 (1.2 DDL); `retired_at` phase-29.md:266; activation wording phase-29.md:1092 (3.11) | NEW: none
+
+@@ REP 29
+`prepare` validates the grammar and the `basis` (a CBI order or an internal policy reference, at most 500 characters).
+@@ WITH
+`prepare` validates the grammar and the `basis` (a CBI order or an internal policy reference, 1 to 500 characters after trimming); an empty or over-long `basis` is 422 `E_VALIDATION` with `errors[].code = basis_invalid` and the path `/basis`.
+@@ END
+# V-29-06-b (part 2 of 2) | LOW | grep -c -F gave 1 | names used and where they exist: `basis` CHECK `length(btrim(basis)) BETWEEN 1 AND 500` phase-29.md:261 (1.2 DDL); `E_VALIDATION` phase-29.md:1171 (3.16); field-path convention phase-29.md:920 (3.1 step 6) | NEW: `basis_invalid` (listed in 3.16 by the REP above, which also covers V-29-03-c); the anchor shares line phase-29.md:1063 with the V-29-06-a anchor, and the two do not overlap
+
+@@ REP 29
+`domain/assess::rules` evaluates the condition as a pure function.
+@@ WITH
+`domain/assess::rules` evaluates the condition as a pure function: `pub fn rules<'a>(active: &'a [ProhibitedRule], rail: &str, corridor: Option<&str>, currency: &str, amount: Decimal) -> Option<&'a str>`, returning the `rule_id` of the first match in slice order (the caller passes the active rules in `rule_id` order).
+@@ END
+# V-29-06-c | LOW | grep -c -F gave 1 | names used and where they exist: `ProhibitedRule` phase-29.md:823 (entity); `rule_id` TEXT phase-29.md:256 (1.2 DDL); `amount` as `Decimal` phase-29.md:956 (ParsedPayment); crate placement of `domain/assess` phase-29.md:821 (section 2) | NEW: none
+# The inputs are plain values, so the pure domain crate does not depend on akr-assess (ParsedPayment, section 3.2).
+
+@@ REP 29
+Phase 16 (scenario register `phase2_candidate`, read only as described in section 3.9)
+@@ WITH
+Phase 06 (scenario column `phase2_candidate`, read only as described in section 3.9)
+@@ END
+# V-29-06-d (part 1 of 2) | LOW | grep -c -F gave 1 | names used and where they exist: `phase2_candidate` column of `scn.scenarios` phase-06.md:88 (phase 06 section 1); the column is not in phase 16 (grep count 0) | NEW: none
+
+@@ REP 29
+(phase 06 line 84, phase 16 S-26)
+@@ WITH
+(the column of phase 06 section 1; the item S-26 of phase 16)
+@@ END
+# V-29-06-d (part 2 of 2) | LOW | grep -c -F gave 1 | names used and where they exist: `scn.scenarios.phase2_candidate` phase-06.md:88; S-26 at phase-16.md:2170 (a mapping of items to phases that names no owner of the column) | NEW: none
+# phase-16.md:2170 is not changed: it maps S-26 to phase 29 and claims no owner of the column. The lead may align it if wanted.
+
+@@ REP 29
+are stored in `inventory_items.tier_basis` for the two inventory items
+@@ WITH
+are stored in `inventory_items.tier_basis` for the two inventory items, and the create call of each item (phase 04, `tier_basis`) carries all seven answers
+@@ END
+# V-29-08-a | LOW | grep -c -F gave 1 | names used and where they exist: `inventory_items.tier_basis` phase-29.md:1301 (3.22 Tier 1 bullet); create field `tier_basis?` phase-04.md:1339 | NEW: none
+
+@@ REP 29
+the rule set is tested with the golden fixtures of section 6 before its activation.
+@@ WITH
+the rule set is tested with the phase 24 validation pack before its activation (Open doubts 27).
+@@ END
+# V-29-08-b | LOW | grep -c -F gave 1 | names used and where they exist: `validation_packs` phase-24.md:103 (admin.validation_packs); the phase 24 pack named in the same bullet phase-29.md:1304; Open doubts 27 phase-29.md:1563 (the production rule set is validated under phase 24) | NEW: none
+# Section 6 has no golden fixtures (the only "golden" in the file is this bullet), so this points at the pack that Open doubts 27 already names.
+
+# DECIDE V-29-09-a | option A: the 1 ms budget of step 3 (phase-29.md:917) is the call timeout; a Valkey call not back within it counts as "does not answer", and the fallback answers that request (phase-30.md:65 already uses "does not answer") | option B: a separate timeout, a new governed key in the section 1.4 settings INSERT with a value the lead sets, used by step 3 and as the fallback trigger of section 7.1 (phase-29.md:1472); phase 00 has no Valkey timeout, and phase-01.md:1085 uses "does not answer" for a different limiter
+
+# DECIDE V-29-09-b | option A: one bucket for the gateway in total, key `assess:rl:{gateway_id}` as phase-29.md:1076 says; the total is the setting, which is what the phase 30 division by replica count gives (phase-30.md:203); the words "enforced per node" and "twice the per-node figure" (phase-29.md:1076) then go | option B: one bucket per node, key `assess:rl:{gateway_id}:{node_id}`, as "per node" in phase-29.md:917 and phase-29.md:1076 and Open doubts 10 (phase-29.md:1546) say; then the division of phase-30.md:203 goes. Open doubts 10 asks the bank "whether the limit is per bank".
+
+@@ BLOCK 29
+### 7.N Source keys of the roll-up warnings (V-29-10-a, MEDIUM; DR-413)
+Section 3.12 step 3: each warning of the roll-up watch has the `source_key` `'assess:' || <name> || ':' || <subject> || ':' || day`, where `day` is the roll-up day (`YYYY-MM-DD`). `<name>` and `<subject>` are: `key_age` and the signing key version; `certificate_expiry` and the gateway id; `fallback_stale` and the extract version of section 3.13; `control_test_stale` and the rail; `repeat_attempts` and the payment key of section 3.10. One condition therefore raises at most one warning a day.
+The open-period warning keeps the key of section 3.13 step 1 (`'assess:blind:' || started_at`), so the roll-up and the outage watch raise one warning per period.
+@@ END
+# V-29-10-a | MEDIUM | names used and where they exist: `RegisterWriter::warn` phase-24.md:1296 (section 7.7, insert-or-nothing on `source_key`); key style `'review:' || kind || ':' || subject_id || ':' || due_on` phase-24.md:663; the seven titles phase-29.md:1479-1486 (section 7.3); `'assess:blind:' || started_at` phase-29.md:1117 (3.13 step 1); repeat counter phase-29.md:1077 (3.10) | NEW: none
+
+# SUMMARY: fixes written 20 (REP 15, BLOCK 5); DECIDE 6; DROP 0; claims covered: V-29-01-a, V-29-01-b, V-29-02-a, V-29-02-b, V-29-03-a, V-29-03-b, V-29-03-c, V-29-04-a, V-29-04-b, V-29-04-c, V-29-04-d, V-29-04-e, V-29-04-f, V-29-05-b, V-29-05-c, V-29-06-a, V-29-06-b, V-29-06-c, V-29-06-d, V-29-08-a, V-29-08-b, V-29-09-a, V-29-09-b, V-29-10-a

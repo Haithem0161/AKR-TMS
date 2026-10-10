@@ -1,0 +1,19 @@
+Replacements made in docs/plan/phase-22.md by the first re-check (DR-413). 3 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-22-1]
+WHY: R-22-1 | CONFIRMED LOW (raised MEDIUM) | 7.11 says an approver learns of an open deciding task through `task.waiting`; phase 04 sends that notice to the escalation target only | the sentence names the inbox and `task.overdue`
+OLD: An approver learns of an open deciding task through `task.waiting`.
+NEW: An approver learns of an open deciding task from the phase 04 inbox and, once the task is overdue, from `task.overdue`; `task.waiting` goes to the escalation target only (phase 04 section 7.8).
+
+=== F2 [R-22-2a]
+WHY: R-22-2 | CONFIRMED LOW (raised MEDIUM) | `by_internal_report` returns `Observation`, which has no notes | it returns `ObservationView`, selects `notes_enc` and decrypts it; phase 19 calls it for M only
+OLD: `by_internal_report(conn, internal_report_ids: &[Uuid]) -> Vec<Observation>`: one read
+NEW: `by_internal_report(conn, internal_report_ids: &[Uuid]) -> Vec<ObservationView>`: one read
+
+=== F3 [R-22-2b]
+WHY: R-22-2 | CONFIRMED LOW (raised MEDIUM) | `by_internal_report` returns `Observation`, which has no notes | it returns `ObservationView`, selects `notes_enc` and decrypts it; phase 19 calls it for M only
+OLD: (three fields: `indicator_groups`, `escalation_criteria`, `notes`). The key is set for M only.
+NEW: (three fields: `indicator_groups`, `escalation_criteria`, `notes`). The key is set for M only. The method selects `notes_enc` as well and decrypts it through the phase 02 personal seal (AAD = the observation id); the register list of phase 19 calls it only when the caller holds M.

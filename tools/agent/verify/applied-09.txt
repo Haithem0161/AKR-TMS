@@ -1,0 +1,61 @@
+Fixes applied to docs/plan/phase-09.md by the verification pass (DR-413). 13 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/06.txt)
+OLD: `principal.roles`, `principal.kind`, `principal.active`;
+NEW: `principal.roles`, `principal.kind`, `principal.status`;
+
+=== F2 REP (from fixes/09.txt)
+OLD: and stored with its variant name.
+NEW: and stored in `hijri_label` with its variant name inside the label text (no separate column).
+
+=== F3 BLOCK (from fixes/09.txt)
+### 7.N Codes for the document refusals the section 3.8 table does not name (V-09-01-b, V-09-04-b, V-09-05-a, V-09-09-a, MEDIUM; DR-413)
+A refusal of a calendar, authority matrix or policy pack document that the `E_VALIDATION` row of section 3.8 does not name takes a DSL code (DSL.md section 7) in `errors[]`, with the JSON pointer of the offending key or value:
+- `E_SCHEMA`: a weekend list that is not a subset of `1..=7` of size 1 to 3; a week with fewer than three working days; a repeated `(on_date, kind)`, template key or term id; `from` not before `to`; more than 400 rows in one request; a `max_priority` outside the four classes; a `second_review` that is not a boolean; an empty forbidden list; a `fixed` clock or switch that the document omits.
+- `E_DANGLING_REF`: an unknown currency; an inactive reason code; a matrix version that does not exist; a placeholder outside the allow-list.
+- `E_PARAM_OUT_OF_BOUNDS`: a clock outside its registry bounds (section 3.5 step 2); a `max_days` outside `1..=delegation.max_days` (section 3.6).
+
+=== F4 BLOCK (from fixes/09.txt)
+### 7.N The clock method name in phases 00 and 04 (V-09-01-d, LOW; DR-413)
+This phase renames the `BusinessClock` method to `add(from, n, unit) -> Result<ClockResult, ClockError>` (section 2). The phase 00 trait line (`add_working`) and the two phase 04 calls (the emergency review date of phase 04 section 3.2 and the task due date of phase 04 section 3.6) change to `add`, and each call handles the `Result`. Section 4's phase 00 and phase 04 bullets include this.
+
+=== F5 BLOCK (from fixes/09.txt)
+### 7.N CaptureRun fields (V-09-01-e, LOW; DR-413)
+`CaptureRun` (section 2, `CaptureRepository::latest_run`) is a read of the phase 05 `admin.discovery_runs` row with the fields `id`, `source_id`, `status` and `finished_at`.
+
+=== F6 BLOCK (from fixes/09.txt)
+### 7.N The pack names no queue (V-09-03-a, MEDIUM; DR-413)
+Section 3.5, "What a pack holds": the routing part of a pack is the switch `branch_first_routing` and nothing else. A pack names no queue and no pool. Queues are rows of `casework.queues`, created and changed only through phase 17's `queue_definition` change target, and phase 17 takes an alert's pool from them. So the queue and pool check of validation step 4 and the routing keys of step 9 apply to no key of `policy-pack.v1`, and the codes `unknown_queue` and `pool_archived` of section 3.8 are raised by the authority matrix only.
+
+=== F7 REP (from fixes/09.txt)
+OLD:     fn window_limit_days(&self, roles: &[RoleCode]) -> Result<u32, DelegationRefusal>;
+NEW:     fn window_limit_days(&self, roles: &[RoleCode]) -> Option<u32>;   // phase 03 section 7.6; None when no matrix is current (check then refuses)
+
+=== F8 REP (from fixes/09.txt)
+OLD: with the estimate in the body (phase 04 pattern).
+NEW: with the estimate in the body (API.md section 6).
+
+=== F9 BLOCK (from fixes/09.txt)
+### 7.N PolicyPackSummary, Validated and ValidationIssue (V-09-05-c, LOW; DR-413)
+`PolicyPackSummary` (the list rows of `PolicyPackRepository::list`) is the `PolicyPackView` of section 2 without `document`. `Validated`, the success result of `PolicyValidator::validate`, holds the canonical `document`, its `content_sha256` (validation step 8), the `changed_keys` (step 9) and the warnings of step 6. `ValidationIssue` is the phase 04 type that `Prepared.warnings` carries; the 422 maps each issue to a phase 00 `ValidationError`.
+
+=== F10 BLOCK (from fixes/09.txt)
+### 7.N The object ids of the four inventory items (V-09-06-a, MEDIUM; DR-413)
+The four inventory items of section 4 describe a whole register, not a row, so each has a fixed `object_id`: the UUIDv5 (URL namespace) of `urn:akr:inventory:countries`, `urn:akr:inventory:calendars`, `urn:akr:inventory:reason_codes` and `urn:akr:inventory:policy_pack`, held as constants of the `reference` module. A target's `prepare` returns its constant as `Prepared.object_id` (`country_override`: countries; `calendar` and `calendar_day`: calendars; `reason_code`: reason codes; `policy_pack`: its own), so the phase 04 gate finds the item by `(kind, object_id)`. The bank registers each item through `POST /inventory` with that `object_id`; `akr-ctl ref seed` prints the four ids.
+
+=== F11 REP (from fixes/09.txt)
+OLD: at save time (M-42, UX-68, IR-56); the HTTP API has no scan route.
+NEW: at save time (M-42, UX-68, IR-56), always against the active pack version, whatever version the case pinned, so a new term binds at once; the HTTP API has no scan route.
+
+=== F12 BLOCK (from fixes/09.txt)
+### 7.N The reference release: check, keys, later releases and owners (V-09-08-a, V-09-08-b, V-09-08-c, V-09-08-d, MEDIUM; DR-413)
+Owners: `ref seed` and `ref verify-data` are operations of `ReferenceService` (section 3.1), which also holds the reason-code seed (section 3.4); `policy-pack seed` is an operation of `PolicyPackService`. The `ctl` commands of section 4 call them with the release directory.
+Check: before any write the seed reads the release manifest (the phase 00 bundle manifest of SHA-256 digests), verifies its signature (phase 00 release signing) and compares the SHA-256 of each release file with its entry; a mismatch exits 1 and writes nothing, as the catalogue seed does (phase 06 section 3.1 step 1). `ref verify-data` makes the same two checks.
+Keys: each file of `backend/packs/reference/` carries its `release_id` (1 to 64 characters) and the rows of one table. A `countries` row carries `iso2`, `name`, `risk_level` and `basis`; a `governorates` row `code`, `name` and `region`; a `currencies` row `code`, `minor_unit`, `name` and `is_active`. `version` and `updated_at` are set by the seed. `reference-release.v1.json` is closed and validates exactly these keys.
+Later releases: a key the table does not hold is inserted. A row whose content differs is updated (`IS DISTINCT FROM`, the rule of `upsert_days`) with the new `release_id` and `updated_at`; a changed `countries` row also bumps `version`. An identical row is not written and keeps its `release_id`. A row the release no longer lists is left as it is and listed in the seed output: reference rows are never deleted (section 1).
+
+=== F13 REP (from fixes/09.txt)
+OLD: own unit test. A walk past the earliest day the calendar holds returns the same error as `add` past the horizon.
+NEW: own unit test. The backward load reads the closed days from `d - (3n + 14)` days to `d`. A walk past the earliest day the calendar holds (the earliest active row date of any kind) is decided by the weekend pattern alone for the remaining dates, as `add` is past `covered_until` (section 3.3 step 7), and returns the date. `ClockError`, for both methods, has the variants `CalendarMissing` (no calendar for the id, or no default calendar) and `OutOfRange` (`n` outside 1 to 3660).

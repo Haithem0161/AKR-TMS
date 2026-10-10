@@ -1,0 +1,122 @@
+Fixes for the claims of tools/agent/verify/refute-30.md (phase 30 draft; for lead review).
+@@ REP 30
+It holds one table `drill.seq (id bigint primary key, written_at timestamptz)`.
+@@ WITH
+It holds one sequence `drill.id_seq` (`CREATE SEQUENCE IF NOT EXISTS drill.id_seq;`, which the writer's `nextval` reads) and one table `drill.seq (id bigint primary key, written_at timestamptz)`.
+@@ END
+# V-30-02-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `drill.seq` phase-30.md:550 (same sentence); sequence style `<schema>.<name>_seq` as `casework.ops_ref_seq` phase-20.md:47 | NEW: `drill.id_seq` (a grep of docs/plan finds no sequence for the drill schema)
+
+@@ BLOCK 00
+### 7.N pgBackRest stanza (V-30-02-b, LOW; DR-413)
+The stanza of the `pgbackrest` service in section 4 is `akr`. Its backups, the WAL archive of the `postgres` service (its `archive_command`) and every `pgbackrest` command of the bundle use this stanza.
+@@ END
+# V-30-02-b | LOW | names used and where they exist: `pgbackrest` row phase-00.md:694 (section 4); `archive_command` in the `postgres` row phase-00.md:692; "the phase 00 stanza" phase-30.md:153 | NEW: `akr` as the stanza name (no stanza name exists in docs/plan)
+
+@@ REP 30
+Pool settings for every role (SQLx pool options of phase 00):
+@@ WITH
+Pool settings for every role (SQLx pool options, set by this phase):
+@@ END
+# V-30-02-c | LOW | grep -c -F gave 1 | names used and where they exist: none new; the values are stated in the same paragraph, phase-30.md:146 | NEW: none
+
+@@ BLOCK 30
+### 7.N One winning rule for the PostgreSQL proof of concept (V-30-02-d, HIGH; DR-413)
+This block states the one rule. It replaces the decision rule of section 3.4, the requirement that every candidate meets every criterion, and DR-320 of the Decisions list, where they differ. It follows research DR-320: the 10-criteria proof of concept and the bank accepting another backup tool.
+1. Each candidate, Patroni and CloudNativePG, runs the ten criteria of section 3.4 and must meet all of them.
+2. Criterion 5 is applied to each candidate. Patroni meets it with the phase 00 stanza unchanged. CloudNativePG meets it only when the bank accepts a backup tool other than pgBackRest. That acceptance replaces the pgBackRest check, and the work listed in section 3.4 then applies.
+3. Patroni is the default when it meets all ten criteria and the bank's operators accept the footprint of criterion 6. CloudNativePG becomes the default only when it meets all ten criteria under item 2, the bank's operators accept its footprint, and the bank accepts a backup tool other than pgBackRest.
+@@ END
+# V-30-02-d | HIGH | names used and where they exist: research DR-320 docs/plan/research.md:331 ("CloudNativePG wins only by the 10-criteria proof of concept and the bank accepting another backup tool"); decision rule phase-30.md:160; "every pass criterion" phase-30.md:148; DR-320 phase-30.md:590; Open doubts 1 phase-30.md:615 | NEW: none. Two points go beyond the wording of phase-30.md:160 and the lead should confirm them: criterion 5 is applied per candidate, and criterion 6 applies to CloudNativePG too (the "10-criteria" reading of the research DR).
+
+@@ REP 30
+**Bundle (phase 00 section 3, step 7, extended):**
+@@ WITH
+**Bundle (phase 00 section 4, step 7, extended):**
+@@ END
+# V-30-03-a | LOW | grep -c -F gave 1 | names used and where they exist: bundle step 7 phase-00.md:747 under section 4 (phase-00.md:678); "step 7 of section 4" phase-00.md:986 | NEW: none
+
+@@ REP 30
+phase 25 section 3.6, step 1 (c)
+@@ WITH
+phase 25 section 7.7, check (g)
+@@ END
+# V-30-03-b | LOW | grep -c -F gave 1 | names used and where they exist: check (g), the Helm chart check, phase-25.md:1395 (section 7.7 at phase-25.md:1393); check (c) is the image signature check, phase-25.md:893 | NEW: none
+
+@@ REP 30
+labelled with that membership only, and tries every port that the matrix names for every destination, including the ports that must stay closed.
+@@ WITH
+labelled with that membership only, running the image `zone-probe` (a catalogue entry, pinned by digest under section 3.1 step 1), and tries every port that the matrix names for every destination, including the ports that must stay closed. Each connect has a timeout of 3 seconds (the connection timeout of section 3.4), and a connect that does not complete in time is observed as closed.
+@@ END
+# V-30-05-b | LOW | grep -c -F gave 1 | names used and where they exist: "open" and "closed" observed values phase-00.md:718-720 (`make zone-check`); digest rule for catalogue images phase-30.md:81; connection timeout 3 seconds phase-30.md:146 | NEW: `zone-probe` (the probe image name; phase 00 does not name its probe image either)
+
+@@ BLOCK 30
+### 7.N The restore namespace takes the cluster rules (V-30-05-a, HIGH; DR-413)
+When the monthly rehearsal of section 3.9 runs on this cluster, it runs in the namespace `akr-restore`. Section 3.3 applies to `akr-restore` as it applies to `akr`: the renderer writes the same default deny, DNS egress and edges for it, each pod carries the zone labels of the workload it runs, and the cluster zone check probes its memberships. Section 3.12 puts `akr-restore` under the Kyverno `verifyImages` policy in `Enforce` mode, with `akr` and `akr-mgmt`.
+@@ END
+# V-30-05-a | HIGH | names used and where they exist: `akr-restore` phase-30.md:293 (section 3.9); `akr` and `akr-mgmt` phase-30.md:126; render phase-30.md:128; cluster probe phase-30.md:134; `verifyImages` and the namespaces phase-30.md:326 | NEW: none. The DR-server alternative in phase-30.md:293 ("or the DR server") stays open; the lead may drop it in a REP.
+
+@@ BLOCK 30
+### 7.N A passed drill below six cases is refused (V-30-06-c, MEDIUM; DR-413)
+Section 3.9, "Recording a drill": `akr-ctl ops record-failover-drill --result passed` with `--cases-passed` below 6 is refused before step 1. The refusal exits with 2, a failed check (section 3.16), and writes nothing: no setting, no evidence object and no audit event. Steps 1 to 3 run only for an input that the command accepts. A `--result failed` drill runs steps 2 and 3 and writes no date, as step 1 says.
+@@ END
+# V-30-06-c | MEDIUM | names used and where they exist: `ops record-failover-drill` phase-30.md:277; steps 1 to 3 phase-30.md:278-280; exit 2 "on a failed check" phase-30.md:399 (section 3.16) | NEW: none
+
+@@ BLOCK 00
+### 7.N CLI-only exemption for the failover drill key (V-30-06-a, HIGH; DR-413)
+From phase 30 on, the CLI-only exemption of section 3 covers two governed keys: `ops.last_restore_drill_at`, written by `akr-ctl ops record-restore-drill`, and `ops.last_failover_drill_at`, written by `akr-ctl ops record-failover-drill` (phase 30, section 3.9). Both writes go through `SettingsService::apply` with `ChangeSource::Direct`, as research DR-328 decides. No other governed key is covered.
+@@ END
+# V-30-06-a | HIGH | names used and where they exist: `SettingsService::apply` and `ChangeSource::Direct` phase-00.md:574-576; exemption "for this one governed key" phase-00.md:631; `ops record-failover-drill` phase-30.md:277; research DR-328 docs/plan/research.md:339 | NEW: none. Research DR-328 settles the exemption for the second key, so no DECIDE is written.
+
+@@ BLOCK 00
+### 7.N Nullable failover drill key (V-30-06-b, MEDIUM; DR-413)
+From phase 30 on, the settings registry marks `ops.last_failover_drill_at` nullable, as it marks `ops.last_restore_drill_at` until the first drill. Migration `0095` (phase 30, section 1) seeds it null, which the null rule of the auth slot paragraph of section 3 allows for nullable keys.
+@@ END
+# V-30-06-b | MEDIUM | names used and where they exist: `settings_registry` phase-00.md:572 (SettingsService item 1); null rule phase-00.md:664-665 (auth slot paragraph); seed phase-30.md:41 | NEW: none
+
+@@ BLOCK 11
+### 7.N System-scope automatic open (V-30-07-a, HIGH; DR-413)
+From phase 30 on, `BlindPeriodService` has a second open method for scope `system`: `open_system(tx, cause, started_at, ended_at, statement)`. It accepts only cause `akr_outage`. The probe of phase 03 (`ops_probe`) calls it in the transaction of the job that detects the outage (section 3.8 item 1 of phase 30), with `declared_by` = the system principal. It has no Cedar action: a job handler has no session (section 3 of phase 00), and the automatic source opens of section 3.6 name no Cedar action either. It applies the start rule of section 3.6 (not earlier than the newest `audit_anchors.anchored_at`) and audits `blind_period.opened`.
+@@ END
+# V-30-07-a | HIGH | names used and where they exist: `BlindPeriodService` phase-11.md:968 (section 3.6); automatic opens in the transaction of the event phase-11.md:974; `declared_by` and the system principal phase-11.md:88 and phase-01.md:97-100; "handlers have no session" phase-00.md:542; `ops_probe` phase-03.md:982; start rule phase-11.md:991-992 (declarations) | NEW: `open_system` (the service has steward declarations only, phase-11.md:702 and phase-11.md:1215)
+
+# DECIDE V-30-07-d | option A: refuse an overlap. Both writers take `pg_advisory_xact_lock(hashtext('blind_period:system'))` in their transaction, as the job harness takes its lock for job kinds (phase-00.md:851, section 7.2), and refuse a system row whose span overlaps an existing system row of the same cause. The probe logs and skips; the command exits 2 and prints the row id (exit codes phase-30.md:399) | option B: extend the earlier row's `statement`, as phase 11 does for an open source period (phase-11.md:97). This needs `UPDATE (statement)` for `akr_app`, while phase-11.md:313-314 grant UPDATE to `akr_ingest` only. Note: the rows of section 3.8 are created closed (`ended_at` is set at creation, phase-30.md:230), so option B extends a closed row.
+
+@@ BLOCK 30
+### 7.N Operator path: declared_by, comment, database role and audit kind (V-30-07-b, V-30-07-c, V-30-07-e; DR-413)
+These rules complete section 3.8 item 2, the command `akr-ctl ha outage record`.
+1. `declared_by` is the system principal (phase 01), not a named user. The command runs in zone Z5 with no AKR session. Phase 05 section 3.10 gives the same actor to the `akr-ctl` events of its table, with the operator's OS user and host in the details. The phase 00 rule for commands that change an installation also logs the OS user and the PAM session id.
+2. The command requires `--comment` of 10 to 2,000 characters and writes it to `comment`, as section 3.6 of phase 11 requires for a declaration. The command does not use the steward route `POST /coverage/blind-periods` (phase 11), which needs an AKR session.
+3. The command connects as `akr_app`, the role that phase 03 section 1 gives `akr-ctl`. That role holds `SELECT, INSERT` on `admin.blind_periods` (phase 11 section 1), so no grant is added.
+4. The row is audited as `blind_period.declared`, the phase 11 kind for a declaration. `blind_period.opened` stays the kind of the probe's automatic open. Section 3.17 then reuses two phase 11 kinds, and the `ha.outage_recorded` row names `blind_period.declared` in place of `blind_period.opened`.
+@@ END
+# V-30-07-b | HIGH; V-30-07-c | MEDIUM; V-30-07-e | MEDIUM | names used and where they exist: `ha outage record` phase-30.md:231; system principal phase-01.md:97-100; zone Z5 in the `akr-ctl` list phase-00.md (section 3); no AKR session and the `akr-ctl` actor phase-05.md section 3.10 (line 1257); `comment` of 10 to 2,000 characters phase-11.md:994; `akr_app` phase-03.md:153 (section 1); grant phase-11.md:314; `blind_period.declared` phase-11.md:1199; 3.17 row phase-30.md:410; reused-kind sentence phase-30.md:403 | NEW: none. The header count "1 reused phase 11 kind" (phase-30.md:8) would read 2; the lead may change it. The lead should also decide whether a CLI declaration without a steward is accepted; this block accepts it, as the phase 05 CLI precedent does.
+
+@@ BLOCK 30
+### 7.N Start time of the automatic system period (V-30-07-f, LOW; DR-413)
+The automatic open of section 3.8 item 1 departs from phase 11 section 3.6 on the start time. Phase 11 records the true start of a declaration. The probe learns of the outage only after recovery, so it records `started_at` as the estimate that `statement` names, bounded below by the previous snapshot and by the newest audit anchor, as item 1 says. The rule that a period never reaches back past sealed evidence still holds.
+@@ END
+# V-30-07-f | LOW | names used and where they exist: "records the true start" phase-11.md:994 (section 3.6); estimate phase-30.md:230; DR-331 "estimated start" phase-30.md:601 | NEW: none
+
+# DECIDE V-30-08-a | option A: the immutable copy is a pgBackRest repository in the object store under COMPLIANCE object lock, in a new bucket beside the list of phase 00 (phase-00.md:616-618). Open doubts 22 asks whether the DR repository uses object lock (phase-30.md:636). The clean environment is the DR server, not the production cluster | option B: an offline copy on offline media kept by the bank's operators (the monthly full backup of section 3.9, with its retention set by the bank; Open doubts 22 asks "whether the offline monthly copy is its own", phase-30.md:636), restored on a host with no route to the production zones. SP-88 asks for "an immutable or offline copy" (research/30-security-privacy.md:1461); phase-30.md:259 and phase-30.md:254 name the offline copy, and no line defines it. Note: after a ransomware event the same cluster is not clean, so the monthly rehearsal in `akr-restore` (phase-30.md:293) cannot be the clean environment under either option.
+
+@@ BLOCK 30
+### 7.N Audit event for the credential rotation (V-30-08-c, MEDIUM; DR-413)
+Section 3.9, ransomware paragraph: each rotation of a credential or key writes one audit event `credential.rotated {credential_kind, count}`, with SIEM yes. Section 3.17 gains the kind as a sixth new kind. Where the rotation runs as an `akr-ctl` command, the phase 00 rule for commands that change an installation also logs the operator's OS user and PAM session id.
+@@ END
+# V-30-08-c | MEDIUM | names used and where they exist: `service_client.rotated` phase-01.md:852 (the pattern); rotation sentence phase-30.md:291; 3.17 list phase-30.md:403-414 (the "5 new" count at phase-30.md:414 and the header at phase-30.md:8 would change) | NEW: `credential.rotated` with `credential_kind`, `count` (no audit kind for the rotation of AppRole secret ids or database passwords exists)
+
+# DECIDE V-30-08-b | option A: the rotation covers only the credentials the plan already rotates or issues per ceremony, in a named order: the Hydra client secrets (`akr-ctl identity client rotate`, phase-01.md:795), the key encryption key and the deletion key (the key rotation rule at phase-00.md:596, SP-11, and the deletion key rule at phase-00.md:919), and the AppRole secret ids and database passwords that the operator issues per ceremony (phase-00.md:600-601, "policies issued per ceremony, never stored") | option B: a new `akr-ctl` command for the AppRole secret ids and the database passwords, with ordered steps that the plan does not yet have (NEW command; the steps must be written by the lead). Evidence: phase-30.md:291 names the rotation with no steps; phase-30.md:329 says the secret ids are Kubernetes Secrets created from files; research/30-security-privacy.md:1461 (SP-88, "rotate every credential and key before service resumes") is wider than section 3.12. Note: the audit event for the rotation is the separate BLOCK V-30-08-c above and holds under either option.
+
+@@ BLOCK 30
+### 7.N Requester of the restore reconciliation runs (V-30-11-a, MEDIUM; DR-413)
+Section 3.9, restore check, step 5: each `recon_run` is requested the way `POST /recon/runs` requests one. Phase 12 section 3.1 step 2 inserts the `recon_runs` row with status `queued`, and step 3 enqueues the job. The insert sets `requested_by` to the system principal (phase 01), the same actor that phase 12 gives its sweeps.
+@@ END
+# V-30-11-a | MEDIUM | names used and where they exist: `POST /recon/runs` phase-12.md:635 (section 3.1), steps 2 and 3 phase-12.md:640-641; `requested_by` NOT NULL with "the system principal for sweeps" phase-12.md:79; system principal phase-01.md:97-100; actor of the `akr-ctl` events phase-05.md:1257 (section 3.10) | NEW: none
+
+# DECIDE V-30-11-b | option A: the check waits for the active run named in `errors[]` and uses its result; no second run is queued for that date (the wait that phase-30.md:288 already names) | option B: the check stops at step 5 with exit 2, prints the active run id, and the operator reruns the check after that run ends (exit codes phase-30.md:399). Evidence: 409 `run_active` phase-12.md:641; "No claim condition or ordering rule is added here" phase-12.md:1313 (phase 12 section 7.2, which names phase 30 step 5); step 5 phase-30.md:288. Note: a run that was active when the backup was taken is in the restored database. Whether workers run during the check is not stated, so option A can wait on a run that cannot end.
+
+# DECIDE V-30-12-a | option A: add one owner-scoped route for the content of the ops drill report, read by evidence id, with scope `admin.system` and a Cedar action named in section 3.9. The header count "0 routes" (phase-30.md:8) and the "No route" line (phase-30.md:650) change with it. Owner routes are the pattern for evidence (phase-18.md:596; docs/API.md:236, "there is no generic evidence route (DR-380)") | option B: no route. The report is read on the management host (zone Z5) by an `akr-ctl` command (NEW name), and the words "viewable by `admin.system`" in section 3.18 (phase-30.md:418) and in section 7.4 (phase-30.md:582) are replaced by that. Evidence for option B: phase-30.md:8 and phase-30.md:650 (no route in this phase).
+
+# V-30-01-a | REFUTED by the refuter (no fix). Agreed: the chart pins are named in Chart.yaml (phase-30.md:83), and the plan uses the same pin convention for images (phase-30.md:78).
+
+# SUMMARY: fixes written 16 (REP 5, BLOCK 11); DECIDE 5; DROP 0; claims covered: V-30-02-a, V-30-02-b, V-30-02-c, V-30-02-d, V-30-03-a, V-30-03-b, V-30-05-a, V-30-05-b, V-30-06-a, V-30-06-b, V-30-06-c, V-30-07-a, V-30-07-b, V-30-07-c, V-30-07-d, V-30-07-e, V-30-07-f, V-30-08-a, V-30-08-b, V-30-08-c, V-30-11-a, V-30-11-b, V-30-12-a

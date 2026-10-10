@@ -1,0 +1,29 @@
+Replacements made in docs/plan/phase-29.md by the first re-check (DR-413). 5 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-29-1]
+WHY: R-29-1 | CONFIRMED LOW (raised LOW) | "every later change of a hold has its kind below" is not true of the alert link | the sentence names the state changes and the phase 14 kind that covers the link
+OLD: every later change of a hold has its kind below.
+NEW: every later change of a hold's state has its kind below, and the alert link of section 3.5 step 2 is covered by phase 14's `screening.alert_created`.
+
+=== F2 [R-29-2]
+WHY: R-29-2 | CONFIRMED MEDIUM (raised MEDIUM) | a rail can get its first mode with no fail-policy row, and step 7 then finds no row | the first mode proposal needs the rail's wildcard row in the current matrix (422 `wildcard_row_missing`)
+OLD: `prepare` sets `volume_effect` to `neutral`, and no entry criterion applies.
+NEW: `prepare` sets `volume_effect` to `neutral`, and no entry criterion applies. `prepare` also requires the rail's `*`, `*`, `*` row in the current matrix (422 `E_VALIDATION`, `errors[].code = wildcard_row_missing`), so step 7 of section 3.1 always finds a fail policy for an assessed rail; a policy set that names the new rail is activated first.
+
+=== F3 [R-29-3]
+WHY: R-29-3 | CONFIRMED LOW (raised LOW) | section 4.5 item 2 says 17 event kinds; there are 19 | "19"
+OLD: 2. **Phase 02**: 17 event kinds of section 3.17 added to the catalogue
+NEW: 2. **Phase 02**: 19 event kinds (the 18 rows of section 3.17 and `assess.rail_added` of section 7+) added to the catalogue
+
+=== F4 [R-29-4]
+WHY: R-29-4 | CONFIRMED LOW (raised LOW) | "as API section 5 says" points at the codegen section | "as the API.md row of this route says"
+OLD: so the PUT is refused as API section 5 says;
+NEW: so the PUT is refused as the API.md row of this route says;
+
+=== F5 [R-29-5]
+WHY: R-29-5 | CONFIRMED LOW (raised HIGH) | section 3.6 says `set_version = previous + 1`, which reads as a counter of its own; `activate` uses the global counter, so the reconstruction rule of 7.x holds | section 3.6 names the global counter and says numbers may be skipped
+OLD: inserts the new rows with `set_version = previous + 1` and supersedes every current row in the same transaction.
+NEW: inserts the new rows with `set_version` = `assess.policy_state.set_version` + 1, the global counter after this activation's increment (section 3.11), and supersedes every current row in the same transaction. The set versions of the matrix and of the bands may therefore skip the numbers that a mode or rule activation took.

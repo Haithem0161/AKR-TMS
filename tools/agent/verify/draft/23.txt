@@ -1,0 +1,266 @@
+Fixes for the claims of tools/agent/verify/phase-23.md (drafted from tools/agent/verify/refute-23.md; for lead review).
+@@ REP 23
+| GET | `/api/v1/retention/report` | `audit.read` |
+@@ WITH
+| GET | `/api/v1/retention/report` | `audit.read`, `admin.system` |
+@@ END
+# V-23-01-a (1 of 8; also covers V-23-07-a, MEDIUM, same rule) | HIGH | grep -c -F gave 1 | names used and where they exist: `admin.system` (docs/API.md section 2, role ADM); `audit.read` phase-23.md:529; ADM permits phase-23.md:867-870 already hold `retention.run.read` and `retention.report.read` | NEW: none
+
+@@ REP 23
+| GET | `/api/v1/retention/runs` | `audit.read` |
+@@ WITH
+| GET | `/api/v1/retention/runs` | `audit.read`, `admin.system` |
+@@ END
+# V-23-01-a (2 of 8) | HIGH | grep -c -F gave 1 | names used and where they exist: `admin.system` (docs/API.md section 2); row phase-23.md:531 | NEW: none
+
+@@ REP 23
+| GET | `/api/v1/retention/runs/{id}` | `audit.read` |
+@@ WITH
+| GET | `/api/v1/retention/runs/{id}` | `audit.read`, `admin.system` |
+@@ END
+# V-23-01-a (3 of 8) | HIGH | grep -c -F gave 1 | names used and where they exist: `admin.system` (docs/API.md section 2); row phase-23.md:532; check 5a (phase-23.md:974) passes its scope gate as adm@ | NEW: none
+
+@@ REP 23
+(section 3.10); `held` is `null` for IA and SEC
+@@ WITH
+(section 3.10); `held` is `null` for IA, SEC and ADM
+@@ END
+# V-23-01-a (4 of 8) | HIGH | grep -c -F gave 1 | names used and where they exist: `held` null rule of section 3.13 phase-23.md:826 | NEW: none. Once ADM can read the report, the null rule must cover ADM too; section 3.13 says a person outside the case access list learns nothing about a case hold.
+
+@@ REP 23
+One run with its items; `held` is `null` for IA and SEC
+@@ WITH
+One run with its items; `held` is `null` for IA, SEC and ADM
+@@ END
+# V-23-01-a (5 of 8) | HIGH | grep -c -F gave 1 | same rule as the report row, section 3.13 (phase-23.md:826) | NEW: none
+
+@@ REP 23
+(`GET /retention/report`, scope `audit.read`)
+@@ WITH
+(`GET /retention/report`, scope `audit.read` or `admin.system`)
+@@ END
+# V-23-01-a (6 of 8) | HIGH | grep -c -F gave 1 | names used and where they exist: `admin.system` (docs/API.md section 2) | NEW: none
+
+@@ REP 23
+are `null` for IA and SEC (section 3.13)
+@@ WITH
+are `null` for IA, SEC and ADM (section 3.13)
+@@ END
+# V-23-01-a (7 of 8) | HIGH | grep -c -F gave 1 | names used and where they exist: section 3.13 run items rule phase-23.md:826 | NEW: none
+
+@@ REP 23
+the reason code `legal_hold` are `null` for IA and SEC.
+@@ WITH
+the reason code `legal_hold` are `null` for IA, SEC and ADM.
+@@ END
+# V-23-01-a (8 of 8) | HIGH | grep -c -F gave 1 | names used and where they exist: section 3.13 (phase-23.md:826) | NEW: none. The ADM permit of section 3.14 (phase-23.md:867-870) needs no change: it already grants the three ADM reads, and check 5a passes once the route admits ADM.
+
+@@ REP 23
+`execute(run_id) -> RunSummary`
+@@ WITH
+`execute(run_id) -> RunSummary` (the value stored in the `summary` column of section 1.1: the class totals, `truncated`, and the later-of count and earliest due date of section 3.10)
+@@ END
+# V-23-01-c | LOW | grep -c -F gave 1 | names used and where they exist: `summary` column of `admin.retention_runs` phase-23.md:83; `truncated` phase-23.md:553 (step 6); later-of count and earliest due date phase-23.md:771 | NEW: none
+@@ BLOCK 23
+### 7.N Audit event for a failed run item (V-23-01-d, MEDIUM; DR-413)
+Section 3.1 step 8: a failed item writes the audit event `retention.item_failed {run_id, retention_class, table, reason_code}`, on resource `table` (a partition item adds `partition`). Section 3.12 gains the same row after `evidence.orphan_deleted`. The payload holds no party id and no case id.
+@@ END
+# V-23-01-d | MEDIUM | names used and where they exist: `retention.partition_blocked` phase-23.md:807 (model row: resource and payload keys); `retention.purge_deferred` phase-23.md:809 (`table` resource, `reason_code`); `evidence.orphan_deleted` phase-23.md:817 (last row of the table) | NEW: `retention.item_failed` (the event table has no kind for a failed item; the name follows the `<domain>.<verb>` style of its neighbours)
+
+@@ BLOCK 23
+### 7.N Audit event for a dry-run request (V-23-01-e, MEDIUM; DR-413)
+`POST /retention/dry-runs` (section 3.1) writes the audit event `retention.dry_run_requested {run_id, requested_by, as_of}` on resource `retention_run`. Section 3.12 gains this row before `retention.run_started`.
+@@ END
+# V-23-01-e | MEDIUM | names used and where they exist: `requested_by`, `as_of`, `run_id` phase-23.md:545 (the run row that the request inserts); `retention_run` resource and `retention.run_started` phase-23.md:804 (the only run event, written at start) | NEW: `retention.dry_run_requested` (no event exists at the request; `requested_by` is a user id, not a personal value)
+
+@@ REP 23
+`list(ctx, HoldFilter) -> Page<HoldView>`, `get(ctx, id) -> HoldView`. `HoldView` is the view of section 3.8
+@@ WITH
+`list(ctx, HoldFilter) -> Page<LegalHoldView>`, `get(ctx, id) -> LegalHoldView`. `LegalHoldView` is the view of section 3.8
+@@ END
+# V-23-02-a (1 of 2) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `HoldView` phase-29.md:867 (a utoipa schema of phase 29, which akr-api serves, phase-29.md:9); `LegalHoldService` phase-23.md:508 | NEW: `LegalHoldView` (the entity is `LegalHold`; the name follows `LegalHoldService` and `LegalHoldRepository`)
+
+@@ REP 23
+`ProposeHoldRelease`, `HoldView`, `HoldPage`
+@@ WITH
+`ProposeHoldRelease`, `LegalHoldView`, `HoldPage`
+@@ END
+# V-23-02-a (2 of 2) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `HoldPage` is named only here (phase-23.md:519), so it does not clash and keeps its name; the place response (phase-23.md:726) says "hold view" in lower case and needs no change | NEW: none (uses the name of part 1)
+
+@@ REP 23
+2. Validate the body: the field combination must match `kind` (`E_VALIDATION`);
+@@ WITH
+2. Validate the body: the field combination must match `kind` (`E_VALIDATION`), and `reason_text`, when given, is at most 500 characters (`E_VALIDATION`);
+@@ END
+# V-23-02-c | LOW | grep -c -F gave 1 | names used and where they exist: `E_VALIDATION` (422) phase-23.md:784 (section 3.11); the 500-character limit on the DTO phase-23.md:484 | NEW: none
+
+@@ REP 23
+scanned, section 3.2)
+@@ WITH
+scanned, section 3.8)
+@@ END
+# V-23-02-d | LOW | grep -c -F gave 1 | names used and where they exist: the reason scan is step 3 of section 3.8 (phase-23.md:721, `PolicyPackService::scan`); section 3.2 is classes, floors, clocks (phase-23.md:564) | NEW: none
+# DECIDE V-23-03-a | (A) A repeat call is a no-op. `ShredOutcome` has two values, `Shredded` and `AlreadyShredded`; a repeat returns `AlreadyShredded`, keeps the first `shredded_at` and writes no second event (the idempotent style of phase-23.md:676, step 4 of section 3.6) (evidence: phase-23.md:666 and phase-23.md:500; phase-02.md:385 CHECK `shredded_at IS NULL OR wrapped_dek IS NULL`) | (B) Every call sets `shredded_at = now()` and audits `retention.evidence_shredded` again, as phase-23.md:666 says now; `ShredOutcome` then needs one value, `Shredded` (evidence: phase-23.md:666; phase-02.md:406 guard protects `wrapped_dek` only, not `shredded_at`; phase-02.md:1202 names the type with no values)
+
+@@ REP 02
+the one phase 23 section 1.1 defines
+@@ WITH
+the one phase 23 section 1.2 defines
+@@ END
+# V-23-03-b | LOW | grep -c -F gave 1 | names used and where they exist: `evidence_objects` classification row phase-23.md:449 (section 1.2, migration 0072; section 1.1 is migration 0071 and has no such row) | NEW: none
+
+@@ REP 23
+`facility`, `trade_instrument` (through `account_id`)
+@@ WITH
+`facility`, `trade_instrument` (through `customer_id` and `canon.customer.party_id`)
+@@ END
+# V-23-04-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `customer_id` on canon.facility phase-10.md:1312 and on canon.trade_instrument phase-10.md:1337 (no `account_id` in phase-10.md lines 1310 to 1360); `party_id` on canon.customer phase-10.md:601 | NEW: none
+
+@@ BLOCK 23
+### 7.N RelationshipEndResolver in section 2 (V-23-04-c, LOW; DR-413)
+`RelationshipEndResolver` (`akr-worker`, section 3.5): `end_date(party_id) -> Option<NaiveDate>`. It gives the party end date of section 3.5 (`greatest(max(canon.customer.valid_to), max(canon.account.closed_on))` over the party's rows). It gives `None` while the party is not due: the relationship is open, or the party has no customer and no account role.
+@@ END
+# V-23-04-c | LOW | names used and where they exist: `RelationshipEndResolver` phase-23.md:643 (section 3.5 heading); `canon.customer.valid_to` and `canon.account.closed_on` phase-23.md:645; the not-due rule phase-23.md:645 and Open doubts 4 | NEW: `end_date` (a method name only, on the resolver the plan already names)
+
+@@ REP 23
+`canon.txn` has no index on `account_id` in phase 10 as far as this draft reads, and the account purge needs one.
+@@ WITH
+`canon.txn` has the index `idx_txn_account` on `account_id` in phase 10, which the account purge uses.
+@@ END
+# V-23-04-d | LOW | grep -c -F gave 1 | names used and where they exist: `idx_txn_account` phase-10.md:1120 (`canon.txn (account_id, booking_date DESC)`) | NEW: none
+@@ REP 23
+`rpt.reports` (`subject_party_id`). The list is closed in this phase: a case, an alert or a report is R5 or R6 and is not deleted here,
+@@ WITH
+`rpt.reports` (`subject_party_id`), `alert.screening_alerts` (`subject_id`, where `subject_kind` is `party`). The list is closed in this phase: a case, an alert, a report or a screening alert is R5, R6 or R7 and is not deleted here,
+@@ END
+# V-23-05-a (1 of 2) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `alert.screening_alerts` phase-14.md:251-255 (`subject_kind` CHECK party, counterparty, payment_party; `subject_id` with no foreign key); DR-190 names "an alert" as a reason to defer a party, phase-23.md:1052; screening alerts are R7 `report_only`, phase-23.md:597 | NEW: none. Choice: the safe default of the DR-190 rule (defer), not a purge that leaves a kept R7 row pointing at nothing.
+
+@@ REP 23
+The party columns of the screening tables (phase 14) and of `ref.list_*` are not checked, so the blocking list of section 3.5 is closed on the four tables named.
+@@ WITH
+The party columns of `ref.list_*` are not checked. The blocking list of section 3.5 names five tables; the party subject of `alert.screening_alerts` is in the phase 14 DDL (`subject_kind`, `subject_id`).
+@@ END
+# V-23-05-a (2 of 2) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `subject_kind`, `subject_id` phase-14.md:254-255 | NEW: none. Closes the screening part of Open doubts 22 (phase-23.md:1099); `ref.list_*` stays open.
+
+# DECIDE V-23-06-a | (A) Row-level purge of `feat.feature_runs` by `as_of`: the R4 row (phase-23.md:592) gives it `record_purge` on clock `age`; the table leaves the drop allow-list (phase-23.md:282) and `akr_retention` gains DELETE under the rule of section 7.3 (phase-23.md:1021). Evidence: phase-13.md:158-167 (no PARTITION BY; PRIMARY KEY (as_of, feature_id)) | (B) Phase 13 partitions `feat.feature_runs` by RANGE (as_of): one PARTITION BY clause and partition creation as for its sister tables, so section 3.2 stays as written. Evidence: phase-13.md:184, 203, 219 (the PARTITION BY lines of feat.feature_values, feat.segment_stats and feat.profiles); phase-13.md:370 already gives feature_runs a partition clock on `as_of`; phase-13.md:167 (the key starts with `as_of`)
+
+# DECIDE V-23-06-b | (A) `akr-anchors`: the COMPLIANCE bucket with a 3,650-day default (phase-02.md:1033), the same length as the R10 lock of section 3.7; the anchors already live there (phase-02.md:6 and phase-02.md:766); the S3 grant of section 4.4 would name `akr-anchors` under `certificates/` (phase-23.md:923) | (B) `akr-evidence`: the bucket that section 4.4 names in the same S3 bullet (phase-23.md:923), and section 3.9 keeps certificates outside its `ev/` listing (phase-23.md:759); its default is 2,555 days, and every PUT sets its own lock (phase-02.md:1032-1033)
+@@ REP 23
+`RetentionReportService` applies this rule (section 3.10).
+@@ WITH
+The engine computes the number of reports due under this rule into the run summary (section 3.10), and `RetentionReportService` reads it from there.
+@@ END
+# V-23-07-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: run summary and the due-report count phase-23.md:771; `RetentionReportService { runs, items, clock }` phase-23.md:511 (no port to the report tables, so it must read the summary) | NEW: none
+
+@@ REP 23
+('retention.period_days.R1'
+@@ WITH
+('retention.period_days.r1'
+@@ END
+# V-23-08-a (1 of 12) | HIGH | grep -c -F gave 1 | names used and where they exist: `admin.settings.key` CHECK `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$` phase-00.md:204 (refuses upper case; ON CONFLICT does not catch a CHECK violation, so the migration aborts at this row) | NEW: none. Label text such as "(R1)" stays as it is.
+
+@@ REP 23
+('retention.period_years.R2'
+@@ WITH
+('retention.period_years.r2'
+@@ END
+# V-23-08-a (2 of 12) | HIGH | grep -c -F gave 1 | same key rule, phase-00.md:204 | NEW: none
+
+@@ REP 23
+('retention.period_years.R3'
+@@ WITH
+('retention.period_years.r3'
+@@ END
+# V-23-08-a (3 of 12) | HIGH | grep -c -F gave 1 | same key rule, phase-00.md:204 | NEW: none
+
+@@ REP 23
+('retention.period_years.R4'
+@@ WITH
+('retention.period_years.r4'
+@@ END
+# V-23-08-a (4 of 12) | HIGH | grep -c -F gave 1 | same key rule, phase-00.md:204 | NEW: none
+
+@@ REP 23
+('retention.period_years.R5'
+@@ WITH
+('retention.period_years.r5'
+@@ END
+# V-23-08-a (5 of 12) | HIGH | grep -c -F gave 1 | same key rule, phase-00.md:204 | NEW: none
+
+@@ REP 23
+('retention.period_years.R6'
+@@ WITH
+('retention.period_years.r6'
+@@ END
+# V-23-08-a (6 of 12) | HIGH | grep -c -F gave 1 | same key rule, phase-00.md:204 | NEW: none
+
+@@ REP 23
+('retention.period_years.R7'
+@@ WITH
+('retention.period_years.r7'
+@@ END
+# V-23-08-a (7 of 12) | HIGH | grep -c -F gave 1 | same key rule, phase-00.md:204 | NEW: none
+
+@@ REP 23
+('retention.period_years.R8'
+@@ WITH
+('retention.period_years.r8'
+@@ END
+# V-23-08-a (8 of 12) | HIGH | grep -c -F gave 1 | same key rule, phase-00.md:204 | NEW: none
+
+@@ REP 23
+`retention.period_days.R1` and `retention.period_years.R2` to `R8`
+@@ WITH
+`retention.period_days.r1` and `retention.period_years.r2` to `r8`
+@@ END
+# V-23-08-a (9 of 12) | HIGH | grep -c -F gave 1 | names used: the period setting keys of section 1.2 (phase-23.md:769, section 3.10 text) | NEW: none
+
+@@ REP 23
+`retention.period_years.R2` configured at 5 with floor 7 gives 7
+@@ WITH
+`retention.period_years.r2` configured at 5 with floor 7 gives 7
+@@ END
+# V-23-08-a (10 of 12) | HIGH | grep -c -F gave 1 | the check uses the key of section 1.2 (check 4b, phase-23.md:969) | NEW: none
+
+@@ REP 23
+setting `retention.period_years.R2` to 5 is refused
+@@ WITH
+setting `retention.period_years.r2` to 5 is refused
+@@ END
+# V-23-08-a (11 of 12) | HIGH | grep -c -F gave 1 | the check uses the key of section 1.2 (check 5i, phase-23.md:982) | NEW: none
+
+@@ REP 14
+`retention.period_years.R7`
+@@ WITH
+`retention.period_years.r7`
+@@ END
+# V-23-08-a (12 of 12) | HIGH | grep -c -F gave 1 | phase 14 sets the same key (phase-14.md:1351) and must match the lower-case key of phase-23.md:401 | NEW: none
+# NOTE V-23-08-a | docs/plan/research.md:388 (DR-377) also writes `retention.period_years.R7` in upper case. That file is not a phase file, so this draft does not touch it. The lead decides whether DR-377 is reworded or the lower-case rule stands (phase-00.md:204 refuses upper case).
+# DECIDE V-23-09-a | (A) A new `akr-ctl` subcommand (NEW name, to be chosen) that creates the ed25519 transit keys `akr-sign-anchor` and `akr-sign-deletion` (and the other signing keys of phase 00 section 7.6) once at install, idempotently; section 4.4 (phase-23.md:920) names it. Evidence: phase-23.md:920 names `akr-ctl ops provision`, which no phase defines; phase 00 defines only `akr-ctl ops record-restore-drill` (phase-00.md:630) | (B) A step of the OpenBao ceremony runbook (SP-12, phase-00.md:589) written as `bao write` commands; section 4.4 names that step. Evidence: neither phase 00 nor phase 02 has a step that creates a transit key; the key lists are phase-00.md:589-591 and phase-00.md:914-926; phase-02.md:277 and phase-02.md:761 only use `akr-sign-anchor`
+
+@@ BLOCK 23
+### 7.N Drop allow-list for assess.decisions (V-23-10-a, MEDIUM; DR-413)
+From phase 29 on, the allow-list of `admin.retention_drop_partition` (section 1.2, step 1) also names `assess.decisions`. The phase 29 migration `0094_assess_settings_classes` (its section 1.4) re-creates the function with that entry added (`CREATE OR REPLACE`; the body is otherwise the same). The drop of section 7.2 for `assess.decisions` is then accepted.
+@@ END
+# V-23-10-a | MEDIUM | names used and where they exist: `admin.retention_drop_partition` phase-23.md:280-284 (allow-list, step 1); `assess.decisions` phase-29.md:85 (CREATE TABLE, migration 0091); `0094_assess_settings_classes` phase-29.md:649; R7 partition row of `assess.decisions` phase-29.md:798 (inside section 1.4) | NEW: none. The block extends the function from its owner's file (phase 23) with a "From phase 29 on" block, as the fix rules require.
+
+@@ BLOCK 23
+### 7.N R7 and the assess.decisions exception (V-23-10-b, LOW; DR-413)
+Class R7 is `report_only` (section 3.2 and section 7.2), except `assess.decisions`: from phase 29 on it is R7 on a partition clock and leaves by partition drop, as section 7.2 says. This block wins over the R7 row of section 3.2 and the R7 sentence of section 7.2 for that table.
+@@ END
+# V-23-10-b | LOW | names used and where they exist: R7 row phase-23.md:597; R7 sentence phase-23.md:1012; `assess.decisions` R7 partition row phase-29.md:798 | NEW: none
+
+@@ REP 23
+re-read the holds for the party (party holds on it, case holds whose `case_parties` contain it)
+@@ WITH
+re-read the holds for the party (party holds on it, and case holds matched as in section 3.8, which follows `merged_into` as section 7.4 says)
+@@ END
+# V-23-12-a | HIGH | grep -c -F gave 1 | names used and where they exist: `merged_into` phase-17.md:297 (casework.cases); section 3.8 matching phase-23.md:712-716; section 7.4 phase-23.md:1029-1034 | NEW: none. Check before applying: the blocking references of the same step (`casework.case_parties`, `alert.alerts`) also defer a party after a merge, because a merged party stays in the target's `case_parties` (phase-17.md:1032). So no deletion follows; the gap is the reason code (`legal_hold`, section 3.8). Step 2 also names no reason when a hold and a reference both hit. MEDIUM may fit better.
+
+@@ BLOCK 23
+### 7.N Section 6 check 10: the merged-case hold (V-23-12-b, MEDIUM; DR-413)
+10. Merged-case hold (section 7.4): hold case S, merge S into T, then run `akr-ctl retention run --now`. The next run still holds S's alerts in T: no row of their parties is deleted, and each such party's item is `deferred`.
+@@ END
+# V-23-12-b | MEDIUM | names used and where they exist: check 9 phase-23.md:995 (the last check); `akr-ctl retention run --now` (section 4.5 item 9); `merged_into` phase-17.md:297; the `deferred` item state (section 3.5 batch step 2, phase-23.md:653) | NEW: none
+
+# SUMMARY: fixes written 38 (REP 32, BLOCK 6); DECIDE 4; DROP 0; claims covered: V-23-01-a, V-23-01-c, V-23-01-d, V-23-01-e, V-23-02-a, V-23-02-c, V-23-02-d, V-23-03-a, V-23-03-b, V-23-04-a, V-23-04-c, V-23-04-d, V-23-05-a, V-23-06-a, V-23-06-b, V-23-07-a, V-23-07-c, V-23-08-a, V-23-09-a, V-23-10-a, V-23-10-b, V-23-12-a, V-23-12-b

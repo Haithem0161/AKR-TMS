@@ -1,0 +1,210 @@
+Fixes for the claims of tools/agent/verify/refute-07.md (Haiku draft for lead review; not applied).
+
+@@ REP 07
+| GET | /goaml/profiles | report.prepare, config.author |
+@@ WITH
+| GET | /goaml/profiles | report.prepare, config.author, config.approve |
+@@ END
+# V-07-01-a (row 1 of 2) | HIGH | grep -c -F gave 1 | names used and where they exist: `config.approve` docs/API.md:96 (CHK, M, CH, MRO); `goaml_profile.read` row phase-07.md:737 and Cedar permit phase-07.md:762-764 (A2, M, CFG, CHK); section 6 expects 200 for CHK at phase-07.md:947 | NEW: none
+
+@@ REP 07
+| GET | /goaml/profiles/{id} | report.prepare, config.author |
+@@ WITH
+| GET | /goaml/profiles/{id} | report.prepare, config.author, config.approve |
+@@ END
+# V-07-01-a (row 2 of 2) | HIGH | grep -c -F gave 1 | the same names as row 1 | NEW: none
+# NOTE V-07-01-a: the paragraph under the route table (phase-07.md:454) still says these reads take config.author only. The lead may add config.approve there too; docs/API.md section 2 needs the same two rows under config.approve when this is applied.
+
+@@ REP 07
+(no DTD; a `<!DOCTYPE` refuses the file).
+@@ WITH
+(no DTD; a `<!DOCTYPE` refuses the file as `xsd_unparseable`).
+@@ END
+# V-07-01-b (DOCTYPE part) | LOW | grep -c -F gave 1 | names used and where they exist: `xsd_unparseable` phase-07.md:468 (absent schemaVersion, same step) and phase-07.md:652 (the watcher's failed code for an XSD the loader refuses) | NEW: none
+
+@@ REP 07
+100 and bands descend.
+@@ WITH
+100 and bands descend, else refused as `quality_invalid`.
+@@ END
+# V-07-01-b (weights and bands part) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `quality` column phase-07.md:75; `params_invalid` phase-07.md:708 (rule parameters only); `limit_out_of_bounds` phase-07.md:708 (limits only) | NEW: `quality_invalid` (no listed reason covers the quality weights and bands)
+
+@@ REP 07
+`profile_not_usable`, `corpus_failed`, `rule_unknown`, `params_invalid`, `pattern_invalid`, `limit_out_of_bounds`,
+@@ WITH
+`profile_not_usable`, `corpus_failed`, `corpus_not_run`, `rule_unknown`, `params_invalid`, `pattern_invalid`,
+`limit_out_of_bounds`, `quality_invalid`, `rejection_too_long`,
+@@ END
+# V-07-01-b | MEDIUM | grep -c -F gave 1 (this is the section 3.8 reason list, shared with V-07-03-a and V-07-06-a) | `quality_invalid` added for the section 3.1 step 4 check | NEW: `quality_invalid` (params_invalid is for rule parameters and limit_out_of_bounds for limits)
+# V-07-03-a | MEDIUM | (shared section 3.8 line, see above) | `corpus_not_run` added for the promote refusal | NEW: `corpus_not_run` (corpus_failed means a run ran and failed; here no run ran)
+# V-07-06-a | MEDIUM | (shared section 3.8 line, see above) | `rejection_too_long` added for the 20,000-character limit | NEW: `rejection_too_long` (no listed reason names a text length)
+# NOTE V-07-01-b: the amend row (phase-07.md:686) does not say whether the step 4 weights and bands check runs on an amendment. The lead may want that stated; no text is drafted for it.
+
+@@ REP 07
+`NewFinding`, `NewWatchRun`.
+@@ WITH
+`NewFinding`, `NewWatchRun`. The loader fills `lookups` and `schema_summary` (section 3.1 step 2); the caller, which holds the bytes, computes `xsd_sha256` and stores both XSDs as evidence, and passes `xsd_evidence_id` and `effective_xsd_evidence_id` (section 3.1).
+@@ END
+# V-07-01-c | LOW | grep -c -F gave 1 | names used and where they exist: `xsd_sha256` phase-07.md:61, `xsd_evidence_id` :62, `effective_xsd_evidence_id` :63, `lookups` :69, `schema_summary` :71 (migration 0023); loader step 2 phase-07.md:472; the seed stores both XSDs at phase-07.md:486-487 | NEW: none
+# NOTE V-07-01-c: the refuter listed effective_xsd_evidence_id as a loader fill. The text has the caller store both XSDs and pass the ids (phase-07.md:486-487), so the sentence above follows the text.
+
+@@ REP 07
+OR NEW.rejection_patterns <> OLD.rejection_patterns OR NEW.xsd_sha256 <> OLD.xsd_sha256
+@@ WITH
+OR NEW.rejection_patterns <> OLD.rejection_patterns OR NEW.open_questions <> OLD.open_questions
+            OR NEW.lookups <> OLD.lookups OR NEW.schema_summary <> OLD.schema_summary
+            OR NEW.xsd_sha256 <> OLD.xsd_sha256
+@@ END
+# V-07-01-d | LOW | grep -c -F gave 1 | names used and where they exist: `lookups` phase-07.md:69 and `schema_summary` :71 (migration 0023); the freeze test phase-07.md:115-119 (guard at :110); the loader writes both at insert, phase-07.md:472 | NEW: none
+# V-07-04-a | LOW | (same REP as V-07-01-d) | `open_questions` (phase-07.md:82) joins the freeze test. Answers arrive as amendments: `open_questions` is in `ProfileAmendment` (phase-07.md:356) and the watcher copies the questions into a new candidate (phase-07.md:652) | NEW: none
+
+# DROP V-07-02-a | phase-07.md:137 "CREATE TABLE IF NOT EXISTS rpt.goaml_watch_runs (" with the start columns `trigger`, `requested_by`, `profile_code` and `source_url`; and phase-07.md:172 "GRANT UPDATE (status, attachment_list, xsd_sha256, candidate_profile_id, error_code, detail, finished_at)" is the set that `finish` writes (section 3.5 steps 1 to 6). The claim is refuted; no fix is drafted.
+
+@@ REP 07
+permit (principal, action in [Akr::Action::"goaml_profile.read", Akr::Action::"goaml_watch.read"], resource)
+@@ WITH
+permit (principal, action == Akr::Action::"goaml_profile.read", resource)
+@@ END
+# V-07-02-b (Cedar, 1 of 4) | LOW | grep -c -F gave 1 | names used and where they exist: `goaml_watch.read` row phase-07.md:738 (A2, M, CFG); watch route scope phase-07.md:451 (report.prepare, config.author); section 6 expects 403 `E_SCOPE` for CHK on watch-runs at phase-07.md:947 | NEW: none
+
+@@ REP 07
+when { principal.roles.containsAny(["A2", "M", "CFG", "CHK"]) };
+@@ WITH
+when { principal.roles.containsAny(["A2", "M", "CFG", "CHK"]) };
+
+@id("goaml.watch_readers") @role("A2,M,CFG")
+permit (principal, action == Akr::Action::"goaml_watch.read", resource)
+when { principal.roles.containsAny(["A2", "M", "CFG"]) };
+@@ END
+# V-07-02-b (Cedar, 2 of 4) | LOW | grep -c -F gave 1 | the new permit takes the roles of the row at phase-07.md:738 | NEW: `goaml.watch_readers` (a Cedar policy id; the readers permit no longer covers watch reads, so no existing id fits)
+
+@@ REP 07
+changes but holds no `goaml_watch.read` beyond the profile (the policy grants both to the readers' set; the route
+@@ WITH
+changes and holds no `goaml_watch.read`, which the watch routes refuse (section 6, 403 `E_SCOPE`).
+@@ END
+# V-07-02-b (note, 3 of 4) | LOW | grep -c -F gave 1 | the sentence at phase-07.md:772-773 now matches the Cedar split above | NEW: none
+
+@@ REP 07
+scope keeps CHK off the watch routes). Bundle tests:
+@@ WITH
+Bundle tests:
+@@ END
+# V-07-02-b (note, 4 of 4) | LOW | grep -c -F gave 1 | completes the note at phase-07.md:772-774 | NEW: none
+# NOTE V-07-02-b: the other option, adding CHK to the row at phase-07.md:738, would contradict the watch route scope (phase-07.md:451) and the test at phase-07.md:947, so it is not drafted. If the lead prefers CHK to read watch runs, the alternative is config.approve on GET /goaml/watch-runs plus CHK in the row, and the note above would then be dropped.
+
+@@ REP 07
+the target is a `candidate` of this code with `corpus_result` present;
+@@ WITH
+the target is a `candidate` of this code with `corpus_result` present (else 422 `corpus_not_run`);
+@@ END
+# V-07-03-a (promote part) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `corpus_result` phase-07.md:86 ("NULL until run"); `corpus_failed` phase-07.md:708; `goaml_corpus` max attempts 2 at phase-07.md:805 | NEW: `corpus_not_run` (a run that never ran is not a failed run, so `corpus_failed` does not fit)
+
+# DECIDE V-07-03-a (amend part: what the change request does when its validation run never arrives) | A: the request waits. The candidate stays `candidate`, and the request cannot be decided while `validation_run` is missing (phase-07.md:686, `required_evidence = [validation_run]`). When `goaml_corpus` dies after its second attempt (phase-07.md:805; phase-00.md:543-545; event `job.dead` at phase-00.md:654), a person withdraws or rejects the request (phase-04.md:167 allows `withdrawn`; candidate -> `rejected` at phase-07.md:689) | B: the request closes by itself when its corpus job goes dead. The amendment candidate becomes `rejected`, the change request closes, and `goaml_profile.rejected` is audited (phase-07.md:689 and :721)
+
+# DECIDE V-07-03-b (the FIU-answers corpus has no writer in phase 21; the fix belongs in phase 21's file, so none is drafted here) | A: phase 21 writes one corpus case per anonymised rejection row of the FIU feedback register (`rpt.fiu_feedback`, phase-21.md:213), with its file, expected codes and Office message, stored as in option A of V-07-07-a; phase 21 defines the anonymisation step (research/23-regulatory-reporting-goaml.md:747 names "the anonymised FIU-answers corpus" under RP-06) | B: the bank curates the FIU-answers corpus outside the product, and it enters through a release, as the rule codes do (research.md:379, DR-368; phase-21.md:1261). Then phase-07.md:24, :617, :700 and :989 are reworded to say so
+
+@@ BLOCK 07
+### 7.N Rule parameter types (V-07-05-a, MEDIUM; DR-413)
+The parameter schema of each rule (section 3.1 step 4) takes these JSON types for the parameters in the Parameters column of section 3.3. `report_codes` (BR-03: STR, SAR, TFR), `placeholders` (BR-14: the five words quoted in that row), `currencies` (BR-18: IQD, USD) and `domestic` (BR-13: IQ) are arrays of strings. `days` (BR-08: 31; CONS-02: 7), `min_chars` (CONS-03: 400) and `threshold_usd` (BR-13: 10000) are integers. `tolerance` (CONS-01: 1) is a number. The shipped `profile.json` holds these values.
+@@ END
+# V-07-05-a | MEDIUM | names used and where they exist: `report_codes`, `placeholders`, `currencies`, `domestic`, `days`, `min_chars`, `threshold_usd`, `tolerance` in the 3.3 rows at phase-07.md:586-612; "each rule's parameter schema" at phase-07.md:480 | NEW: none
+
+@@ REP 07
+file, at most 8 MiB);
+@@ WITH
+file, at most 8 MiB, else `file_too_large`);
+@@ END
+# V-07-06-a (xml_text, 1 of 3) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `file_too_large` phase-07.md:511 and :707 (an existing 422 reason) | NEW: none (reused)
+
+@@ REP 07
+(at most 20,000 characters; only with exactly one file)
+@@ WITH
+(at most 20,000 characters, else `rejection_too_long`; only with exactly one file)
+@@ END
+# V-07-06-a (rejection_text, 2 of 3) | MEDIUM | grep -c -F gave 1 | the shared section 3.8 line above lists the name | NEW: `rejection_too_long` (no listed reason names a text length)
+
+@@ REP 07
+`profile_not_usable`).
+@@ WITH
+`profile_not_usable`, `rejection_too_long`).
+@@ END
+# V-07-06-a (422 list, 3 of 3) | MEDIUM | grep -c -F gave 1 | the violation list at phase-07.md:511-512 gains the new reason | NEW: none (the name is `rejection_too_long`, above)
+
+# DECIDE V-07-07-a (no storage, field or route for the cases a profile amendment adds) | A: each case file is stored as evidence the way the XSDs are (`put_generated`, owner kind `goaml_profile`, kind `snapshot`, phase-07.md:486-487). The amendment names it by evidence id in a new `cases` member of `ProfileAmendment` (phase-07.md:356). The candidate keeps the list in a new column, `cases JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(cases) = 'array')`, added to migration 0023. `goaml_corpus` runs them after the release cases. A route to upload a case file is still missing, since the nine routes (phase-07.md:457) take no case file | B: cases ship in a release, in the packs tree (`corpus/cases/` with `cases.json`, phase-07.md:321), as phase 21's codes do (research.md:379, DR-368; phase-21.md:1261). An amendment then carries rule codes and messages only, and phase-07.md:615-617 and :686 are reworded
+
+@@ REP 07
+1. `start`; a run not `queued` -> done.
+@@ WITH
+1. `start`: a `queued` run moves to `running`; a `running` run is a retry and goes on from its first file (section 4); a `completed` or `failed` run is final and the job is done.
+@@ END
+# V-07-08-a | HIGH | grep -c -F gave 1 | names used and where they exist: `start` phase-07.md:386 (returns an Option); status values `queued` and `running` phase-07.md:203; the retry sentence of section 4 at phase-07.md:798-799 | NEW: none
+# NOTE V-07-08-a: step 11 inserts findings in batches with no unique key, so a retry after a partial insert can repeat findings. The plan does not say what a retry does with them. The lead may want a DECIDE for that.
+
+@@ REP 07
+| `goaml_check.use_candidate` | GoamlProfile | M, CFG |
+@@ WITH
+| `goaml_check.use_candidate` | GoamlProfile | M |
+@@ END
+# V-07-08-b (action row, 1 of 3) | HIGH | grep -c -F gave 1 | names used and where they exist: step 2 "a `candidate` only for M" at phase-07.md:509-510; the row at phase-07.md:736 | NEW: none
+
+@@ REP 07
+permit (principal, action in [Akr::Action::"goaml_check.read", Akr::Action::"goaml_check.read_all"], resource)
+@@ WITH
+permit (principal, action in [Akr::Action::"goaml_check.read", Akr::Action::"goaml_check.read_all", Akr::Action::"goaml_check.use_candidate"], resource)
+@@ END
+# V-07-08-b (Cedar M, 2 of 3) | HIGH | grep -c -F gave 1 | names used and where they exist: `goaml.check_mlro` with `@role("M")` at phase-07.md:753-754 (M only; its `when` tests M) | NEW: none
+
+@@ REP 07
+permit (principal, action in [Akr::Action::"goaml_watch.run", Akr::Action::"goaml_check.use_candidate"], resource)
+@@ WITH
+permit (principal, action == Akr::Action::"goaml_watch.run", resource)
+@@ END
+# V-07-08-b (Cedar CFG, 3 of 3) | HIGH | grep -c -F gave 1 | CFG keeps `goaml_watch.run` (row at phase-07.md:739; `@role("M,CFG")` at phase-07.md:766) | NEW: none
+
+@@ REP 07
+12. One transaction: `complete` with the files and the summary;
+@@ WITH
+12. One transaction: `complete` with the files and the summary (`CheckSummary`: counts per layer and per severity, block, warn and info; outcome counts; grade counts, good, moderate, acceptable and poor; the blocks and warns totals);
+@@ END
+# V-07-08-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: `CheckSummary` and `complete` at phase-07.md:388; the audit keys `outcomes`, `grades`, `blocks`, `warns` at phase-07.md:561-562; `Grade` values at phase-07.md:351-352 | NEW: none (the fields are described in words, not given new names)
+
+@@ REP 07
+`EvidenceStore::stage_transient(purpose = "goaml", owner = run_id, n)`
+@@ WITH
+`EvidenceStore::stage_transient(purpose = "goaml", owner = run_id, n: u8, stream)` (`n` is 1 to 50 for a file and 0 for the rejection text; `stream` is the part as `Stream<Item = Result<Bytes, io::Error>>`, never collected)
+@@ END
+# V-07-08-d | MEDIUM | grep -c -F gave 1 | names used and where they exist: `stage_transient` at phase-02.md:1194 (signature without types) and phase-02.md:1192-1193 (points to this step); `goaml.check_max_files` 1-50 at phase-07.md:789; `Bytes` at phase-02.md:612 | NEW: none (`u8`, `Bytes` and `io::Error` are Rust types; the plan gives no type for a part stream)
+
+@@ REP 07
+outcome. The upload path does not change.
+@@ WITH
+outcome, which holds the `FileResult` of the file (section 3.2 step 11), its findings as `NewFinding` rows (section 2) and its `CheckSummary` (section 3.2 step 12). The upload path does not change.
+@@ END
+# V-07-09-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `FileResult` in `complete` at phase-07.md:388 and step 11 at phase-07.md:559; `NewFinding` at phase-07.md:358; `CheckSummary` in step 12 at phase-07.md:561 | NEW: none
+
+@@ REP 07
+profile: &ProfileVersion, layers
+@@ WITH
+profile: &GoamlProfile, layers
+@@ END
+# V-07-09-b | LOW | grep -c -F gave 1 | names used and where they exist: `GoamlProfile` entity at phase-07.md:344 (carries the rules and quality); `ProfileRef` at phase-07.md:347 holds only code and version; the caller holds the pinned row (phase-21.md:775) | NEW: none
+
+@@ REP 07
+| NAME-01 | an apostrophe, dot, comma, parenthesis or slash removed from a person name | warn | `removed_count` |
+@@ WITH
+| NAME-01 | an apostrophe, dot, comma, parenthesis or slash removed from a person name (raised only by the phase 21 builder, never on an uploaded file) | warn | `removed_count` |
+@@ END
+# V-07-10-a | LOW | grep -c -F gave 1 | names used and where they exist: `NAME-01` at phase-21.md:800 ("each removal is a warn finding `NAME-01` (new in phase 21)"); the upload path is section 3.2 steps 1 to 12 | NEW: none
+
+@@ REP 07
+| CTR-02 | a CTR transaction whose two countries are not both domestic | block | |
+@@ WITH
+| CTR-02 | a CTR transaction whose `from_country` and `to_country` are not both in `domestic` | block | `domestic` [IQ], the list of BR-13 |
+@@ END
+# V-07-12-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `domestic` as the BR-13 parameter at phase-07.md:596; "CTR-02 both countries domestic" at phase-21.md:951 | NEW: `from_country`, `to_country` (the goAML element names of a transaction, shown at research/23-regulatory-reporting-goaml.md:997 and :1007; the plan does not name them yet)
+
+# DECIDE V-07-12-b (BR-13 and CTR-02 both test the domestic countries, at warn and at block; no row says which stands) | A: keep BR-13 as a warn for the shape of an uploaded CTR, as the last section says (phase-07.md:990), and let CTR-01 and CTR-02 block what fails the shape (phase-07.md:980-981) | B: retire BR-13, or disable it by default, once CTR-01 and CTR-02 are on, because DR-368 says a CTR without the cash and account shape, or with a foreign country, "is not a CTR" (research.md:379), which is what the two block rules now check
+# NOTE V-07-12-b: the two rules never fire on the same transaction. BR-13 fires only when the shape holds and both countries are domestic (phase-07.md:596), and those are exactly the cases where CTR-01 and CTR-02 pass. The conflict is one of meaning, not a double count.
+
+# SUMMARY: fixes written 26 (REP 25, BLOCK 1); DECIDE 4; DROP 1; claims covered: V-07-01-a, V-07-01-b, V-07-01-c, V-07-01-d, V-07-02-b, V-07-03-a, V-07-03-b, V-07-04-a, V-07-05-a, V-07-06-a, V-07-07-a, V-07-08-a, V-07-08-b, V-07-08-c, V-07-08-d, V-07-09-a, V-07-09-b, V-07-10-a, V-07-12-a, V-07-12-b (20 of 20 STANDS and PARTLY); V-07-02-a REFUTED, DROP note above

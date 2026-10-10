@@ -1,0 +1,56 @@
+Fixes for the claims of tools/agent/verify/phase-03.md (lead-verified; see tools/agent/verify-verdict.md).
+@@ REP 03
+6. Evaluate the active bundle (`Authorizer::is_authorized`)
+@@ WITH
+6. Evaluate the active bundle (inside `Authorizer::authorize` of section 2: the cedar-policy call `is_authorized`)
+@@ REP 04
+the announced change-request pair is not added (section 3.5, DR-54)
+@@ WITH
+the announced change-request pair is not added (section 3.1, DR-54)
+@@ REP 03
+alternate needs a liaison;
+@@ WITH
+alternate needs a liaison (else 422 at `/alternate_user_id`, `liaison_required`);
+@@ REP 03
+the branch (409 with the three counts)
+@@ WITH
+the branch (409 `E_NOT_ALLOWED_IN_STATE`, sub-code `in_use`, with the three counts)
+@@ REP 03
+`not_liaison_for_branch`, `masked_kind`, bounds)
+@@ WITH
+`not_liaison_for_branch`, `liaison_required`, `masked_kind`, bounds)
+@@ BLOCK 03
+### 7.N Development routes in the authorize layer (V-03-03-a, MEDIUM; DR-413)
+The layer of section 3.2 needs a `RouteAction` for every `/api/v1` route, and the development routes had none. The
+cargo feature `dev-routes` (7.13) adds them to `ROUTES` with actions of the namespace `dev.*` and compiles in the
+policy file `policies/dev.cedar`, which `loader::load` appends to the active bundle only when the feature is on and
+`AKR_ENV != production`. A release build has neither, so the shipped bundle and its hash do not change; the matrix
+file of 7.12 is built without the feature.
+
+| Route | Action | Resource | Permit in `dev.cedar` |
+|-|-|-|-|
+| `POST /api/v1/_echo` (phase 00) | `dev.echo` | System | every active principal |
+| `GET /api/v1/_dev/masked/{id}` | `dev.masked_read` | `_dev_masked` (masked kind) | the `normal` record: every active principal; the `suspicion` record: only a principal on its access list, so a refused read is the 404 of section 3.6 |
+| `POST /api/v1/_dev/detections` (from phase 17 on) | `dev.detection_emit` | System | every active principal |
+
+The scope gate treats the three as "none (dev only)", as the phase 00 route table does. The coverage test of section 6
+runs twice, with the feature and without it; a later phase that adds a development route adds its row here by the
+same rule.
+@@ BLOCK 03
+### 7.N One derivation for the role part of the access matrix (V-03-11-a LOW, V-03-11-b MEDIUM; DR-413)
+The role part of the matrix has one derivation, step 1 of `AccessMatrixBuilder::build` in section 3.5 (an evaluation
+with a synthetic principal per role, so forbids count). It is the pure function
+`AccessMatrixBuilder::roles(bundle: &LoadedBundle) -> Vec<RoleActions>` with `RoleActions { role, actions:
+Vec<String> }`, both sorted; it reads no database. `build(at)` calls it for its `roles` part and adds the principals of
+step 2. `akr-ctl policy matrix` (7.12) loads the directory with `loader::load` and prints the output of `roles`; the
+words "from the permits' `@role` annotations" in 7.12 say only where a role's name comes from. For one bundle hash the
+file and the `roles` part of `GET /admin/access-matrix` are therefore equal, and section 6 gains that comparison as a
+test.
+@@ BLOCK 01
+### 7.N The Kratos admin port gains a traits update (V-03-05-a, MEDIUM; DR-413)
+From phase 03 on the admin API of `IdentityProvider` (section 2) has `update_traits(id, traits)`, with the same
+`traits` type as `create_identity`: Kratos `PUT /admin/identities/{id}` with the identity's current state and schema
+and the new traits. `UserAdminService::update` (phase 03 section 3.7) calls it for an e-mail change before its commit;
+a Kratos failure aborts the request. When a later step of the same request fails, the handler calls `update_traits`
+again with the old traits before it returns the error (the compensation pattern `create` uses with
+`delete_identity`).

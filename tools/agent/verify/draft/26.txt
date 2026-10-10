@@ -1,0 +1,220 @@
+Fixes for the claims of tools/agent/verify/refute-26.md (phase 26; drafted for lead review; nothing applied).
+
+# DECIDE V-26-01-a | the value that marks an Islamic product, which 3.1 step 2 (refusal) and test 3(b) need: (A) a family value `islamic` set by the `product` code map; `canon.product.family` is free TEXT with no value list, so the value is new to the plan, and 3.10 step 3 must drop "of the same family" | (B) no family test: the deal writer refuses every deal whose product row has a NULL type, as 3.2 step 3 already says, and test 3(b) covers the product rows that an islamic_deal uses | evidence: docs/plan/phase-26.md:309 (family test), docs/plan/phase-26.md:328 (3.2 step 3, no type refused), docs/plan/phase-26.md:560 (3.10 step 3, same family), docs/plan/phase-10.md:399 (family TEXT NOT NULL, no value list), docs/DATA-MODEL.md:387
+
+@@ REP 26
+(d) a code mapped to two types is refused by
+@@ WITH
+(d) a code mapped to two types with the same `valid_from` is refused by
+@@ END
+# V-26-01-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `uq_code_map_entries_effective` docs/plan/phase-10.md:162 (UNIQUE on code_map_id, source_list, source_code, valid_from) | NEW: none. Not taken: a new refusal for a second Map of a mapped code, which phase 10 does not have.
+
+@@ REP 26
+the same steps 1 to 6 for each candidate customer, then the rows whose customer is readable;
+@@ WITH
+the steps of the list block of section 7+ (one customer, then its readable rows);
+@@ END
+# V-26-02-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `IslamicDealService` docs/plan/phase-26.md:355; `IslamicDealRepository::list_for_customer` docs/plan/phase-26.md:265; the list block below | NEW: `IslamicDealService::list_for_customer` (in the block; the repository method has the same name)
+
+@@ BLOCK 26
+### 7.N List of one customer's deals (V-26-02-a, MEDIUM; DR-413)
+`IslamicDealService::list_for_customer(ctx, customer_id, after, limit)` serves GET `/islamic/deals?customer_id=`:
+1. Flag: as 3.4 step 1.
+2. Validate `customer_id`, the cursor `after` and `limit`; a missing or malformed value is 422 `E_VALIDATION` (the general 422 of phase 00).
+3. Customer: `customer_party` and its tier as 3.4 steps 3 and 4, for the one customer named; no current customer row gives the empty page.
+4. Cedar `islamic.deal.read` on that customer's Party resource, with purpose and network as 3.4 step 5; a refusal gives the empty page too.
+5. Read `IslamicDealRepository::list_for_customer(customer_id, after, limit)` (current rows, `recorded_to IS NULL`); the page holds `IslamicDealSummary` rows and the next cursor.
+6. A customer in tier suspicion is left out of the list, because 3.4 step 6 needs one deal id and each deal is opened by its id.
+7. One access event for the list, as 3.4 step 9.
+@@ END
+# V-26-02-a | MEDIUM | names used and where they exist: `casework.effective_tier` docs/plan/phase-26.md:363 (3.4 step 4); `list_for_customer` docs/plan/phase-26.md:265; `IslamicDealSummary` docs/plan/phase-26.md:282; general 422 `E_VALIDATION` docs/plan/phase-00.md:499; access event docs/plan/phase-26.md:376 and the reads sentence of 3.12 (docs/plan/phase-26.md:598) | NEW: `IslamicDealService::list_for_customer` (no list method is named for the service)
+
+# DECIDE V-26-02-a | suspicion rows of the list (the block drafts option A): (A) left out of the list, as item 6 says | (B) listed after a step-up for that customer, under a NEW resource ref `islamic_customer:<customer_id>` in place of `islamic_deal:<id>` | (C) listed with no step-up, which is what steps 1 to 5 alone give; 3.4 step 6 cannot name one deal in a list | evidence: docs/plan/phase-26.md:367 (3.4 step 6), docs/plan/phase-26.md:380 (the "same steps 1 to 6" sentence), docs/plan/phase-01.md:731 (consume takes one resource_ref)
+
+@@ BLOCK 26
+### 7.N Step-up actions of this phase (V-26-02-b, MEDIUM; DR-413)
+Two `StepUpAction` constants are declared in `domain::islamic`, each with a class of the phase 01 closed list:
+`DEAL_OPEN = StepUpAction { name: "islamic.deal.open", class: record_open }`, passed to `consume` in 3.4 step 6.
+`EVIDENCE_DECIDE = StepUpAction { name: "islamic.evidence.decide", class: decision }`, passed to `consume` in 3.5 verify step 2.
+@@ END
+# V-26-02-b | MEDIUM | names used and where they exist: `StepUpAction { name, class }` docs/plan/phase-01.md:711; closed classes `record_open` and `decision` docs/plan/phase-01.md:711; `StepUpService::consume(tx, ctx, header, action: StepUpAction, resource_ref)` docs/plan/phase-01.md:731; call sites docs/plan/phase-26.md:367 and 420 | NEW: `DEAL_OPEN`, `EVIDENCE_DECIDE`, `islamic.deal.open`, `islamic.evidence.decide` (the phase declares no action yet)
+
+@@ REP 26
+header, record_open, "islamic_deal:<id>")
+@@ WITH
+header, DEAL_OPEN, "islamic_deal:<id>")
+@@ END
+# V-26-02-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `DEAL_OPEN` (the block above) | NEW: none
+
+@@ REP 26
+Step-up `decision` consumed with resource ref
+@@ WITH
+Step-up `EVIDENCE_DECIDE` (class `decision`) consumed with resource ref
+@@ END
+# V-26-02-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `EVIDENCE_DECIDE` (the block above) | NEW: none
+
+@@ REP 26
+its display name from `canon.party_name`.
+@@ WITH
+its display name from `canon.party_name` where `superseded_at IS NULL`.
+@@ END
+# V-26-02-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: current-name rule `WHERE superseded_at IS NULL` docs/plan/phase-10.md:778 (uq_party_name_current); the deal-party filter docs/plan/phase-26.md:369 | NEW: none
+
+# DECIDE V-26-03-a | how SCN-ISL-01 matches the related party, the contacts and the accounts (the agent relation is V-26-03-b): (A) the related party is a party that the shared linked-party resolver links to the customer; its link kinds are the DSL `linked_parties` kinds (family_no, phone, address, depositor, companion, signatory, owner), and kinship widens the group for scenarios and is named on the alert; accounts are matched by a shared `canon.account_party_role` row on the same `account_id`; email is not a resolver kind, so it needs its own match | (B) no resolver: the related party is any party with a `canon.party_relationship` row to the customer (any of the ten types); contacts match on an equal `canon.party_contact.value_hk` of type mobile or email; accounts as in (A) | evidence: docs/plan/phase-16.md:16 (S-08 linked-party resolver), docs/plan/phase-16.md:858 (LinkedPartyResolver), docs/DSL.md:231 (linked_parties and kinship), docs/plan/phase-10.md:547 (party_contact), docs/plan/phase-10.md:668 (account_party_role), docs/plan/phase-26.md:463 (row: field list only), research/24-islamic-banking-aml.md:633 (requirement: shared owner, address, phone, email, signatory, account or device)
+
+# DECIDE V-26-03-b | which relation says that the seller or supplier is "his agent" (the customer's agent): (A) party_relationship type `attorney`, from the seller or supplier party to the customer party; it is the only agency value of the phase 10 CHECK, so no DDL change | (B) a new value `agent` in the CHECK of `canon.party_relationship.type`, by an ALTER in migration 0083 of this phase (the pattern of section 1.1, lines 31-32), with the DDL line written by the lead | evidence: docs/plan/phase-10.md:574-575 (type CHECK), docs/plan/phase-26.md:84 ('agent' is a deal role, not a relation), docs/plan/phase-26.md:31-32 (widening pattern); "a related party" is answered in V-26-03-a
+
+@@ BLOCK 26
+### 7.N Command centre tile counts (V-26-04-a, HIGH; DR-413)
+Phase 24 `CommandReadRepository` (`akr_app`) gains two methods for the tiles of section 5.3. Each takes the caller's visibility predicate as a bound parameter and applies it to the deal's customer party (3.4 steps 3 and 4). Each reads current rows only (`canon.islamic_deals` with `recorded_to IS NULL`) and returns one count.
+1. `islamic_awaiting_evidence(conn, visibility) -> i64`: deals whose `kyc.deal_evidence_status` is `attached`, or `unknown` while `islamic.evidence_tracking` is on.
+2. `islamic_duplicate_refs(conn, visibility) -> i64`: the `document_ref_hk` values that two or more different deals hold, in rows with `status <> 'rejected'` (the predicate of index `idx_possession_doc`, section 1.3). Each reference counts once.
+Both are called only while `pack.islamic` is on (section 5.3), and only for M.
+@@ END
+# V-26-04-a | HIGH | names used and where they exist: `CommandReadRepository` docs/plan/phase-24.md:540 (one method per tile, visibility predicate bound); the two tiles docs/plan/phase-24.md:1281 and docs/plan/phase-26.md:794, 797; `kyc.deal_evidence_status` docs/plan/phase-26.md:188; `idx_possession_doc` docs/plan/phase-26.md:183; `islamic.evidence_tracking` docs/plan/phase-26.md:434; `pack.islamic` docs/plan/phase-26.md:360 | NEW: `islamic_awaiting_evidence`, `islamic_duplicate_refs` (no method exists for either tile); the duplicate count is read as a count of references, not rows (the wording of 5.3)
+
+@@ BLOCK 26
+### 7.N PossessionEvidenceService methods (V-26-04-b, LOW; DR-413)
+`PossessionEvidenceService` (3.5) has these methods, each run by the steps of its part of 3.5:
+- `attach(ctx, deal_id, idempotency_key, AttachEvidence, file) -> PossessionEvidenceView` (Attach).
+- `verify(ctx, deal_id, evidence_id, if_match, DecideEvidence, idempotency_key) -> PossessionEvidenceView` (Verify).
+- `content(ctx, deal_id, evidence_id, download: bool) -> VerifiedReader` (Content; phase 02 `open`).
+- `sweep(now) -> Result<SweepCounts, IslamicError>` is the body of job `islamic_evidence_sweep` (Sweep, section 4.1); `SweepCounts { missing, late }` holds the two counts of its step 3.
+@@ END
+# V-26-04-b | LOW | names used and where they exist: `AttachEvidence`, `DecideEvidence` docs/plan/phase-26.md:260-262; `PossessionEvidenceView` docs/plan/phase-26.md:281-282; `VerifiedReader` docs/plan/phase-02.md:881; `islamic_evidence_sweep` docs/plan/phase-26.md:434 and 710; `IslamicError` docs/plan/phase-26.md:564; `PossessionEvidenceService` docs/plan/phase-26.md:384 | NEW: the four method names, `SweepCounts`, and the `file` and `idempotency_key` arguments
+
+@@ REP 26
+file_name, classification: personal, lang, bytes })` (phase 02 section 3).
+@@ WITH
+file_name, classification: personal, lang, bytes }, ctx.user)` (phase 02 section 3).
+@@ END
+# V-26-04-d | LOW | grep -c -F gave 1 | names used and where they exist: `stage(tx, NewEvidence, actor)` docs/plan/phase-02.md:839-841; the same call with an actor argument docs/plan/phase-18.md:692; `ctx.user` as the acting user docs/plan/phase-26.md:398 | NEW: none
+
+@@ REP 26
+so a test asserts both (section 6, check 13).
+@@ WITH
+so a test asserts both (section 6, check 6 l).
+@@ END
+# V-26-04-e | LOW | grep -c -F gave 1 | names used and where they exist: the CBS deal test is section 6, check 6, item l, docs/plan/phase-26.md:843 | NEW: none
+
+@@ REP 26
+used only to write the register warning, never returned to the caller
+@@ WITH
+used by 3.5 step 7 to count duplicates for the G1 tile, never returned to the caller
+@@ END
+# V-26-04-f | MEDIUM | grep -c -F gave 1 | names used and where they exist: `duplicate_exists` docs/plan/phase-26.md:269; 3.5 step 7 docs/plan/phase-26.md:399; G1 duplicate tile docs/plan/phase-26.md:682 and 797; check 6 m docs/plan/phase-26.md:846 | NEW: none
+
+@@ REP 26
+Qard hasan above IQD 10,000,000 per loan, or to a staff member or a related person (hard rules)
+@@ WITH
+Qard hasan above IQD 10,000,000 per loan (IQD deals only; a USD deal is not compared), or to a staff member or a related person (hard rules)
+@@ END
+# V-26-05-a | LOW | grep -c -F gave 1 | names used and where they exist: `contract_amount` docs/plan/phase-26.md:52 (no lcy or usd companion); `amount_lcy` and `amount_usd` docs/plan/phase-10.md:959-960 (canon.txn only); DSL T-04 docs/DSL.md:235 (separate thresholds; this rule has only the IQD threshold) | NEW: none. Not taken: a USD basis, which needs a conversion source the plan does not have.
+
+# DECIDE V-26-05-b | the source of `party.related_to_staff`, which stays NULL until a named rule sets it: (A) a named derivation rule of this phase: TRUE when the party has a `party_relationship` of type `family` or `associate` to a party whose `staff_flag` is TRUE | (B) mapped from the source's own related-party field through the party mapping (the column is already in the detection-logic classification) | for a NULL, both options: not evaluable and grades D, as SCN-ISL-02 already says for its NULL field (the proposal); the other answer, "counts as not related", makes NULL act as false, which the phase 10 comment rules out | evidence: docs/plan/phase-10.md:472 (staff_flag), docs/plan/phase-10.md:473 (comment), docs/plan/phase-10.md:574-575 (types), docs/plan/phase-10.md:795 (classification), docs/plan/phase-26.md:464 (NULL precedent), docs/plan/phase-26.md:468 (row)
+
+# DECIDE V-26-05-c | what marks full repayment and unpaid for SCN-ISL-07: (A) for agreement deals, status `settled` with `closed_on` marks full repayment, and `active` or `defaulted` marks unpaid; `closed` is not read by the rule; `facility.events` is not read until the schedule mapping exists (readiness B already says so) | (B) the repayment entries of `canon.facility.events` for schedule sources, which needs an event kind that the schedule mapping names (the plan names none) | the plan also does not say what `closed` means, only that it needs `closed_on` | evidence: docs/plan/phase-26.md:46 (status CHECK, no meaning given), docs/plan/phase-26.md:74-75 (closed_on rules), docs/plan/phase-26.md:469 (row), docs/plan/phase-10.md:1320 (events, untyped JSONB)
+
+# DECIDE V-26-06-a | when the freeze moves from `listed` to `frozen` when it has groups: (A) only when every group task has reached its first verified level, so the freeze is one state over all its accounts (3.8 would add this rule) | (B) at the first verified level of any task, as phase 20 `on_level` ships; the restrict and hold groups may then still be unverified | evidence: docs/plan/phase-20.md:660-661 (on_level step 1), docs/plan/phase-20.md:1053-1062 (7.1: groups, no state rule), docs/plan/phase-26.md:520 (3.8 step 4: one freeze, several tasks)
+
+@@ REP 26
+`facility.limit_amount`, `facility.currency`, `facility.contract_type` for sources without agreements (the mapping decides which; never both for one agreement); `party.staff_flag`, `party.related_to_staff`, `customer.party_id`
+@@ WITH
+`facility.limit_amount`, `facility.currency`, `facility.product_id` (its product row with `islamic_contract_type` = `qard_hasan`, section 3.1 step 2) for sources without agreements (the mapping decides which; never both for one agreement); `party.staff_flag`, `party.related_to_staff`, `customer.party_id`, `canon.product.islamic_contract_type`
+@@ END
+# V-26-05-d | MEDIUM | grep -c -F gave 1 | names used and where they exist: `facility.product_id` docs/plan/phase-10.md:1313 (NOT NULL, references canon.product); `canon.product.islamic_contract_type` docs/plan/phase-10.md:400 (list with qard_hasan); section 3.1 step 2 docs/plan/phase-26.md:308-309; the row's reads must all be listed (the header of 3.6, DSL A.1) | NEW: none. The values that mark a qard hasan facility are the product type values, so no free-text list is needed.
+
+@@ REP 26
+`ops_task.created` and `freeze.created`
+@@ WITH
+`ops.task_created` and `freeze.created`
+@@ END
+# V-26-06-c | LOW | grep -c -F gave 1 | names used and where they exist: `ops.task_created` docs/plan/phase-20.md:541 and 781; `freeze.created` docs/plan/phase-20.md:791 | NEW: none
+
+@@ BLOCK 26
+### 7.N Aggregate counts and their query (V-26-07-a, LOW; DR-413)
+`AggregateCounts`, the return of `ShariaAggregateRepository::counts(period)` (section 2), holds the cells of 3.9 step 3: `by_contract_type` (per contract type: active, settled, closed, other), `by_evidence_status` (per `evidence_status`), `islamic_book_accounts`, and `gaps` (three pairs of numerator and denominator: no asset, no supplier or seller, evidence unknown). `counts` runs the statement of 3.9 step 2.
+`ShariaAggregateQuery::view(ctx, period) -> ShariaAggregateView` runs steps 1 and 4 to 7 of 3.9 around that call.
+@@ END
+# V-26-07-a | LOW | names used and where they exist: `ShariaAggregateRepository::counts(period)` docs/plan/phase-26.md:270; `ShariaAggregateQuery` docs/plan/phase-26.md:529 (heading); `ShariaAggregateView` docs/plan/phase-26.md:284; the cells docs/plan/phase-26.md:537 | NEW: `AggregateCounts` field names and `ShariaAggregateQuery::view` (the heading names the struct only)
+
+@@ REP 26
+one query with grouped counts; section 3.4)
+@@ WITH
+one query with grouped counts; section 3.9)
+@@ END
+# V-26-07-b | LOW | grep -c -F gave 1 | names used and where they exist: `counts(period) -> AggregateCounts` docs/plan/phase-26.md:270; the aggregates are in section 3.9, docs/plan/phase-26.md:529 | NEW: none
+
+@@ REP 26
+`ShariaAggregateView` (section 3.4)
+@@ WITH
+`ShariaAggregateView` (section 3.9)
+@@ END
+# V-26-07-b | LOW | grep -c -F gave 1 | names used and where they exist: `ShariaAggregateView` docs/plan/phase-26.md:284; section 3.9 docs/plan/phase-26.md:529 | NEW: none
+
+@@ REP 26
+`reject_code_not_allowed`, `period_future` |
+@@ WITH
+`reject_code_not_allowed`, `period_future`, `period_invalid` |
+@@ END
+# V-26-07-c | LOW | grep -c -F gave 1 | names used and where they exist: `period_future` docs/plan/phase-26.md:533; the Validation row docs/plan/phase-26.md:574; `E_VALIDATION` docs/API.md:985 | NEW: `period_invalid` (sub-code, in the style of `period_future`)
+
+@@ REP 26
+a future month is 422 `E_VALIDATION` at `/period` (sub-code `period_future`).
+@@ WITH
+a future month is 422 `E_VALIDATION` at `/period` (sub-code `period_future`), and a value that is not `YYYY-MM` or names no month from 01 to 12 is 422 `E_VALIDATION` at `/period` (sub-code `period_invalid`).
+@@ END
+# V-26-07-c | LOW | grep -c -F gave 1 | names used and where they exist: `period_future` docs/plan/phase-26.md:533; `E_VALIDATION` docs/API.md:985 | NEW: `period_invalid`
+
+@@ REP 26
+Checks of the file (section 6, check 17)
+@@ WITH
+Checks of the file (section 6, check 10)
+@@ END
+# V-26-07-d | LOW | grep -c -F gave 1 | names used and where they exist: section 6, check 10 (the Cedar bundle validates, with the generated-principal test) docs/plan/phase-26.md:863 | NEW: none
+
+@@ REP 26
+fails on a hit (section 6, check 17).
+@@ WITH
+fails on a hit.
+@@ END
+# V-26-07-d | LOW | grep -c -F gave 1 | names used and where they exist: the test is the one the same step describes, docs/plan/phase-26.md:554 | NEW: none
+
+@@ REP 26
+`--owner` is required: an Islamic scenario without a named owner is refused.
+@@ WITH
+`--owner` is required: an Islamic scenario without a named owner is refused before any write, with exit 1 and `owner` named (a failed seed also exits 1 and writes nothing, phase 16 section 3.15 step 1).
+@@ END
+# V-26-08-a | LOW | grep -c -F gave 1 | names used and where they exist: `akr-ctl packs seed` docs/plan/phase-16.md:1513; exit 1 and nothing written on a failed seed, docs/plan/phase-16.md:1515 | NEW: none
+
+@@ BLOCK 26
+### 7.N Islamic document in the pack seed and rule 15 (V-26-08-c, V-26-08-d, MEDIUM; DR-413)
+Extends phase 16 section 3.15 for this pack: (a) the release manifest also lists `packs/scenarios/islamic.v1.0.0.json` with its SHA-256 and signature, checked as `packs/scenarios/documents.v1.0.0.json` is (phase 06); (b) phase 16 rule 15 (`evidence_label` required, `E_SCHEMA`) applies to `pack: islamic` as to `pack: akr`.
+@@ END
+# V-26-08-c | MEDIUM | names used and where they exist: `packs/scenarios/documents.v1.0.0.json` docs/plan/phase-16.md:1513 and 1769; `akr-ctl packs seed` docs/plan/phase-16.md:1513; the extension is owned by phase 26 under docs/plan/phase-16.md:1950-1953 (7.2) | NEW: none
+# V-26-08-d | LOW | names used and where they exist: rule 15 docs/plan/phase-16.md:969; `evidence_label` required for the pack docs/plan/phase-26.md:456; the extension owner docs/plan/phase-16.md:1950-1953 (7.2) | NEW: none (covered by the same block)
+
+# DECIDE V-26-10-a | what "normalised document_ref" covers in the duplicate key of 3.5 step 5: (A) trimmed and upper-cased only, with the phase 10 transforms `Trim` and `Upper`, so inner spaces and separators stay as typed | (B) also remove inner spaces, hyphens and slashes, so that "12/34-56" and "123456" are one reference | section 2 says only "trimmed" (docs/plan/phase-26.md:260), so the choice is open | evidence: docs/plan/phase-26.md:396 (3.5 step 5), docs/plan/phase-26.md:260 (AttachEvidence, trimmed), docs/plan/phase-10.md:1585 (transforms Trim, Upper, Lower)
+
+@@ REP 26
+`ON CONFLICT (source_key) DO NOTHING`, fixed
+@@ WITH
+`ON CONFLICT (source_key) WHERE source_key IS NOT NULL DO NOTHING`, fixed
+@@ END
+# V-26-11-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `uq_registers_source_key` (partial unique index) docs/plan/phase-24.md:75; the warn insert with the WHERE predicate docs/plan/phase-24.md:1297-1299 (block 7.7) | NEW: none
+
+@@ REP 26
+`ON CONFLICT (source_key) DO NOTHING`).
+@@ WITH
+`ON CONFLICT (source_key) WHERE source_key IS NOT NULL DO NOTHING`).
+@@ END
+# V-26-11-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: as above; `RegisterWriter::warn` docs/plan/phase-24.md:1297 (block 7.7) | NEW: none
+
+@@ REP 26
+the message catalogue. The insert-or-nothing on
+@@ WITH
+the same map's `title {ar, en}` entry. The insert-or-nothing on
+@@ END
+# V-26-11-c | LOW | grep -c -F gave 1 | names used and where they exist: `WarningTitle` closed enum with `title {ar, en}` docs/plan/phase-24.md:1300 (block 7.7); the variant named in this block docs/plan/phase-26.md:882 | NEW: none
+
+# SUMMARY: fixes written 27 (REP 21, BLOCK 6); DECIDE 8; DROP 0; claims covered: V-26-01-a, V-26-01-b, V-26-02-a, V-26-02-b, V-26-02-c, V-26-03-a, V-26-03-b, V-26-04-a, V-26-04-b, V-26-04-d, V-26-04-e, V-26-04-f, V-26-05-a, V-26-05-b, V-26-05-c, V-26-05-d, V-26-06-a, V-26-06-c, V-26-07-a, V-26-07-b, V-26-07-c, V-26-07-d, V-26-08-a, V-26-08-c, V-26-08-d, V-26-10-a, V-26-11-a, V-26-11-c

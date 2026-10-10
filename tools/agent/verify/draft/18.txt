@@ -1,0 +1,123 @@
+Fixes for the claims of tools/agent/verify/refute-18.md about docs/plan/phase-18.md (draft for lead review).
+@@ BLOCK 18
+### 7.N Decision act with no running proposal (V-18-01-a, LOW; DR-413)
+Section 3.8 step d(ii): when the case is not `in_review`, or its proposal has ended (`ended_at` is set), the act is refused with 409 `E_NOT_ALLOWED_IN_STATE` and sub-code `no_running_proposal`. `proposal_running` is the refusal of an in-review case, so no code of section 3.17 fits. `no_running_proposal` joins the closed list of section 3.17.
+@@ END
+# V-18-01-a | LOW | names used and where they exist: `E_NOT_ALLOWED_IN_STATE` docs/API.md:982; `proposal_running` phase-18.md:733 and 921; `ended_at` and step d(ii) phase-18.md:758 | NEW: `no_running_proposal` (the closed list has no code for a case that is not in review)
+
+@@ BLOCK 18
+### 7.N Writers of the alert rows in the contribution step (V-18-02-a, MEDIUM; DR-413)
+Section 3.8 step i: each change of an alert row is saved with `AlertRepository::update` (phase 17 section 2; `expected` is the version the change was read at; the row gets `version + 1`). This phase extends phase 17 `AlertRepository` (section 2) with `append_event(&self, tx: &mut Tx, alert: &Alert, actor: Uuid, kind: &str, payload: serde_json::Value) -> Result<AlertEvent, RepoError>`. It inserts one `alert.alert_events` row in the caller's transaction, with `actor_kind = 'user'`, `seq` the alert's next number and a payload of ids and codes only. Step i calls it once per change with kind `alert.contribution_set`.
+@@ END
+# V-18-02-a | MEDIUM | names used and where they exist: `AlertRepository::update` phase-17.md:808; `Alert` phase-17.md:780; `AlertEvent` phase-17.md:783; `alert.alert_events` phase-17.md:190; `alert.contribution_set` phase-18.md:773; the inline trail write of phase 17 phase-17.md:1139 | NEW: `AlertRepository::append_event` (no phase names a writer for `alert.alert_events`; phase 17 writes its trail rows inline in its services)
+
+@@ BLOCK 18
+### 7.N Steps of `POST /cases/{id}/opened-views` (V-18-03-a, MEDIUM; DR-413)
+1. Cedar `case.read` on Case (section 3.19 forbids apply). A case the caller cannot see is 404 `E_NOT_FOUND` (section 3.10).
+2. Check `view_key` against `view_kind`. A `panel` key must be one of the six `PanelKey` values (section 2). An `evidence` key must be the id of an evidence item of this case (`EvidenceItemRepository::get(conn, case_id, id)`). A key that fails is 422 `E_VALIDATION` at `/view_key`: sub-code `unknown_view_key` (NEW, joins the closed list of section 3.17) when it is neither a panel key nor an id, and sub-code `not_on_case` when it is the id of an evidence item of another case.
+3. In one transaction: `OpenedViewRepository::insert` with the caller as `actor_id`, the `view_kind`, the `view_key` and `opened_at = now()`; audit `case.view_opened {view_kind, view_key}` (section 3.18; no chain event).
+@@ END
+# V-18-03-a | MEDIUM | names used and where they exist: route row phase-18.md:597 (`case.read`, `queue.work`); `E_NOT_FOUND` phase-18.md:907; `E_VALIDATION` phase-18.md:916; `PanelKey` phase-18.md:554; `EvidenceItemRepository::get` phase-18.md:578; `OpenedViewRepository::insert` phase-18.md:580; `not_on_case` phase-18.md:921; `case.view_opened` phase-18.md:932; section 3.10 phase-18.md:799 | NEW: `unknown_view_key` (the closed list has no code for a key that is neither a panel key nor an id)
+
+@@ BLOCK 18
+### 7.N The chain append is `CaseRepository::append_event` (V-18-04-a, LOW; DR-413)
+Where the intro of section 3 names `CaseChain` as the route of the append, and where section 3.3 step 5 and section 3.12 step 6 say `CaseChain::append_event(tx, case_id, kind, payload)`, read `CaseRepository::append_event(tx, case, e)` of phase 17 section 2, with `e` carrying that kind and payload. That method runs under the case row lock and sets the sequence, the time and the head, as phase 17 section 3.7 defines. `CaseChain` names the verifier only (`CaseChain::verify`).
+@@ END
+# V-18-04-a | LOW | names used and where they exist: `CaseRepository::append_event` phase-17.md:820; `CaseChain::verify` phase-17.md:1115; the wrong name at phase-18.md:624 (intro), 679 and 845 | NEW: none
+
+@@ REP 18
+9. `set_closure(case, closed_at, sealed_at, seal_hash)`;
+@@ WITH
+9. `set_closure(tx, id, closed_at, sealed_at, seal_hash, outcome)`;
+@@ END
+# V-18-04-b | LOW | grep -c -F gave 1 | names used and where they exist: `set_closure(tx, id, closed_at, sealed_at, seal_hash, outcome)` phase-18.md:581 (section 2) | NEW: none
+
+@@ REP 18
+a `reject` needs `comment`).
+@@ WITH
+a `reject` needs `comment`, and the comment passes `GenericTextGuard::check(comment, casework.decision_text_min_chars)` (section 3.3, decision text); a missing comment is 422 `E_VALIDATION` at `/comment` with sub-code `note_required`, and a refused one is 422 `E_VALIDATION` at `/comment` with sub-code `forbidden_term` or `text_too_short`).
+@@ END
+# V-18-05-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `GenericTextGuard::check` phase-18.md:667; `casework.decision_text_min_chars` phase-18.md:669; `E_VALIDATION` phase-18.md:916; `note_required`, `forbidden_term`, `text_too_short` phase-18.md:921; UX-65 research/31-analyst-ux.md:965 | NEW: none. Two checks for the lead: (1) 40 is the decision-text minimum of section 3.3; the lead may choose 1 (ordinary note) instead. (2) Section 3.3 step 4 calls `GenericTextGuard::check(body, 1)` inside `NoteService::post`, while the prose of 3.3 gives 40 for manual-grant notes, which go through that same post; phase 18 contradicts itself there (not drafted).
+
+@@ REP 18
+the step-up prompt of 7.12 (class `decision`)
+@@ WITH
+the step-up prompt of DESIGN-SYSTEM 7.12 (class `decision`)
+@@ END
+# V-18-05-b | LOW | grep -c -F gave 1 | names used and where they exist: `DESIGN-SYSTEM 7.12` "Step-up dialog and session warning" docs/DESIGN-SYSTEM.md:583; the same citation style `DESIGN-SYSTEM 7.14` phase-18.md:683 | NEW: none
+
+@@ BLOCK 18
+### 7.N Report sub-codes join the closed list (V-18-06-a, LOW; DR-413)
+The sub-codes `report_sign_required` and `filing_not_acknowledged` of section 7.3 join the closed list of section 3.17, as section 7.8 does for the sub-codes of phase 19.
+@@ END
+# V-18-06-a | LOW | names used and where they exist: closed list phase-18.md:921; `report_sign_required` phase-18.md:1280; `filing_not_acknowledged` phase-18.md:1282; section 7.8 phase-18.md:1307 | NEW: none
+
+@@ REP 18
+`sign` behaves as `approve` for `case_report_approval`.
+@@ WITH
+`sign` behaves as `approve` for `case_report_approval` only when the act carries `via = "report"` (section 7.3); without it the sign is refused with 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `report_sign_required`.
+@@ END
+# V-18-06-b | HIGH | grep -c -F gave 1 | names used and where they exist: `via = "report"` and `report_sign_required` phase-18.md:1280 (section 7.3); step e phase-18.md:759 | NEW: none
+
+@@ BLOCK 00
+### 7.N Grant expiry timer in the registry (V-18-07-b, MEDIUM; DR-413)
+From phase 18 on, the table of section 7.3 also lists `case_acl_expiry` | `case_acl` | phase 18. The kind is the timer of a time-boxed manual grant (phase 18 section 7.10 item 3; owner id the grant id).
+@@ END
+# V-18-07-b | MEDIUM | names used and where they exist: table of section 7.3 phase-00.md:863-870 (the `work_item_due` row is at 870); `case_acl_expiry` phase-18.md:1335 (7.10 item 3); `case_acl` phase-18.md:1335 | NEW: none. Note: phase-18.md:1111 already says phase 18 registers the kind; section 4.2 could also name it (not drafted, to keep one entry per claim).
+
+@@ BLOCK 18
+### 7.N Job row and worker handler of the grant expiry (V-18-07-c, MEDIUM; DR-413)
+Section 4.1 table gains the row `case_acl_expiry_scan` | worker | `{}` [`case_acl_expiry_scan`] | 1, 3 | `schedule.case_acl_expiry_scan` (hourly at minute 15); the backstop of section 7.10 item 5. Its concurrency and attempts are those of the scan row `work_item_due_scan`. Section 4.3, akr-worker, gains `case_acl_expiry: Arc<CaseAclExpiryHandler>`, which runs `timer_case_acl_expiry` (section 7.10 item 4) and the scan.
+@@ END
+# V-18-07-c | MEDIUM | names used and where they exist: `work_item_due_scan` row phase-18.md:1105 (values 1, 3); `schedule.case_acl_expiry_scan` phase-18.md:476; `timer_case_acl_expiry` phase-18.md:1337; akr-worker entry phase-18.md:1118 | NEW: `CaseAclExpiryHandler` (section 4.3 has only `WorkItemClockHandler`, and no handler of this phase covers case grants). Check: 1, 3 copies the phase's own scan row. The timer job's own row is not in 4.1 either (its analogue `timer_work_item_due` has 2, 3); not drafted.
+
+@@ REP 18
+The rule-5 visibility clause (section 3.9)
+@@ WITH
+The rule-5 visibility clause (section 3.10)
+@@ END
+# V-18-07-d | LOW | grep -c -F gave 1 | names used and where they exist: section 3.10 "Case rows" phase-18.md:799-801 (the rule-5 clause); the ViewGate section is 3.9 at phase-18.md:789 | NEW: none
+
+@@ REP 18
+if_match) -> CaseAccessView`**
+@@ WITH
+if_match) -> AccessView`**
+@@ END
+# V-18-07-f | LOW | grep -c -F gave 1 | names used and where they exist: `AccessView` phase-18.md:569 (section 2 views) | NEW: none. The fields of the view are not listed here; the claim is about the name.
+
+@@ REP 18
+`analyst_rejected` with `decided_by`;
+@@ WITH
+`analyst_rejected` with `decided_by` and `valid_from = now()` (the same instant as `valid_to` of the closed row);
+@@ END
+# V-18-08-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `valid_from TIMESTAMPTZ NOT NULL`, with no default, phase-13.md:1072; `decided_by` phase-13.md:1071; `analyst_rejected` method value phase-13.md:1069-1070; the close with `valid_to = now()` phase-18.md:1365 | NEW: none
+
+@@ BLOCK 18
+### 7.N Search response and its rows (V-18-09-a, MEDIUM; DR-413)
+The response of `GET /api/v1/search` is `SearchResponse` (utoipa `ToSchema`). It has a group `party` and a group `case`, each with `rows` and `has_more` and no total (section 7.12). A party row is `{ party_id, name }`: the current name, Arabic first, read by `CanonPartyReader::current_names` (section 2). A case row is `{ case_id, case_ref }`.
+@@ END
+# V-18-09-a | MEDIUM | names used and where they exist: route row phase-18.md:1382; `has_more` and no totals phase-18.md:1382; `SearchService::query` phase-18.md:1384; `CanonPartyReader::current_names` phase-18.md:582; `case_ref` on `casework.cases` phase-17.md:24; Arabic-first ordering in section 7.12 step 6, phase-18.md:1375-1404 | NEW: `SearchResponse` (no type of that name in docs/plan). The row fields are the least the prose supports (the name, `case_ref`, and the ids the routes need). The lead may widen them.
+
+# DECIDE V-18-09-b | A: a `limit` above 10 is refused with 422 `E_VALIDATION` at `/limit`, as phase 17 refuses an over-cap bulk list (phase-17.md:1208) | B: a `limit` above 10 is capped at 10, and `has_more` comes from the capped query; no plan text chooses (docs/API.md:46 sets 200 as the maximum and says nothing above it). The `q` range (2 to 80) is already a 422 `E_VALIDATION` (phase-00.md:499).
+
+@@ REP 18
+5. `set_reopened(case)`:
+@@ WITH
+5. `set_reopened(tx, id, at)`, with `at = now()`:
+@@ END
+# V-18-10-a | LOW | grep -c -F gave 1 | names used and where they exist: `set_reopened(tx, id, at)` phase-18.md:581 (section 2) | NEW: none. Check: `at = now()`, because the chain time of step 6 is only known after step 5.
+
+@@ REP 18
+has an `outcome` (sub-code `decided`)
+@@ WITH
+has an `outcome` (sub-code `already_decided`)
+@@ END
+# V-18-11-a | LOW | grep -c -F gave 1 | names used and where they exist: `already_decided` phase-18.md:733 (section 3.7 step 2) and 921 (closed list) | NEW: none. Phase 17 section 7.13 still says `decided` for the same refusal (phase-17.md:1898); the lead needs a phase 17 REP for it (not drafted).
+
+@@ BLOCK 18
+### 7.N Deny event of a refused link add (V-18-12-b, MEDIUM; DR-413)
+The deny access event of section 7.19 is written through `AccessLog::record` in its own transaction (phase 03 section 3.2 step 8). It has `action = view`, the plain read action of the phase 02 CHECK (the add reads the target to refuse it), and `decision = deny`. Its `resource_type` is `customer`, and its `resource_id` and `subject_party` are the owner party of the target (section 3.5 step 1). Its `tier` is `casework.effective_tier(owner party)`, and its `purpose_code` is the request's purpose.
+@@ END
+# V-18-12-b | MEDIUM | names used and where they exist: `AccessLog::record` phase-03.md:711; `customer` masked kind phase-03.md:407; `action` CHECK phase-02.md:151; `decision` CHECK phase-02.md:156; `casework.effective_tier` phase-18.md:713; section 7.19 phase-18.md:1460-1461 | NEW: none. Two choices to check: `customer` is the masked kind of the owner party, whose tier the read uses; `view` is the only plain read in the phase 02 CHECK (no write action exists there).
+
+# SUMMARY: fixes written 18 (REP 9, BLOCK 9); DECIDE 1; DROP 0; claims covered: V-18-01-a, V-18-02-a, V-18-03-a, V-18-04-a, V-18-04-b, V-18-05-a, V-18-05-b, V-18-06-a, V-18-06-b, V-18-07-b, V-18-07-c, V-18-07-d, V-18-07-f, V-18-08-b, V-18-09-a, V-18-09-b, V-18-10-a, V-18-11-a, V-18-12-b

@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-22.md by the second re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-22-1]
+WHY: S-22-1 | CONFIRMED LOW (raised MEDIUM) | section 7 (the R-22-1 text) says an approver learns of an overdue task from `task.overdue`; phase 04 section 7.8 sends it on a `remind` timeout only, and most shipped approval steps have an `escalate` timeout alone. Descriptive text; phase 04 builds the rule | the clause is limited to a step with a `remind` timeout
+OLD: An approver learns of an open deciding task from the phase 04 inbox and, once the task is overdue, from `task.overdue`; `task.waiting` goes to the escalation target only (phase 04 section 7.8).
+NEW: An approver learns of an open deciding task from the phase 04 inbox and, where the step has a `remind` timeout, from `task.overdue` once the task is overdue (a step with an `escalate` timeout alone sends its approver no overdue notice); `task.waiting` goes to the escalation target only (phase 04 section 7.8).

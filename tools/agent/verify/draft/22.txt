@@ -1,0 +1,161 @@
+Fixes for the claims of tools/agent/verify/phase-22.md (fix drafter's draft; the lead reviews each entry before it is applied).
+@@ REP 22
+until the object is `scanned` it cannot be used in an answer
+@@ WITH
+until its `av_status` is `clean` it cannot be used in an answer
+@@ END
+# V-22-02-a | LOW | part 1 of 2; grep -c -F gave 1 | names used and where they exist: `av_status` phase-02.md:368; enum `admin.av_status` ('pending', 'clean', 'infected', 'rejected') phase-02.md:350 | NEW: none
+
+@@ REP 22
+and status scanned (`version_id` set)
+@@ WITH
+and `av_status = 'clean'` (`version_id` set)
+@@ END
+# V-22-02-a | LOW | part 2 of 2; grep -c -F gave 1 | names used and where they exist: `av_status` phase-02.md:368; `version_id` phase-02.md:361 (the final object's version id) | NEW: none
+
+@@ REP 22
+classification: personal, lang: none, bytes }
+@@ WITH
+classification: personal, lang: und, bytes }
+@@ END
+# V-22-02-b | LOW | grep -c -F gave 1 | names used and where they exist: `lang` CHECK with 'und' phase-02.md:367; `ContentLang { Ar, En, Ku, Mixed, Und }` phase-02.md:607; `NewEvidence` phase-02.md:611 | NEW: none
+
+@@ REP 22
+when it corrects a current claim through `corroborates`, phase 19 section 3.3 step 2
+@@ WITH
+when it corrects a current claim through `supersedes`, phase 19 section 3.3 step 2
+@@ END
+# V-22-02-c | HIGH | part 1 of 2; grep -c -F gave 1 | names used and where they exist: the correction rule `supersedes` phase-19.md:1119 (section 3.3 step 2); `supersedes` column phase-19.md:175; `corroborates` writes no new claim phase-19.md:1120 | NEW: none
+
+@@ REP 22
+evidence_ids: Vec<Uuid> (0 to 5), corroborates: Option<Uuid> }` (the phase 19 `AnswerInput` with the branch's source kind fixed to `branch_officer`).
+@@ WITH
+evidence_ids: Vec<Uuid> (0 to 5), supersedes: Option<Uuid> }` (the phase 19 `AnswerInput` with `question_key` in place of `question_id`, the source kind fixed to `branch_officer`, corroboration `none` and no evidence object (section 3.2 step 5); the route finds `question_id` through `casework.rfi_questions`, unique on `(rfi_id, question_key)` (phase 19 section 1); the 500-character cap of `value` is this route's own, narrower than the 2000 of phase 19).
+@@ END
+# V-22-02-c (part 2 of 2: the field), V-22-02-d | HIGH, LOW | grep -c -F gave 1 | names used and where they exist: `AnswerInput` phase-19.md:983; `supersedes` phase-19.md:175 and phase-19.md:983; `casework.rfi_questions` with `UNIQUE (rfi_id, question_key)` phase-19.md:143-153 | NEW: none. Lead: the branch AnswerInput drops `corroborates`, because section 3.2 step 5 says only the desk raises corroboration. The plan does not say whether a branch may supersede a claim it did not give, desk claims included.
+
+@@ REP 22
+InternalReportService::receive(tx, ReceiveCommand {
+@@ WITH
+InternalReportService::receive(tx, CreateInternalReport {
+@@ END
+# V-22-03-a | LOW | grep -c -F gave 1 | names used and where they exist: `CreateInternalReport { reporter_kind, reporter_id, branch_id, subject_party_id, channel, body, received_at }` phase-19.md:985; `InternalReportService::receive` with the same command for the branch window phase-19.md:1135 | NEW: none
+
+@@ REP 22
+through the register detail (Open doubts 9)
+@@ WITH
+through the rows that section 7.2 extends (Open doubts 9)
+@@ END
+# V-22-03-b | LOW | part 1 of 2; grep -c -F gave 1 | names used and where they exist: `GET /internal-reports` phase-19.md:1039 (the list route); section 7.2 of this phase phase-22.md:929-933 | NEW: none
+
+@@ REP 22
+through the phase 19 register detail, which has no observation fields today; the register detail gains them for M only
+@@ WITH
+in the rows of phase 19's `GET /internal-reports`, which have no observation fields today; section 7.2 adds them for M only
+@@ END
+# V-22-03-b | LOW | part 2 of 2; grep -c -F gave 1 | names used and where they exist: `GET /internal-reports` phase-19.md:1039; section 7.2 phase-22.md:929 | NEW: none. Lead: "(a read extension, not built here)" in the same bullet conflicts with 7.2 ("This phase owns the read extension"); left as it is.
+
+@@ BLOCK 22
+### 7.N Alarm row of the liaison report (V-22-04-a, MEDIUM; DR-413)
+Section 3.10 of phase 19 gains the row of the kind this phase raises (phase 19 section 7.3 asks each owner to add its rows): `liaison_report_overdue` (no stage) | raised by `timer_liaison_due` (section 3.6 of this phase) | subject `liaison_report` | supervisor `M` | read by `M`.
+@@ END
+# V-22-04-a | MEDIUM | names used and where they exist: `liaison_report_overdue` with subject `liaison_report` phase-19.md:1861; the 3.10 table phase-19.md:1301-1308; `AlarmService::raise` phase-19.md:1299; `timer_liaison_due` phase-22.md:562; section 3.6 of this phase phase-22.md:546 | NEW: none
+
+# DECIDE V-22-04-b | option A: a return that comes after the timer has fired raises `liaison_report_overdue` in the return transaction through `AlarmService::raise`, as the timer does (section 3.6 timer step 2), when the due day has passed (evidence: phase-22.md:575 "a report returned and not re-signed by the due day raises the overdue alarm"; phase-22.md:563 a signed report is a no-op) | option B: the return schedules a new `liaison_due` timer with the fire rule of section 3.5 step 1e (evidence: phase-22.md:541; a fired timer matches nothing again, phase-00.md:1013 "already fired or was cancelled matches nothing"; DR-211 phase-22.md:1011 "the timer fires the next morning, once")
+
+@@ REP 22
+`get(conn, code)`, `all(conn)`, `put_version(tx, NewVersion)`
+@@ WITH
+`get(conn, code)`, `get_version(conn, code, version) -> Option<NotificationTemplate>` (one stored version by its `UNIQUE (code, version)`, for the render of `NotificationService::list`; `updated_at` is the version's `created_at`), `all(conn)`, `put_version(tx, NewVersion)`
+@@ END
+# V-22-05-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `TemplateRepository` phase-22.md:404; `NotificationTemplate` phase-22.md:390; `UNIQUE (code, version)` phase-22.md:155; `NotificationService::list` phase-22.md:619 | NEW: `get_version` (no repository method reads one stored version; `get(conn, code)` takes no version)
+
+@@ REP 22
+both languages present; placeholders from the template's `params` only;
+@@ WITH
+both languages present (`E_MISSING_I18N`); placeholders from the template's `params` only (`unknown_key`);
+@@ END
+# V-22-05-b | LOW | part 1 of 2; grep -c -F gave 1 | names used and where they exist: `E_MISSING_I18N` DSL.md:1098 ('ar' or 'en' missing); `unknown_key` phase-09.md:926 (template validation list) | NEW: none
+
+@@ REP 22
+on both languages; the code exists.
+@@ WITH
+on both languages (`forbidden_term`, span only); the code exists (`unknown_key`).
+@@ END
+# V-22-05-b | LOW | part 2 of 2; grep -c -F gave 1 | names used and where they exist: `forbidden_term` (span only) and `unknown_key` phase-09.md:926; `template_has_figures` is already named in the same sentence | NEW: none
+
+# DECIDE V-22-05-c | option A: keep the seed (phase-22.md:201) and name a producer: an approval route's `notify` effect sends `desk.approval_waiting` with `count` to the approvers, which needs a new `to` value because section 4.5 item 5(a) admits only `initiator` and `subject_team` (evidence: phase-22.md:821) | option B: drop the seed row (phase-22.md:201) and the code from the closed list, so fifteen becomes fourteen (phase-22.md:579) and seventeen becomes sixteen (phase-22.md:921); approvers already get their deciding task through `task.waiting` (evidence: phase-04.md:1682 `Holders::eligible` for the open deciding task; phase-04.md:1713 escalate writes `task.waiting`)
+
+@@ REP 22
+and the link `serve.public.base_url` (phase 01).
+@@ WITH
+and the link built from `AKR_PUBLIC_ORIGIN` (phase 01 environment variable).
+@@ END
+# V-22-05-d | LOW | part 1 of 2; grep -c -F gave 1 | names used and where they exist: `AKR_PUBLIC_ORIGIN` phase-01.md:879 (environment variables list); phase-01.md:903 is prose only | NEW: none
+
+@@ REP 22
+`serve.public.base_url` (phase 01), `bank.timezone` (phase 00).
+@@ WITH
+`AKR_PUBLIC_ORIGIN` (phase 01 environment variable, not a settings row), `bank.timezone` (phase 00).
+@@ END
+# V-22-05-d | LOW | part 2 of 2; grep -c -F gave 1 | names used and where they exist: `AKR_PUBLIC_ORIGIN` phase-01.md:879 | NEW: none
+
+@@ REP 22
+the task and the template code in the payload | `task.waiting` or `task.overdue` (count 1) | holders of the open task (phase 04 `Holders::eligible`); for an escalation, the escalation assignee | the producer names the code; the code is one of the two |
+@@ WITH
+the task or the workflow instance named in the payload, and the template code (a count-only break-glass code carries no id) | `task.waiting` or `task.overdue` (count 1), or a break-glass code of 7.1 (`security.break_glass_waiting` or `security.break_glass_opened`, count) | holders of the open task (phase 04 `Holders::eligible`); for an escalation, the escalation assignee; for a break-glass code, the active holders of the role (7.1) | the producer names the code; the code is one of the closed codes of section 1.2 (section 4.5 item 5(a)) |
+@@ END
+# V-22-06-a | HIGH | grep -c -F gave 1 | names used and where they exist: `security.break_glass_waiting` and `security.break_glass_opened` phase-22.md:921-922 (7.1) and phase-25.md:813-814 (table); active holders phase-22.md:924 (7.1) and `active_holders(role)` phase-01.md:451; `Holders::eligible` phase-04.md:1072; payloads of `notify.request` phase-04.md:1712-1713; closed codes phase-22.md:383 and section 4.5 item 5(a) phase-22.md:821 | NEW: none
+
+@@ BLOCK 22
+### 7.N Count-only notices in the dispatcher (V-22-06-b, HIGH; DR-413)
+A notice whose payload carries `count` and no id (the break-glass codes of section 7.1, whose count phase 25 sets to the waiting requests or the active grants, phase 25 section 3.3) has no source row and no tier. Steps 2 and 3 of section 3.8 do not run, so step 5 never changes its template. Step 4 takes the active holders of the role (section 7.1) with no visibility filter, since the notice names no resource. Step 6 is replaced by the `count` in the payload.
+@@ END
+# V-22-06-b | HIGH | names used and where they exist: `NoticeParams { count }` phase-22.md:389; steps 2 to 6 phase-22.md:585-589; `security.break_glass_waiting` phase-22.md:922; phase 25 count payload phase-25.md:775 and table phase-25.md:813-814; phase 25 section 3.3 phase-25.md:809 | NEW: none
+
+@@ REP 22
+`ObservationView` (for M and the desk only) carries the decrypted notes through the phase 02 sealing service.
+@@ WITH
+`ObservationView` (for M only) carries the decrypted notes through the phase 02 personal seal (AAD = the observation id, as section 3.3 step 5 applies it).
+@@ END
+# V-22-07-a, V-22-07-b | HIGH, LOW | grep -c -F gave 1 | names used and where they exist: `phase 02 personal seal` phase-18.md:480 and phase-19.md:868; M-only rule phase-22.md:931-932 (7.2) and DR-385 research.md:396 | NEW: none. Lead: section 3.3 step 5 (phase-22.md:507) says "phase 18 field-sealing pattern", which phase 18 does not name (it says "phase 02 personal seal", phase-18.md:480); align that line too if you agree (not in this draft).
+
+@@ BLOCK 22
+### 7.N Observation read for the register list (V-22-07-c, LOW; DR-413)
+Section 2 `ObservationRepository` gains `by_internal_report(conn, internal_report_ids) -> Vec<Observation>`: one read of the observations whose `internal_report_id` is in the page of the register list, for the `observation` key of section 7.2. The list row that key extends is phase 19's `InternalReportView` (phase 19 section 3.4 step 5), and the key is set for M only.
+@@ END
+# V-22-07-c | LOW | names used and where they exist: `ObservationRepository` phase-22.md:401; `casework.observations.internal_report_id` phase-22.md:66; `InternalReportView` phase-19.md:1140; `GET /internal-reports` phase-19.md:1039 | NEW: `by_internal_report` (no read of observations by internal_report_id exists; the repository has insert, set_hybrid and unchecked only)
+
+# DECIDE V-22-10-a | option A: `CaseService::close` moves the case's released and answered RFIs to `closed` and sets `closed_at`, in its own transaction (guard phase-19.md:544-545 allows released to closed and answered to closed; the closure gate at phase-19.md:1127 already reads the case's RFIs at that call) | option B: a desk act `POST /rfis/{id}/close` (a new route with its own Cedar action) closes a released or answered RFI; no step of phase 19 sets `closed` or `closed_at` today (the RfiService steps at phase-19.md:1089-1135 set neither), and phase 22 relies on that close (evidence: phase-22.md:961 "after phase 19 closes or withdraws it"; phase-22.md:473 `closed_at > now()` in the list)
+
+@@ REP 22
+`closed`, which a withdrawn
+@@ WITH
+`closed`;
+@@ END
+# V-22-10-b | LOW | part 1 of 2; grep -c -F gave 1 | names used and where they exist: `rfi.released_at IS NOT NULL` phase-22.md:473 (an RFI never released is not listed); the guard has no released-to-withdrawn move, phase-19.md:542-545 | NEW: none
+
+@@ REP 22
+request also shows; test e of section 6
+@@ WITH
+test e of section 6
+@@ END
+# V-22-10-b | LOW | part 2 of 2; grep -c -F gave 1 | names used and where they exist: as part 1 | NEW: none
+
+@@ REP 22
+(phase 19 section 3.14, Cedar `followup.a2.report`)
+@@ WITH
+(phase 19 section 3.13, Cedar `followup.a2.report`)
+@@ END
+# V-22-11-a | LOW | grep -c -F gave 1 | names used and where they exist: `followup.a2.report` phase-19.md:1436 (section 3.13 heading phase-19.md:1357; section 3.14 is the tipping-off review, phase-19.md:1597) | NEW: none. The A2 read of the subject party stays: the Cedar permit has no attribute condition (the refuted part of the claim).
+
+@@ REP 22
+`set_email_state(tx, id, state, attempts, sent_at, error_code)`; `sweep_read_older_than(tx, days, limit)`
+@@ WITH
+`set_email_state(tx, id, state, attempts, sent_at, error_code)`; `get_for_update(tx, id) -> Option<Notice>` (the notice row with `FOR UPDATE`, read by the job `notification_email`); `sweep_read_older_than(tx, days, limit)`
+@@ END
+# V-22-12-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `Notice { id, user_id, ... }` phase-22.md:388; `notification_email` loads the notice `FOR UPDATE` phase-22.md:981 and phase-22.md:734; `get_for_update(tx, id)` is the name of the other repositories' locked reads (InternalReportRepository phase-19.md:1000) | NEW: none (the name is not new to the plan; the notice repository has no read by id)
+
+# DROP V-22-09-a | docs/plan/phase-19.md:1964 "The RFI templates, the question keys, the purpose codes and the `authority_response.v1` template are pack content that the compliance owner writes (phase 09)." The branch RFI seed is bank pack content by design, not a phase 22 gap.
+
+# SUMMARY: fixes written 22 (REP 19, BLOCK 3); DECIDE 3; DROP 1; claims covered: V-22-02-a, V-22-02-b, V-22-02-c, V-22-02-d, V-22-03-a, V-22-03-b, V-22-04-a, V-22-04-b, V-22-05-a, V-22-05-b, V-22-05-c, V-22-05-d, V-22-06-a, V-22-06-b, V-22-07-a, V-22-07-b, V-22-07-c, V-22-10-a, V-22-10-b, V-22-11-a, V-22-12-a (all 21 STANDS and PARTLY; V-22-09-a REFUTED, DROP)

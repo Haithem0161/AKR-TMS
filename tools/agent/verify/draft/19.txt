@@ -1,0 +1,130 @@
+Fixes for the claims of tools/agent/verify/refute-19.md (phase 19). Drafted for lead review; nothing is applied.
+@@ REP 19
+cursor (Owned; `watch.read`)
+@@ WITH
+cursor (Owned; `watch.list`)
+@@ END
+# V-19-01-a (route row) | LOW | grep -c -F gave 1 | names used and where they exist: `watch.list` phase-19.md:1376 (declared on System), permitted at phase-19.md:1408 (A1), 1427 (A2) and 1461 (M); scope `queue.work` admits A1, A2 and M (docs/API.md section 2) | NEW: none
+
+@@ REP 19
+and Cedar `watch.read` are unchanged.
+@@ WITH
+and Cedar `watch.list` are unchanged.
+@@ END
+# V-19-01-a (section 7.8 text) | LOW | grep -c -F gave 1 | names used and where they exist: `watch.list` phase-19.md:1376 (declared on System), as in the entry above | NEW: none
+
+@@ REP 19
+`If-Match`): the watch is `under_review`
+@@ WITH
+`If-Match`), served by `WatchService::review(ctx, id, ReviewWatch, if_match)` (NEW; it writes the outcome with `WatchRepository::set_review`). The watch is `under_review`
+@@ END
+# V-19-01-b (review part only) | LOW | grep -c -F gave 1 | names used and where they exist: `WatchService` phase-19.md:1155; `ReviewWatch` phase-19.md:986; `WatchRepository::set_review` phase-19.md:1001 | NEW: `WatchService::review` (the route has no service method yet)
+# DROP V-19-01-b (expiry and trigger parts, refuted) | phase-19.md:1646 "handler: section 3.5 expiry" (the 4.1 row of `timer_watch_expiry`); phase-19.md:1650 "runs the triggers of sections 3.5 and 3.6 per party" (the 4.1 row of `watch_trigger_dispatch`)
+
+@@ BLOCK 19
+### 7.N Parties of a canonical batch (V-19-01-c, MEDIUM; DR-413)
+`CanonNetworkReader::batch_parties(conn, batch_id) -> Vec<Uuid>` (SELECT only) returns the distinct party ids of the rows that carry this `batch_id` (the lineage column of phase 10 section 1) in `canon.party` (`id`), `canon.party_contact` (`party_id`), `canon.party_relationship` (`from_party` and `to_party`) and `canon.account_party_role` (`party_id`). It gives the batch's changed party rows of section 3.5: `profile_change` fires for each watched party in the result. It is also the `batch_parties` input of `EdgeBuilder::rebuild` (section 3.7) and the source of the `party_ids` of the `network_edge_build` payload (section 4.1).
+@@ END
+# V-19-01-c | MEDIUM | names used and where they exist: `CanonNetworkReader` phase-19.md:1010; `EdgeBuilder::rebuild` phase-19.md:1203; `network_edge_build` payload `{batch_id, party_ids}` phase-19.md:1655; `batch_id` lineage column phase-10.md:49 and in `canon.party` (phase-10.md:480), `canon.party_contact` (phase-10.md:561), `canon.party_relationship` (phase-10.md:584) and `canon.account_party_role` (phase-10.md:680); `canon.touched` payload phase-11.md:833 | NEW: `CanonNetworkReader::batch_parties` (no reader of the batch's parties exists; phase 15's fan-out names no method, phase-15.md:1271)
+
+@@ REP 19
+`insert_many(tx, rows)`; `set_coaching(tx, id, state)`;
+@@ WITH
+`insert_many(tx, rows)`; `get(conn, id) -> Option<QaFinding>` (NEW; the severity and `created_at` that the bulk reopen of section 3.9 reads); `set_coaching(tx, id, state)`;
+@@ END
+# V-19-02-a (finding read part) | MEDIUM | grep -c -F gave 1 | names used and where they exist: `QaFinding` phase-19.md:974 (`severity`, `created_at`); `RfiRepository::get(conn, id)` phase-19.md:996 (the by-id style); bulk reopen step phase-19.md:1282 | NEW: `QaFindingRepository::get`
+# DECIDE V-19-02-a (dialog part: the list of closed cases in section 5.5) | option A: a new read route with its row in the section 2 route table (scope `qa.review`, M only), listing the analyst's cases closed in the window of V-19-02-b (route row of the reopen at phase-19.md:1048; section 5.5 bullet at phase-19.md:1768) | option B: phase 17's `GET /api/v1/cases` (phase-17.md:848, "post-filter, cursor", no closer or closed-date filter) gains `closed_by` and `closed_from` filters, which is a change to phase 17; phase 18 lists decisions per case only (phase-18.md:600) and the shelved register (phase-18.md:616), so no existing list feeds the dialog
+
+# DECIDE V-19-02-b | option A: the window of the finding is the window of the population its sample was drawn from (section 3.8: the last business week for the weekly sample, the previous business day for the daily one, otherwise `since` and `until`; phase-19.md:1238); the sample keeps no window (`QaSample` at phase-19.md:972 has none, and section 3.8 step 6 inserts none), so this needs a new column on `casework.qa_samples` in migration 0064 | option B: a new governed setting `qa.bulk_reopen_window_days` (integer, a row beside `qa.bulk_reopen_max` at phase-19.md:847), counted back from the finding's `created_at` (`QaFinding` at phase-19.md:974; bulk reopen at phase-19.md:1282)
+
+@@ BLOCK 19
+### 7.N Bulk reopen of a finding that is not critical (V-19-02-c, MEDIUM; DR-413)
+Section 3.9 bulk reopen: a `finding_id` that is not a critical finding is refused with 422 `E_VALIDATION` at `/finding_id`, sub-code `not_critical_finding`. This is an input rule, like `not_bulk_case`: the request names a finding that does not qualify. The 409 state refusal of section 3.11 is for a state that blocks a command, and this is not one. The sub-code joins the closed sub-code list of section 3.11.
+@@ END
+# V-19-02-c (non-critical part) | MEDIUM | names used and where they exist: `not_bulk_case` (422 `E_VALIDATION`, input rule) phase-19.md:1282; `Validation { errors }` = 422 `E_VALIDATION` phase-19.md:1333; `NotAllowed` = 409 phase-19.md:1329 (state rule, not used here); closed sub-code list phase-19.md:1338. The 409 alternative is not chosen: the other input refusal of this route is 422 (`not_bulk_case`) | NEW: sub-code `not_critical_finding`
+# DROP V-19-02-c (missing finding part) | phase-19.md:1323 "| `NotFound` | `E_NOT_FOUND` | 404 |" (section 3.11) already answers a finding id that does not exist
+
+@@ REP 19
+cursor (Owned; `rfi.read`)
+@@ WITH
+cursor (Owned; `rfi.list`)
+@@ END
+# V-19-03-a | LOW | grep -c -F gave 1 | names used and where they exist: `rfi.list` phase-19.md:1376 (declared on System); permitted to RFI by `followup.rfi.list` phase-19.md:1494-1495 and to M at phase-19.md:1461; scope `rfi.desk` admits RFI and M (docs/API.md:89) | NEW: none
+
+# DECIDE V-19-03-b | option A: at release (the effect of section 3.2 step 3, phase-19.md:1104), when `rfi.pre_fill` is on, the service writes one claim per pack question that the replica answers, with `source_kind` `replica`, `corroboration` `none` and state `current`; the desk may correct a claim later with `supersedes` (section 3.3 step 2, phase-19.md:1119; claims exist only after the second signature, DR-150 at phase-19.md:1943; the `replica` value of the answers DDL at phase-19.md:165) | option B: nothing is written at release; the desk view (`RfiDeskView` at phase-19.md:993; section 3.2 "Decision reads and the RFI desk" at phase-19.md:1113) shows a suggested value per question, read from the replica when the desk opens the RFI, and the desk records the values it accepts through `record_answers` (section 3.3, header at phase-19.md:1115) with `source_kind` `replica`. Both options need a map from each question key to replica fields, which the plan does not give; the field list is research/28-case-management-workflow.md section 9.4, line 651. The switch is named at phase-19.md:1699 and phase-09.md:777 and is `false` in the seed.
+
+@@ BLOCK 19
+### 7.N QA grant revocation path (V-19-04-a, MEDIUM; DR-413)
+Section 3.9 step 8, and the grant expiry of section 3.9, revoke a QA grant with `QaService::revoke_review_access(tx, grant_id, revoked_by, at)` (NEW). It runs in the caller's transaction and locks in the order of section 3.15 (case, then sample, then grant). It sets `revoked_by` and `revoked_at` with `CaseAccessRepository::revoke(tx, id, by, at)` (phase 18 section 2). It does not call phase 18's `CaseAccessService::revoke`, whose step 2 refuses a closed case with `E_CASE_SEALED`, so the revocation works on a sealed case. Its audit event is `qa.grant_revoked {sample_id}`, and it writes no case event.
+@@ END
+# V-19-04-a | MEDIUM | names used and where they exist: `QaService::grant_review_access` phase-19.md:1261 (section 3.8 step 7); revoke step phase-19.md:1277 (section 3.9 step 8); `casework.case_acl` UPDATE of `revoked_by, revoked_at` for the QA grants at phase-19.md:793 and phase-18.md:428; `CaseAccessRepository::revoke(tx, id, by, at)` phase-18.md:573; `CaseAccessService::revoke` phase-18.md:661 and its step 2 (closed case, `E_CASE_SEALED`) phase-18.md:655; lock order rule (e) phase-19.md:1629 | NEW: `QaService::revoke_review_access`
+
+@@ BLOCK 19
+### 7.N Alarm list for IA and SEC (V-19-05-a, HIGH; DR-413)
+Section 3.13: `followup.ia.samples` (System) also permits `Akr::Action::"alarm.list"`, so its action becomes `in [Akr::Action::"qa.sample.read", Akr::Action::"alarm.list"]`. A new permit `@id("followup.sec.system") @role("SEC") permit (principal, action == Akr::Action::"alarm.list", resource is Akr::System) when { principal.roles.contains("SEC") };` gives SEC the same action. `AlarmService` then lists, in SQL, the `chain_broken` alarms to IA and the `chain_broken` and `conflict_declared` alarms to SEC, which are the kinds that the per-alarm permits `followup.alarm.audit.chain` and `followup.alarm.sec.conflict` already allow. This follows the readers column of section 3.10, check (p) of section 6 and the `audit.read` scope of `GET /alarms`.
+@@ END
+# V-19-05-a | HIGH | names used and where they exist: `followup.ia.samples` phase-19.md:1511; `followup.alarm.audit.chain` phase-19.md:1582; `followup.alarm.sec.conflict` phase-19.md:1586; `alarm.list` declared phase-19.md:1378 and permitted to A2 (phase-19.md:1429) and M (phase-19.md:1465); readers column phase-19.md:1305-1306; check (p) phase-19.md:1823; route scope `audit.read` phase-19.md:1049 | NEW: Cedar @id `followup.sec.system` (the one new permit, for SEC on System)
+
+@@ REP 19
+`list_visible(conn, principal, filter, page)`; `mark_notified(tx, id, at)`;
+@@ WITH
+`list_visible(conn, principal, filter, page)`; `get_for_update(tx, id, principal) -> Option<Alarm>` (NEW; one alarm under a row lock and the section 7.11 predicate, built by `services::visibility::build`; `None` when the predicate hides it, which answers 404); `mark_notified(tx, id, at)`;
+@@ END
+# V-19-05-b (by-id read part) and V-19-11-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `AlarmRepository` phase-19.md:1004; `services::visibility::build` phase-17.md:1232 (section 3.10 of phase 17); section 7.11 (predicate and 404) phase-19.md:1915-1919; `WatchRepository::get_for_update(tx, id)` phase-19.md:1001 (the by-id style) | NEW: `AlarmRepository::get_for_update`
+# DROP V-19-05-b (lock-list part) | phase-19.md:1626 "casework.hibernation_hits`, `casework.alarms`, `casework.qa_samples`" (section 3.15 step 3) already names the alarm row, so the lock order needs no change
+
+@@ BLOCK 19
+### 7.N Assistant values of the closed enums (V-19-07-a, MEDIUM; DR-413)
+From phase 28 on (migration `0089`), the enums of section 2 follow the widened CHECK lists of section 7.2. `SamplePopulation` gains `AssistantGolden` (`assistant_golden`) and `AssistantAssisted` (`assistant_assisted`), and `SampleSource` gains `AssistantDraft` (`assistant_draft`). `DrawQaSample` then accepts the two new populations, and the rule of section 2 that each enum matches its SQL CHECK list still holds.
+@@ END
+# V-19-07-a | MEDIUM | names used and where they exist: `SamplePopulation` and `SampleSource` phase-19.md:977 (the mirror rule on the same line); `DrawQaSample` phase-19.md:989; the three SQL values in section 7.2 phase-19.md:1851-1854; migration `0089` phase-28.md:123 | NEW: the three Rust variants `AssistantGolden`, `AssistantAssisted` and `AssistantDraft` (the Rust spelling of the three values that section 7.2 already defines)
+
+@@ BLOCK 19
+### 7.N Verified output in the QA item view (V-19-07-c, V-19-07-d, HIGH; DR-413)
+From phase 28 on, the rule of section 2 that a QA item has no text except the decision text for an analyst network reader has one more exception. An item of source kind `assistant_draft` (population `assistant_golden`) shows the verified output of its draft and the records that the output cites. `QaItemView` gains `output: Option<String>` (NEW; the verified output, decrypted from `output_enc` of phase 28 section 1.2 for the sample's reviewer), `source_ids: Vec<SourceRef>` and `cited_panels: Vec<String>` (the names of phase 28 section 2). These three are `None` or empty for every other item. The time-boxed grant of section 3.8 step 7 covers an `assistant_draft` item as it covers a case item, on the draft's `case_id` (phase 28 section 1.2).
+@@ END
+# V-19-07-c (cited records and grant parts) and V-19-07-d | HIGH | names used and where they exist: `QaItemView` phase-19.md:993; the `assistant_golden` text of section 7.2 phase-19.md:1855; `casework.assistant_drafts` with `case_id`, `source_ids`, `cited_panels` and `output_enc` phase-28.md:130-146; `SourceRef` phase-28.md:400; the item rule of phase 28 section 3.6 phase-28.md:544 | NEW: `QaItemView::output` (the other two names exist in phase 28)
+# NOTE V-19-07-d (for the lead): phase 28 says the output is "decrypted only for the case team" (phase-28.md:400, the `AssistantDraft` output field), while phase-28.md:544 gives it to the reviewer under the grant. This block follows phase-28.md:544; phase 28 needs one line of alignment.
+# NOTE V-19-07-c (draft text part): not a gap; phase-19.md:1855 already gives the draft text to the reviewers of the sample.
+
+@@ BLOCK 19
+### 7.N The weekly draw of assisted decisions (V-19-07-b, MEDIUM; DR-413)
+From phase 28 on, the job `qa_suppression_sample` (section 4.1, Monday 06:00) is the weekly draw of section 7.2. In the same run it also draws the population `assistant_assisted` at `assistant.qa_sample_percent` (phase 28 section 1.3), with the draw of section 3.8 (no actor, `drawn_by` NULL) and the skip rule of section 7.2. The coalesce key, concurrency and attempts of the job do not change, and no new job kind is added.
+@@ END
+# V-19-07-b | MEDIUM | names used and where they exist: `qa_suppression_sample` phase-19.md:1659 (and section 7.7, phase-19.md:1883); `schedule.qa_suppression_sample` phase-19.md:860 (Monday 06:00); `assistant.qa_sample_percent` phase-28.md:335 (section 1.3, governed, floor 10); the weekly requirement phase-28.md:936 and DR-287 phase-28.md:910 | NEW: none. The alternative, a new weekly job kind with its own schedule key, adds a job kind and a setting; it was not chosen.
+
+@@ BLOCK 19
+### 7.N Freeze-list rows in the suppression sample (V-19-08-a, HIGH; DR-413)
+The population `screening_suppressions` of section 3.8 is the 5 per cent draw of the week's `alert.pair_memory` rows, plus every row whose `list_kind` is `freeze`. Every freeze row is in the sample, whatever the draw gives. This is the rule of phase 14 (section 7.3), and it holds where section 3.8 and this block differ. The job `qa_suppression_sample` (section 4.1) draws the sample this way.
+@@ END
+# V-19-08-a | HIGH | names used and where they exist: `alert.pair_memory` phase-14.md:356, with `list_kind` ('freeze', 'pep', 'internal') at phase-14.md:362 and `last_suppressed_at` at phase-14.md:378; phase 14 rule phase-14.md:1317-1318 (section 7.3, header at phase-14.md:1311); population row phase-19.md:1247; section 7.7 phase-19.md:1880 | NEW: none
+
+@@ REP 19
+`kpi_rows(conn, window)`.
+@@ WITH
+`kpi_rows(conn, window)`; `count_missed_outreach(conn, rfi_id) -> i64` (NEW; the `prior_failures` of section 7.9: the party's `customer_outreach` RFIs created before this one, with `deadline_at` passed and `answered_at` NULL).
+@@ END
+# V-19-09-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `RfiRepository` phase-19.md:996; `casework.rfis` columns `party_id`, `kind`, `deadline_at`, `answered_at`, `created_at` phase-19.md:95-125; `prior_failures` in section 7.9 phase-19.md:1893 | NEW: `RfiRepository::count_missed_outreach`
+
+@@ BLOCK 19
+### 7.N Section 4.2 row for outreach.failed (V-19-09-b, LOW; DR-413)
+The produced-topics table of section 4.2 gains the row `outreach.failed`, with the payload `{party_id, rfi_id, prior_failures}` of section 7.9 and the consumer phase 15 (the TR-20 trigger handler, phase 15 section 7+).
+@@ END
+# V-19-09-b | LOW | names used and where they exist: produced-topics table phase-19.md:1671-1678; payload phase-19.md:1893 (section 7.9); phase 15 topic list phase-15.md:1278 | NEW: none
+
+@@ REP 19
+`unknown_party`, `forbidden_term`.
+@@ WITH
+`unknown_party`, `forbidden_term`, `rfi_open`.
+@@ END
+# V-19-10-a | LOW | grep -c -F gave 1 | names used and where they exist: the closed sub-code list phase-19.md:1338; `rfi_open` in section 7.10 step 3 (phase-19.md:1903-1910) | NEW: none
+
+@@ REP 19
+`case_chain_check` (section 4.1) raises `chain_broken` through `AlarmService::raise` for each break (phase 17 open doubt 22 closed here).
+@@ WITH
+`case_chain_check` (section 4.1) raises `chain_broken` through `AlarmService::raise` for each break (phase 17 open doubt 22 closed here); the merge validation of phase 17 section 3.6 refuses a source case with a `released` RFI (section 7.10 step 3).
+@@ END
+# V-19-10-b | LOW | grep -c -F gave 1 | names used and where they exist: phase 17 section 3.6 "Merge and grouping" phase-17.md:1076; section 7.10 step 3 phase-19.md:1903-1910; sub-code `rfi_open` in the list at phase-19.md:1338 | NEW: none
+
+# NOTE V-19-05-c is REFUTED by the refuter and has no entry here. Six claims have parts with their own entries (each part is named once): V-19-01-a (two REPs), V-19-01-b (REP and DROP), V-19-02-a (REP and DECIDE), V-19-02-c (BLOCK and DROP), V-19-05-b (REP and DROP), V-19-07-c (BLOCK and NOTE).
+# SUMMARY: fixes written 18 (REP 9, BLOCK 9); DECIDE 3; DROP 3; claims covered: V-19-01-a, V-19-01-b, V-19-01-c, V-19-02-a, V-19-02-b, V-19-02-c, V-19-03-a, V-19-03-b, V-19-04-a, V-19-05-a, V-19-05-b, V-19-07-a, V-19-07-b, V-19-07-c, V-19-07-d, V-19-08-a, V-19-09-a, V-19-09-b, V-19-10-a, V-19-10-b, V-19-11-a

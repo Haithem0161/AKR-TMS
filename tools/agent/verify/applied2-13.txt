@@ -1,0 +1,35 @@
+Replacements made in docs/plan/phase-13.md by the first re-check (DR-413). 6 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-13-1a]
+WHY: R-13-1 | CONFIRMED MEDIUM | `EXCL_POOL_ACCOUNT` is only the example code of docs/DSL.md A.7 and its prefix breaks the phase 09 rule (`EXC_`); no phase defines it | phase 13 names a static exclusion of the scenario document with an active `EXC_` code; the DSL example becomes `EXC_POOL_ACCOUNT`
+OLD: is the phase 16 static exclusion `EXCL_POOL_ACCOUNT`, and
+NEW: is a static exclusion of the scenario document (docs/DSL.md A.7; phase 16 section 3.1 rule 13) with an active reason code of family `exclusion`, `EXC_POOL_ACCOUNT` in the DSL example, and
+
+=== F2 [R-13-2]
+WHY: R-13-2 | CONFIRMED HIGH (raised HIGH) | the seed feature `distinct_counterparties_3m` takes `txn.counterparty_id` as its field; that column is class `personal`, which step 2 of the validator refuses, so the nine-feature seed exits 1 | step 2 gains one exception: the field of a `distinct_count` may be `txn.counterparty_id`
+OLD:    is not a class `personal`, `secret-str` or `card` column, and is not a protected attribute: gender, religion,
+NEW:    is not a class `personal`, `secret-str` or `card` column (one exception: the `field` of a `distinct_count` may be
+   `txn.counterparty_id`, a surrogate id that is counted and never stored or shown), and is not a protected attribute: gender, religion,
+
+=== F3 [R-13-3]
+WHY: R-13-3 | CONFIRMED MEDIUM (raised MEDIUM) | step 3 of the cluster assignment opens a row only for a customer whose open row names another segment, so a first build writes no membership | a customer with no open row has the new row opened
+OLD: and a new row opened (`valid_from = as_of`); an unchanged customer writes nothing.
+NEW: and a new row opened (`valid_from = as_of`); a customer with no open cluster row of that currency (every customer at the first build) has only the new row opened; an unchanged customer writes nothing.
+
+=== F4 [R-13-4]
+WHY: R-13-4 | CONFIRMED LOW (raised MEDIUM) | sub-code `too_long` for a range; the phase 11 row has `range_too_long` | renamed
+OLD: with the sub-code `too_long`, and a `from` after `to`
+NEW: with the sub-code `range_too_long`, and a `from` after `to`
+
+=== F5 [R-13-5]
+WHY: R-13-5 | CONFIRMED LOW (raised LOW) | "uses it" points at `active_static` | "calls `active_by_level`"
+OLD: `active_static` is its `static` case; section 3.3 step 1 uses it for `risk_overlay`.
+NEW: `active_static` is its `static` case; section 3.3 step 1 calls `active_by_level` for `risk_overlay`.
+
+=== F6 [R-13-6]
+WHY: R-13-6 | CONFIRMED LOW (raised LOW) | `combine` of the `profile_refresh` plan not given | `all`; it changes nothing the job stores
+OLD: declared, own history, peer, with `min_history` = `profile.min_history_months`.
+NEW: declared, own history, peer, with `min_history` = `profile.min_history_months` and `combine` = `all`. `combine` decides a scenario's verdict only; it changes nothing that `profile_refresh` stores (the ratios, the z and the status of step 8).

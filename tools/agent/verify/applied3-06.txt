@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-06.md by the second re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-06-1]
+WHY: S-06-1 | CONFIRMED MEDIUM (raised HIGH) | block 7.11 (the R-06-5 text) defines `AttributeKey` as "one canonical attribute reference"; section 7.3 gives catalogue keys the form `<namespace>.<name>` and admits the `feat.` and `rating.` namespaces, which are not canonical columns. Both have the same dotted form, so nothing fails to build, but the definition is too narrow | `AttributeKey` holds one key of the `AttributeCatalogue` of section 7.3 // S-06-2 | CONFIRMED LOW | the same sentence places `grade` in section 2; it is in section 3.2 | pointer corrected (same replacement as S-06-1) // S-06-3 | CONFIRMED LOW | the same sentence cites DSL.md B.1 for `CanonicalRef`; it is defined in DSL.md section 1 | the citation leaves with the rewrite (same replacement as S-06-1)
+OLD: `AttributeKey`, used here and by `Need` and `grade` in section 2, is a newtype over `String` that holds one canonical attribute reference (`<entity>.<field>`, the `CanonicalRef` form of DSL.md B.1) and is checked when it is built.
+NEW: `AttributeKey`, used here, by `Need` in section 2 and by `grade` in section 3.2, is a newtype over `String` that holds one key of the `AttributeCatalogue` (section 7.3: the form `<namespace>.<name>`, which is a canonical `<table>.<column>` or a registered `feat.` or `rating.` key); the form is checked when it is built.

@@ -1,0 +1,140 @@
+Fixes for phase 20 (verification pass, lead-reviewed 2026-10-10). 30 claims: 26 confirmed (1 HIGH, 12 MEDIUM, 13 LOW),
+3 rejected (the refuter's: V-20-01-e, V-20-07-e, V-20-08-d), 1 duplicate (V-20-10-a of V-20-07-f).
+Lead choices: the deadline handler reads the letter state through the port (`LetterRequester::delivered`; no column,
+no callback; two lines of phase 21 follow); a release of a freeze with no task creates no lift task; the exit task
+and the refrain lift take the pack clock `ops.task.due`; Cedar is the rule for refrain registration (M only; the test
+was wrong); the release reason code is a constant and is not frozen in the instance; the OPS list shows completed
+tasks of the current bank day only; the release creates its lift tasks on approval (base step 5 holds over 7.1).
+
+@@ BLOCK 20
+### 7.N Input rows of the repository inserts (V-20-01-a, V-20-02-c, V-20-04-d, V-20-08-c, LOW; V-20-02-b, MEDIUM; DR-413)
+- `NewOpsTask` is `NewOpsTaskSpec` (section 3.1, Creation) plus the values creation derives: `task_ref` (step 3), `neutral_text_code` (step 2), `state = open` and `version = 1` (step 4).
+- `NewFreeze` holds the `casework.freezes` columns that `FreezeService::start` sets before its insert (section 3.4 Start, steps 1 to 4 and the clock table): `freeze_ref`, `screening_alert_id`, `case_id`, `subject_kind`, `subject_id`, `list_id`, `list_code`, `entry_id`, `entry_key`, `listing_decision_at`, `listing_decided_by`, the clock instants and `state = listed`. `listing_decided_by` is `c.decided_by` of the phase 14 candidate, the `decider_id` of the true decision row (the column the backfill of section 3.4 reads). `ops_task_id` stays NULL until `set_task` (step 6).
+- `NewRefrain` holds the values of register step 4 (section 3.7): `refrain_ref`, `office_reference`, `received_at`, `party_ids`, `target_accounts`, `case_id`, `refrain_due_at`, `state = open` and `registered_by = actor`.
+- `NewVerification` holds the values of check step 7 (section 3.3): `kind = canonical_check`, `level`, `post_order_debits`, `accounts_checked`, `holds_matched`, `canon_as_of` and `actor_id` (NULL for the job).
+@@ END
+
+@@ BLOCK 20
+### 7.N Completion hooks and method signatures (V-20-01-b, V-20-04-c, V-20-06-b, V-20-07-d, LOW; DR-413)
+- `FreezeService::on_task_completed(tx, freeze)` and `RefrainService::on_task_completed(tx, refrain)` write nothing and change no state: the completion sits on the task row and is audited by section 3.1 step 8, and the level changes only through the check of section 3.3. This replaces "both only record that the task is done" in section 3.1 step 7.
+- `RefrainService::register(tx, actor, cmd: RegisterRefrain) -> Result<RefrainInstruction, OpsError>` and `RefrainService::close(tx, actor, refrain_id, cmd: CloseRefrain) -> Result<RefrainInstruction, OpsError>` (section 3.7).
+- `FreezeService::refer(tx, actor, freeze_id) -> Result<Freeze, OpsError>` and `RefrainService::refer(tx, actor, refrain_id) -> Result<RefrainInstruction, OpsError>` serve the two referral routes of section 3.6 (the letter request, then `set_referred`).
+- `RefrainService::on_level(tx, refrain, level)`: a level of V1 or better on an `open` refrain sets `confirmed` and `confirmed_at = now()`; any other call changes nothing (section 3.7).
+- `FreezeService::propose_release(tx, actor, freeze_id, cmd: ProposeFreezeRelease)` returns the phase 04 instance and its open task (section 3.5 Propose, step 6).
+@@ END
+
+@@ REP 20
+lock as in complete; state not `completed`;
+@@ WITH
+lock as in complete (a task claimed by another user is refused 409 `E_CLAIMED`, complete step 3); state not `completed`;
+@@ END
+
+@@ BLOCK 20
+### 7.N Due time of the exit task and of the refrain lift (V-20-01-d, MEDIUM; DR-413)
+`OpsTaskService::create` takes `due_at` from its caller. The callers that had no rule use the phase 09 pack clock `ops.task.due` (working days, bounds 1 to 10): the terminal effect `create_ops_task` (the exit task) and the lift task of `RefrainService::close` (section 3.7) set `effective_at = now()` and `due_at = BusinessClock::add(now, ops.task.due, WorkingDays)`. The other callers keep their own clocks: `freeze_due_at` (section 3.4 Start), `refrain_due_at` (register step 4) and `now() + ops.freeze_task_hours` for the lift of a released freeze (section 3.5 step 5). This is the use that phase 24 lists for `ops.task.due`.
+@@ END
+
+@@ REP 20
+`FreezeError` is phase 14's port error, a variant set of this type
+@@ WITH
+`FreezeError` is phase 14's port error type and is this type (`pub type FreezeError = OpsError;`); the port returns the variants of the table below, and section 3.4 Start step 1 raises `NotFreezeList`
+@@ END
+
+@@ BLOCK 20
+### 7.N Registry bounds of the freeze task setting (V-20-03-a, MEDIUM; DR-413)
+Section 4.5 item 8: the settings registry (`common::settings_registry`, phase 00) declares the bounds 1 to 8 of `ops.freeze_task_hours`. The phase 04 setting target checks registry bounds, so a value outside them is refused at change time with 422 `E_VALIDATION`. Section 3.14 keeps the fallback to 8 for a value found outside the bounds.
+@@ END
+
+@@ REP 20
+`a2@` `POST /api/v1/refrain-instructions` with the step-up header and `received_at` on a Monday: 200;
+@@ WITH
+`m@` `POST /api/v1/refrain-instructions` with the step-up header and `received_at` on a Monday: 200 (the same request as `a2@` is 403 `E_FORBIDDEN`: Cedar gives `refrain.register` to M alone, section 3.12);
+@@ END
+
+@@ BLOCK 20
+### 7.N Close and referral: state rules (V-20-04-b, V-20-06-a, MEDIUM; DR-413)
+- Section 3.7 close: after the lock, a refrain already `closed` is refused before any write with 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `already_closed` (the phase 18 sub-code, reused; it joins the list of section 3.9). Close is allowed from `open`, `confirmed` and `referred`. The first `closed_by`, `closed_at` and lift task keep their values.
+- Section 3.6 freeze referral: lock the freeze; allowed in state `listed` or `frozen`. State `released`: 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `already_released`. `referred_at` already set: 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `already_referred`, which joins the list of section 3.9. Both refusals come before the letter request, so the first `referral_letter_id` and `referred_at` keep their values.
+@@ END
+
+@@ REP 20
+is frozen by `FreezeWorkflowSubject::start_context` as `freeze.reason_code`
+@@ WITH
+is not carried in the instance context: `release_freeze` step 3 writes it as a constant and the audit of step 6 names it
+@@ END
+
+@@ BLOCK 20
+### 7.N Release of a freeze with no task, and the one release code (V-20-07-b, MEDIUM; V-20-07-c, LOW; DR-413)
+- Section 3.5 `release_freeze` step 5: a freeze with no freeze task (`ops_task_id` NULL; a non-party freeze, DR-158) gets no lift task. Nothing was asked of operations for it, so there is nothing to lift. Steps 1 to 4 and 6 run as written, and `freeze.released` carries a null lift task id.
+- Section 3.5 Propose step 4: a `reason_code` other than `DEC_FREEZE_DELISTED` is 422 `E_VALIDATION` at `/reason_code`. The sub-code is `reason_code_inactive` for an inactive or unknown code and `reason_family_mismatch` for any other code, including another active `decision` code: the release accepts one code only.
+@@ END
+
+@@ REP 20
+`check_before_decision` (phase 18 section 3.19)
+@@ WITH
+`check_before_decision` (phase 18 section 3.8, item d)
+@@ END
+
+@@ REP 20
+- Section 3.5: `propose_release` creates one release task per group.
+@@ WITH
+- Section 3.5 step 5: `release_freeze` creates one release task per group, on approval and never at proposal; a proposal creates no ops task.
+@@ END
+
+@@ REP 20
+1. Read the task and its owner without a lock;
+@@ WITH
+1. Read the task and its owner without a lock to learn them, then lock the owner and then the task (`FOR UPDATE`, section 3.13) and re-read the task;
+@@ END
+
+@@ REP 20
+counted as `holds_matched`.
+@@ WITH
+counted per target account as `holds_matched` (an account counts once, however many matching holds it has); `n` is the number of target accounts, the `accounts_checked` of the row.
+@@ END
+
+@@ REP 20
+shows "Confirm" (V0) when the copy does not show the hold, with the note that the confirmation is flagged;
+@@ WITH
+shows "Confirm" (V0) after completion; the server's 409 `copy_matches` (section 3.3, Confirm step 3) decides whether the copy already shows the hold, and the screen shows that answer; with the note that the confirmation is flagged;
+@@ END
+
+@@ BLOCK 20
+### 7.N Completed tasks in the operations list (V-20-09-b, LOW; DR-413)
+Section 3.1 Reads, the neutral view (`ops.tasks`): `GET /ops-tasks` returns the `open` and `claimed` tasks and the tasks completed since the start of the current bank day (phase 09 calendar). Older completed tasks are not listed in that view; the team view lists them all. This is the day window of the W-OPS screen (section 5.1), applied by the server, so no filter is added to `ListOpsTasks`.
+@@ END
+
+@@ REP 20
+else the first group's;
+@@ WITH
+else the first group's, in the order `freeze`, `restrict`, `hold`;
+@@ END
+
+@@ BLOCK 20
+### 7.N The deadline handler reads the letter state through the port (V-20-12-a, HIGH; DR-413)
+Section 3.6: `LetterRequester` gains `async fn delivered(&self, conn: &mut PgConnection, letter_id: Uuid) -> Result<bool, LetterError>;`. `RecordingLetterRequester` returns `true` (until phase 21 a requested letter counts as delivered, so 7.3 adds no incident before the letter engine exists). Phase 21 implements it over its letter row (state `delivered`). The handler of 7.3 calls it through the worker's `letters` port (section 4.3) for `committee_report_letter_id`; a `LetterError` leaves the timer to retry. No column is added to `casework.freezes` and phase 21 calls no phase 20 method on delivery.
+@@ END
+
+@@ REP 21
+(phase 20 section 7+). `FreezeService::letter_delivered` (section
+@@ WITH
+(phase 20 section 7+). The handler reads the letter state through `LetterRequester::delivered`, which this phase implements (section
+@@ END
+
+@@ REP 21
+and `FreezeService::letter_delivered` (section 4.5 item 9) is added accordingly.
+@@ WITH
+and DR-413 settles it: `committee_report_at` means requested, and the phase 20 handler reads the delivery through `LetterRequester::delivered` (7.5).
+@@ END
+
+@@ REP 21
+4.5 item 9) records the delivery on the freeze.
+@@ WITH
+4.5 item 9); no phase 20 method records the delivery.
+@@ END
+
+@@ REP 21
+`FreezeService::letter_delivered(letter_id, delivered_at)` is proposed only if gap pass 1 decides Open doubts 4 that way.
+@@ WITH
+this phase implements `LetterRequester::delivered(conn, letter_id)` (phase 20 section 7+), which the phase 20 deadline handler reads.
+@@ END

@@ -1,0 +1,135 @@
+Fixes applied to docs/plan/phase-07.md by the verification pass (DR-413). 31 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/06.txt)
+OLD: lists 9 new operations (128 with
+NEW: lists 9 new operations (129 with
+
+=== F2 REP (from fixes/07.txt)
+OLD: | GET | /goaml/profiles | report.prepare, config.author |
+NEW: | GET | /goaml/profiles | report.prepare, config.author, config.approve |
+
+=== F3 REP (from fixes/07.txt)
+OLD: | GET | /goaml/profiles/{id} | report.prepare, config.author |
+NEW: | GET | /goaml/profiles/{id} | report.prepare, config.author, config.approve |
+
+=== F4 REP (from fixes/07.txt)
+OLD: because the configuration author proposes profile changes and must read what they change (aligned in the same change).
+NEW: because the configuration author proposes profile changes and must read what they change (aligned in the same change). The two profile reads also take `config.approve`, because the checker reads the version it decides (section 6); Cedar still limits them to A2, M, CFG and CHK.
+
+=== F5 REP (from fixes/07.txt)
+OLD: (no DTD; a `<!DOCTYPE` refuses the file).
+NEW: (no DTD; a `<!DOCTYPE` refuses the file as `xsd_unparseable`).
+
+=== F6 REP (from fixes/07.txt)
+OLD: 100 and bands descend.
+NEW: 100 and bands descend (else `params_invalid`).
+
+=== F7 REP (from fixes/07.txt)
+OLD: `profile_not_usable`, `corpus_failed`, `rule_unknown`, `params_invalid`, `pattern_invalid`, `limit_out_of_bounds`,
+NEW: `profile_not_usable`, `corpus_failed`, `corpus_not_run`, `rule_unknown`, `params_invalid`, `pattern_invalid`, `limit_out_of_bounds`,
+
+=== F8 REP (from fixes/07.txt)
+OLD: `NewFinding`, `NewWatchRun`.
+NEW: `NewFinding`, `NewWatchRun`. In `NewProfileVersion` the loader fills `lookups` and `schema_summary` (section 3.1 step 2); the caller, which holds the bytes, computes `xsd_sha256`, stores both XSDs as evidence and passes `xsd_evidence_id` and `effective_xsd_evidence_id` (section 3.1).
+
+=== F9 REP (from fixes/07.txt)
+OLD: OR NEW.rejection_patterns <> OLD.rejection_patterns OR NEW.xsd_sha256 <> OLD.xsd_sha256
+NEW: OR NEW.rejection_patterns <> OLD.rejection_patterns OR NEW.open_questions <> OLD.open_questions
+            OR NEW.lookups <> OLD.lookups OR NEW.schema_summary <> OLD.schema_summary
+            OR NEW.xsd_sha256 <> OLD.xsd_sha256
+
+=== F10 REP (from fixes/07.txt)
+OLD: permit (principal, action in [Akr::Action::"goaml_profile.read", Akr::Action::"goaml_watch.read"], resource)
+NEW: permit (principal, action == Akr::Action::"goaml_profile.read", resource)
+
+=== F11 REP (from fixes/07.txt)
+OLD: when { principal.roles.containsAny(["A2", "M", "CFG", "CHK"]) };
+NEW: when { principal.roles.containsAny(["A2", "M", "CFG", "CHK"]) };
+
+@id("goaml.watch_readers") @role("A2,M,CFG")
+permit (principal, action == Akr::Action::"goaml_watch.read", resource)
+when { principal.roles.containsAny(["A2", "M", "CFG"]) };
+
+=== F12 REP (from fixes/07.txt)
+OLD: changes but holds no `goaml_watch.read` beyond the profile (the policy grants both to the readers' set; the route
+NEW: changes and holds no `goaml_watch.read`; the watch routes refuse CHK at the scope gate (section 6, 403 `E_SCOPE`).
+
+=== F13 REP (from fixes/07.txt)
+OLD: scope keeps CHK off the watch routes). Bundle tests:
+NEW: Bundle tests:
+
+=== F14 REP (from fixes/07.txt)
+OLD: the target is a `candidate` of this code with `corpus_result` present;
+NEW: the target is a `candidate` of this code with `corpus_result` present (else 422 `corpus_not_run`);
+
+=== F15 BLOCK (from fixes/07.txt)
+### 7.N A corpus run that dies, and how the corpus grows (V-07-03-a, V-07-03-b, V-07-07-a, MEDIUM; DR-413)
+When `goaml_corpus` goes dead (phase 00, `job.dead`), `corpus_result` stays NULL. A promote is then refused with 422 `corpus_not_run`, and an amendment request cannot be decided because its `validation_run` evidence is missing: the maker withdraws it (the candidate becomes `rejected`, section 3.6 Closed) or an operator retries the job (phase 03 job administration).
+The corpus is release data (section 3.6): the files under `corpus/` and `cases.json`. A profile amendment adds rejection patterns, rule settings and limits; it adds no case file, and no table or route stores one. A rejection the bank meets becomes a corpus case when the bank gives the anonymised file, the codes it must produce and the Office message to the vendor, and the case ships in a later release, as the rule codes of section 7.2 do; `packs seed` then queues `goaml_corpus`. The header's RP-06 and RP-83 lines, the last paragraph of section 3.3 ("plus the cases a profile amendment adds", "Phase 21 adds the bank's own anonymised rejection cases") and section 3.7 ("and, from phase 21, a corpus case") read this way. Phase 21 adds no corpus.
+
+=== F16 BLOCK (from fixes/07.txt)
+### 7.N Rule parameter types (V-07-05-a, LOW; DR-413)
+The parameter schema of each rule (section 3.1 step 4) takes these JSON types for the Parameters column of section 3.3. `report_codes` (BR-03: STR, SAR, TFR), `placeholders` (BR-14: the five words quoted in that row), `currencies` (BR-18: IQD, USD) and `domestic` (BR-13, CTR-02: IQ) are arrays of strings. `days` (BR-08: 31; CONS-02: 7), `min_chars` (CONS-03: 400) and `threshold_usd` (BR-13: 10000) are integers. `tolerance` (CONS-01: 1) is a number. The shipped `profile.json` holds these values.
+
+=== F17 REP (from fixes/07.txt)
+OLD: file, at most 8 MiB);
+NEW: file, at most 8 MiB, else `file_too_large`);
+
+=== F18 REP (from fixes/07.txt)
+OLD: (at most 20,000 characters; only with exactly one file)
+NEW: (at most 20,000 characters, else `file_too_large` at `/rejection_text`; only with exactly one file)
+
+=== F19 REP (from fixes/07.txt)
+OLD: 1. `start`; a run not `queued` -> done.
+NEW: 1. `start` returns the run when it moved it from `queued` to `running` or when it is already `running` (a retry, which goes on from its first file without a recorded result, section 4), and `None` for a `completed` or `failed` run -> done.
+
+=== F20 REP (from fixes/07.txt)
+OLD: 11. Insert findings in batches; record the file result (`report_code`, transaction count, outcome, score, grade,
+NEW: 11. In one transaction per file: insert its findings in batches and record the file result in the run's `files` entry with `GoamlCheckRepository::record_file(tx, id, n, &FileResult)`, so a retry never repeats a file's findings (`report_code`, transaction count, outcome, score, grade,
+
+=== F21 REP (from fixes/07.txt)
+OLD: | `goaml_check.use_candidate` | GoamlProfile | M, CFG |
+NEW: | `goaml_check.use_candidate` | GoamlProfile | M |
+
+=== F22 REP (from fixes/07.txt)
+OLD: permit (principal, action in [Akr::Action::"goaml_check.read", Akr::Action::"goaml_check.read_all"], resource)
+NEW: permit (principal, action in [Akr::Action::"goaml_check.read", Akr::Action::"goaml_check.read_all", Akr::Action::"goaml_check.use_candidate"], resource)
+
+=== F23 REP (from fixes/07.txt)
+OLD: permit (principal, action in [Akr::Action::"goaml_watch.run", Akr::Action::"goaml_check.use_candidate"], resource)
+NEW: permit (principal, action == Akr::Action::"goaml_watch.run", resource)
+
+=== F24 REP (from fixes/07.txt)
+OLD: 12. One transaction: `complete` with the files and the summary;
+NEW: 12. One transaction: `complete` with the files and the summary (`CheckSummary`: counts per layer and per severity, block, warn and info; outcome counts; grade counts, good, moderate, acceptable and poor; the blocks and warns totals);
+
+=== F25 REP (from fixes/07.txt)
+OLD: `EvidenceStore::stage_transient(purpose = "goaml", owner = run_id, n)`
+NEW: `EvidenceStore::stage_transient(purpose = "goaml", owner = run_id, n: u8, stream)` (`n` is 1 to 50 for a file and 0 for the rejection text; `stream` is the part as `Stream<Item = Result<Bytes, io::Error>>`, never collected)
+
+=== F26 REP (from fixes/07.txt)
+OLD: outcome. The upload path does not change.
+NEW: outcome, which holds the `FileResult` of the file (section 3.2 step 11), its findings as `NewFinding` rows (section 2) and its `CheckSummary` (section 3.2 step 12). The upload path does not change.
+
+=== F27 REP (from fixes/07.txt)
+OLD: profile: &ProfileVersion, layers
+NEW: profile: &GoamlProfile, layers
+
+=== F28 REP (from fixes/07.txt)
+OLD: | NAME-01 | an apostrophe, dot, comma, parenthesis or slash removed from a person name | warn | `removed_count` |
+NEW: | NAME-01 | an apostrophe, dot, comma, parenthesis or slash removed from a person name (raised only by the phase 21 builder, never on an uploaded file) | warn | `removed_count` |
+
+=== F29 REP (from fixes/07.txt)
+OLD: | CTR-02 | a CTR transaction whose two countries are not both domestic | block | |
+NEW: | CTR-02 | a CTR transaction whose two countries are not both in `domestic` | block | `domestic` [IQ] |
+
+=== F30 BLOCK (from fixes/07.txt)
+### 7.N BR-13 beside CTR-01 and CTR-02 (V-07-12-b, MEDIUM; DR-413)
+CTR-01 and CTR-02 block what DR-368 says is not a CTR. BR-13 keeps its warn for the amount: on a transaction for which CTR-01 or CTR-02 raised a finding, BR-13 raises none, so one fault gives one finding. A profile without the two CTR rules (before phase 21's release) keeps BR-13 as section 3.3 states it.
+
+=== F31 REP (from fixes/21.txt)
+OLD: | CTR-03 | an extreme or non-round amount in a CTR transaction | warn | |
+NEW: | CTR-03 | a CTR transaction whose amount is above `max_usd` in USD, or is not a whole multiple of the cash unit (`round_unit_iqd` for IQD, 1 for every other currency) | warn | `max_usd` 1000000, `round_unit_iqd` 250 (integers) |
+| CONS-05 | a transaction whose account is not among the accounts of the report's subjects (RP-30) | warn | |

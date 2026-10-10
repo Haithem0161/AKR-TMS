@@ -1,0 +1,257 @@
+Fixes applied to docs/plan/phase-25.md by the verification pass (DR-413). 57 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/01.txt)
+OLD: the anomaly rules themselves are phase 24's SP-36 pack
+NEW: the anomaly rules themselves are the SIEM rules of section 7+ (SP-36, partly implemented there)
+
+=== F2 BLOCK (from fixes/01.txt)
+### 7.N SP-36 behaviour rules: what ships and what does not (V-01-07-a, MEDIUM; DR-413)
+No phase carried SP-36 (the behaviour rule pack of research 30 section 9.3), and this phase's header named phase 24
+for it. Decision: SP-36 is partly implemented here and the rest is P2.
+1. Shipped: `deploy/siem/use_cases.yaml` (section 3.5) gains the correlation rules that the exported kinds can feed,
+   as entries `{id, title, kinds, group_by: actor, window, threshold}`: repeated denied or conflicting attempts
+   (`authz.denied`), sign-in anomalies and repeated step-up failures (the SP-18 kinds of phase 01), break-glass use,
+   and privileged bursts (role grants, policy activation, key operations). The CI check of section 3.5 covers them: a
+   rule may name exported kinds only. The rules run in the bank's SIEM; their recipients are the second line and
+   security, never the actor's manager, and the actor is told nothing.
+2. Built elsewhere as controls, not as alerts: purpose codes and the conflict check (phase 03), the volume-reduction
+   flag and its second approver (phase 04), QA samples (phase 19), and the monthly counts of the control report
+   (phase 24 section 3.2).
+3. Not built (P2): the rules that need the allowed reads, which are not exported (`authz.allowed` has SIEM "no",
+   phase 03): mass lookup, off-hours or off-network access, access with no work reason, snooping on staff or
+   relatives, export spikes as an alert, and closure patterns; canary access is P2 already (7.12). A behaviour engine
+   inside the product over `access_event` is that P2 item.
+
+=== F3 REP (from fixes/25.txt)
+OLD: `CaseExistence` is a read port that answers `bool` for a case id and is called only by `activate` (step 6 below) and by the case read path that already exists (phase 17). It returns no other fact.
+NEW: No step of this phase asks whether a case exists: activation does not look at the case (step 8, DR-233), and the read path of phase 17 answers the masked 404 by its own predicate. There is no `CaseExistence` port.
+
+=== F4 REP (from fixes/25.txt)
+OLD: grants: Arc<dyn BreakGlassRepository>, cases: Arc<dyn CaseExistence>, steps:
+NEW: grants: Arc<dyn BreakGlassRepository>, steps:
+
+=== F5 REP (from fixes/25.txt)
+OLD: A request in `requested` may be ended by the requester (status `lapsed`, log `lapsed`).
+NEW: A request in `requested` may be ended by the requester (status `lapsed`, log `lapsed`, audit `break_glass.lapsed`). A grant in any other status is refused with 409 `E_NOT_ALLOWED_IN_STATE`.
+
+=== F6 REP (from fixes/25.txt)
+OLD: | `break_glass.lapsed` | request not approved within its lifetime (sweep) | break_glass | yes |
+NEW: | `break_glass.lapsed` | request not approved within its lifetime (sweep), or ended by its requester | break_glass | yes |
+
+=== F7 REP (from fixes/25.txt)
+OLD: An approver holding both must name the role.
+NEW: An approver holding both must name the role; one who names none is refused with 422 `E_VALIDATION`, sub-code `approver_role_required`.
+
+=== F8 REP (from fixes/25.txt)
+OLD: settings: Arc<SettingsService>, cfg: Arc<OidcUpstreamConfig> }
+NEW: settings: Arc<SettingsService> }
+
+=== F9 REP (from fixes/25.txt)
+OLD: by reading it under an active grant (Open doubts 14).
+NEW: by reading it under an active grant (Open doubts 6).
+
+=== F10 BLOCK (from fixes/25.txt)
+### 7.N Step-up constants and sweep counts (V-25-01-e, V-25-01-g, LOW; DR-413)
+- This phase declares its step-up actions as `StepUpAction { name, class }` constants with phase 01's closed classes: `BREAK_GLASS_REQUEST` is `{ "break_glass.request", break_glass }`; `BREAK_GLASS_APPROVE` is `{ "break_glass.approve", break_glass }`; `ACCESS_REVIEW_SIGN` is `{ "access_review.sign", approval }`; `RELEASE_APPLIED` is `{ "release.applied", approval }`; `SUPPORT_SESSION_APPROVE` is `{ "support_session.approve", access_change }`; `SUPPORT_BUNDLE_REGISTER` is `{ "support_bundle.register", export }`.
+- `SweepCounts` of the break-glass sweep is `{ lapsed, expired, review_overdue }`, one count per step; of the support session sweep `{ ended, expired, refused_timeout }`; of the bundle purge `{ archive_deleted }`.
+
+=== F11 REP (from fixes/25.txt)
+OLD: in the same transaction as the dead-letter rows.
+NEW: in the same transaction as the dead-letter rows; the first advance inserts the cursor row (the `INSERT` grant of migration `0082`) and later advances update it.
+
+=== F12 REP (from fixes/25.txt)
+OLD: if not acquired, return (another forwarder runs).
+NEW: if not acquired, return (another forwarder runs). Steps 2 to 7 run on the connection that took the lock, and the job releases it with `pg_advisory_unlock(hashtext('siem_forward'))` before the connection goes back to the pool, on every exit path including an error.
+
+=== F13 REP (from fixes/25.txt)
+OLD: `limit` ≤ 500.
+NEW: `limit` is 1 to 500 (this route's own cap, above the 200 of API.md pagination, because the caller is a machine); a value outside it is 422 `E_VALIDATION`.
+
+=== F14 BLOCK (from fixes/25.txt)
+### 7.N `SiemForwarder`: fields and entry point (V-25-02-d, LOW; DR-413)
+`pub struct SiemForwarder { siem: Arc<dyn SiemRepository>, settings: Arc<SettingsService>, collector: Arc<dyn SiemCollector> }`. `SiemCollector` is the TLS syslog client of the transport paragraph of section 3.5: `send(line: &str) -> Result<(), PlatformError>` returns `Ok` only on the collector's delivery acknowledgement. The job `siem_forward` calls `pub async fn forward(&self) -> Result<(), PlatformError>`, which runs the steps of section 3.5.
+
+=== F15 REP (from fixes/25.txt)
+OLD: Severity: Info 3, Notice 5, Warning 7, Critical 9 (phase 02 `Severity`).
+NEW: Severity: Info 3, Notice 5, Warning 7, Critical 9 (phase 02 `Severity`), read in the forwarder from the phase 02 catalogue entry of the row's kind, as the catalogue name is: `audit.siem_page` returns no severity column.
+
+=== F16 REP (from fixes/25.txt)
+OLD: (the output of `audit.siem_page`, never a `case_id` field)
+NEW: (the output of `audit.siem_page` plus the `severity` of the catalogue entry, section 3.5; never a `case_id` field)
+
+=== F17 REP (from fixes/25.txt)
+OLD: client certificate from OpenBao `pki/akr-worker-siem`
+NEW: client certificate and key issued by the bank's own CA and held in the KV entry `siem/client` (written at install by `akr-ctl siem configure`; the `akr-worker` AppRole policy of phase 00 gains read on that path; no PKI engine is added)
+
+=== F18 REP (from fixes/25.txt)
+OLD: reads through `SiemPageReader`
+NEW: reads through `SiemRepository`
+
+=== F19 BLOCK (from fixes/25.txt)
+### 7.N Moves that write no audit event; dead letters are not resolved in P1 (V-25-02-f, V-25-04-e, LOW; V-25-02-g, MEDIUM; DR-413)
+- The rule of section 3.13 has two exceptions, both technical markers and not business data. The advance of `admin.siem_cursors` writes no event, as anchoring writes none in phase 02: an event per batch would be forwarded by the forwarder itself. The move of a release to `verifying` writes no event: it is the job's own marker between `release.imported` and `release.verified` or `release.refused`.
+- Lead decision. Resolving a dead letter is P2. No route or method sets `resolved_at` or `resolved_by` in P1; the two columns, their CHECK, the index and the UPDATE grant of section 1 stay for it. The tile `siem_dead_letters` (section 3.10) therefore counts the dead letters created in the last 7 days, with the same warn and critical lines, so it clears once the cause is fixed. The rows stay as the record.
+
+=== F20 REP (from fixes/25.txt)
+OLD: count of `siem_dead_letters` with `resolved_at IS NULL`
+NEW: count of `siem_dead_letters` created in the last 7 days (resolving one is P2, section 7+)
+
+=== F21 REP (from fixes/25.txt)
+OLD: has no open session (unique index `uq_support_sessions_open`).
+NEW: has no open session (unique index `uq_support_sessions_open`). Refusals: a vendor user that is missing, not `human` or not `active` is 422 `E_VALIDATION`, sub-code `vendor_user_invalid`; a user holding another role is 422 `E_VALIDATION`, sub-code `sod_conflict` (phase 04's code for the same check); an open session is 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `session_open`.
+
+=== F22 REP (from fixes/25.txt)
+OLD: A session still `requested` after one hour is set `refused_timeout` (`ended_at` set, no grant).
+NEW: A session still `requested` after one hour is set `refused_timeout` (`ended_at` set, no grant; audit `support_session.refused_timeout`). A `DELETE` on a session that is neither `active` nor `requested` is refused with 409 `E_NOT_ALLOWED_IN_STATE`.
+
+=== F23 REP (from fixes/25.txt)
+OLD: sessions_cache: Arc<dyn SessionRevoker>
+NEW: identity: Arc<dyn IdentityProvider>, tokens: Arc<dyn TokenRepository>
+
+=== F24 REP (from fixes/25.txt)
+OLD: through the phase 01 `SessionRevoker` in the same transaction
+NEW: as phase 03's offboarding does (the tokens with phase 01's `TokenRepository::revoke_all_for_user` in the same transaction; after the commit phase 03's `invalidate_user` and Kratos `IdentityProvider::revoke_all_sessions`)
+
+=== F25 BLOCK (from fixes/25.txt)
+### 7.N Sub-codes, audit kinds and methods the steps name (V-25-01-c, V-25-03-a, V-25-03-d, V-25-03-e, V-25-04-b, V-25-07-b, V-25-07-e, MEDIUM; V-25-06-d, V-25-07-c, LOW; DR-413)
+- Section 3.11 gains the sub-codes `approver_role_required`, `vendor_user_invalid`, `sod_conflict` (phase 04's code, reused), `bundle_not_found`, `manifest_missing` under `E_VALIDATION`, and `session_open` under `E_NOT_ALLOWED_IN_STATE`.
+- Section 3.13 gains two rows. `support_session.refused_timeout {session_id}`, SIEM yes, written by the sweep when a session still `requested` after one hour is refused. `access_review.item_superseded {item_id, review_id, grant_id}`, SIEM no, written for each item moved to `superseded` by decide step 4 or sweep step 1. In decide step 4 the move and its event are committed first, and the handler then answers the 409 `grant_changed`.
+- `RoleGrantWriter` (the port the `SupportSessionService` struct names) has one method: `insert_support_grant(tx, user_id, support_session_id, scope, valid_from, valid_to, granted_by) -> Result<Uuid, RepoError>`, the insert of Approve step 3 (`role = 'VS'`, `source = 'support_session'`).
+- `RoleGrantReader` (the port the `AccessReviewService` struct names) has one method: `in_force_at(conn, at: DateTime<Utc>) -> Result<Vec<RoleGrant>, RepoError>`, with the predicate of snapshot step 3.
+- `AccessReviewRepository` gains `insert_items(tx, review_id, &[AccessReviewItem])` (snapshot step 5) and `set_snapshot(tx, id, evidence_id, evidence_sha256, item_count, expected_version)` (snapshot step 6: status `open` with the snapshot identity).
+- Tile reads of section 3.10: `BreakGlassRepository::counts(now) -> BreakGlassCounts { active, active_past_expiry, review_overdue }`; `SupportSessionRepository::count_open(now) -> i64`; `AnchorTimestampRepository::unverified() -> (i64, Option<DateTime<Utc>>)` (the count and the oldest; the repository of `admin.anchor_timestamps`, which `AnchorTimestamper` also writes through); `AccessReviewRepository::open_reviews_due(now)` returns the open reviews past `due_on`; the SIEM tiles read `SiemRepository::status()`; `release_currency` reads `ReleaseRepository::find_applied_latest()` and `newest_verified()`, which returns the newest `verified`, `proposed` or `approved` release not yet applied.
+
+=== F26 REP (from fixes/25.txt)
+OLD: cmd: DecideItem)
+NEW: cmd: DecideAccessReviewItem)
+
+=== F27 REP (from fixes/25.txt)
+OLD: set_status(tx, id, ReviewState, expected_version)
+NEW: set_status(tx, id, ReviewStatus, expected_version)
+
+=== F28 BLOCK (from fixes/25.txt)
+### 7.N The policy bundle hash is compared (V-25-04-a, MEDIUM; DR-413)
+Verify job step 3: the hash computed over the canonical bundle is compared with the policy bundle hash that `notes.json` carries (phase 03: the release notes carry it). A difference refuses the release with `policy_bundle_hash_mismatch`, the code the CHECK of section 1.2 already lists. In the refusal order of step 4 this check comes after (f) and before the checks later phases add.
+
+=== F29 REP (from fixes/25.txt)
+OLD: (read-only mount; the server never follows links out of it).
+NEW: (read-only mount; the server never follows links out of it). A `bundle_ref` that names no directory is 422 `E_VALIDATION`, sub-code `bundle_not_found`; a directory without `manifest.json` is 422 `E_VALIDATION`, sub-code `manifest_missing`; both are answered before the 202.
+
+=== F30 REP (from fixes/25.txt)
+OLD: write the verification report as evidence (kind `package`, owner kind `release`, R10, classification internal)
+NEW: write the verification report as evidence (`EvidenceStore::put_generated` with kind `package`, owner kind `release`, owner id the release id, R10, classification `internal`, content type `application/json`)
+
+=== F31 REP (from fixes/25.txt)
+OLD: jobs: Arc<JobQueue>, currency: Arc<dyn ReleaseCurrency>, keys:
+NEW: jobs: Arc<JobQueue>, keys:
+
+=== F32 REP (from fixes/25.txt)
+OLD: change request `cr_access` (maker ADM, checker SEC); 202; IDEM (added)
+NEW: change request `cr_access` (maker ADM, checker SEC); 202; IF; IDEM (added)
+
+=== F33 REP (from fixes/25.txt)
+OLD: **SU** `approval`; IDEM (added)
+NEW: **SU** `approval`; IF; IDEM (added)
+
+=== F34 REP (from fixes/25.txt)
+OLD: the mode switch needs no redeploy.
+NEW: a mode switch needs one too: the flag of point 1 and the Kratos egress rule of section 4.4 follow the mode, so after the change request is activated the operator renders `kratos.yml` and the zone rules again and restarts Kratos (runbook step). Until then the BFF button of point 4 already follows the new mode.
+
+=== F35 REP (from fixes/25.txt)
+OLD: akr-ctl (new subcommands `support-bundle` and `oidc upstream check`; no new binary)
+NEW: akr-ctl (new subcommands `support-bundle`, `oidc upstream check` and `siem configure`, and `identity link-upstream` and `identity unlink-upstream` in the phase 01 `identity` group; no new binary)
+
+=== F36 REP (from fixes/25.txt)
+OLD: `OidcUpstream` is configuration, not a service:
+NEW: `OidcUpstream` is the read-only configuration struct of section 4.3, not a service:
+
+=== F37 REP (from fixes/25.txt)
+OLD: oidc_config: Arc<OidcUpstreamConfig>
+NEW: oidc_config: Arc<OidcUpstream>
+
+=== F38 REP (from fixes/25.txt)
+OLD: count of grants with `review_overdue` and no review
+NEW: count of grants that have an `admin.break_glass_log` row of kind `review_overdue` and `reviewed_at IS NULL`
+
+=== F39 REP (from fixes/25.txt)
+OLD: `now() - siem_cursors.last_occurred_at`
+NEW: the lag of section 3.5 step 7 (the age of the oldest exported row after the cursor; 0 when there is none)
+
+=== F40 REP (from fixes/25.txt)
+OLD: The lag is `now() - last_occurred_at` of the cursor and is shown on the cockpit (section 3.10);
+NEW: The lag is the age of the first row that `audit.siem_page` returns after the cursor (`now()` minus its `occurred_at`), or zero when it returns none, and it is shown on the cockpit (section 3.10);
+
+=== F41 REP (from fixes/25.txt)
+OLD: when the cursor is older than `siem.max_lag_s`
+NEW: when the lag of section 3.5 step 7 is above `siem.max_lag_s`
+
+=== F42 REP (from fixes/25.txt)
+OLD: applied release refused or superseded with no applied successor for 30 days
+NEW: a newer verified, proposed or approved release has waited unapplied for more than 30 days
+
+=== F43 REP (from fixes/25.txt)
+OLD: `due_on < bank_today` and no `access_review.overdue` event yet, write audit `access_review.overdue` (siem yes) and open a warning in the phase 24 register:
+NEW: `due_on < bank_today`, open a warning through phase 24's `RegisterWriter::warn` and, only when it returns an id, write audit `access_review.overdue` (siem yes) in the same transaction; the statement `warn` runs is:
+
+=== F44 REP (from fixes/25.txt)
+OLD: ON CONFLICT (source_key) DO NOTHING
+NEW: ON CONFLICT (source_key) WHERE source_key IS NOT NULL DO NOTHING RETURNING id
+
+=== F45 BLOCK (from fixes/25.txt)
+### 7.N Register warnings go through `RegisterWriter::warn` (V-25-07-a, V-25-07-d, HIGH; DR-413)
+Two defects of sweep step 2 of section 3.1: the unique index `uq_registers_source_key` is partial, so PostgreSQL refuses `ON CONFLICT (source_key)` without the predicate `WHERE source_key IS NOT NULL`; and the guard "no `access_review.overdue` event yet" needs a read of the audit trail that `akr_app` does not have. Both sweeps of this phase therefore open their warning with phase 24's `RegisterWriter::warn(tx, source, source_key, title_key, body)` (phase 24 section 7.7), which carries the predicate and returns `None` when the key exists:
+- access review (section 3.1 sweep step 2): `warn(tx, review_calendar, 'access_review_overdue:<review_id>', WarningTitle::AccessReviewOverdue, {"review_id"})`; the audit `access_review.overdue` is written only on `Some(id)`, so it is written once.
+- break-glass (section 3.2 sweep step 3): `warn(tx, scan, 'break_glass_review:<id>', WarningTitle::BreakGlassReviewOverdue, {"grant_id"})`; the log row `review_overdue` and the audit `break_glass.review_overdue` are written only on `Some(id)`.
+This phase adds the two variants to phase 24's closed enum `WarningTitle`: `AccessReviewOverdue` {"ar": "مراجعة الصلاحيات الفصلية متأخرة", "en": "Quarterly access review is overdue"} and `BreakGlassReviewOverdue` {"ar": "مراجعة وصول الطوارئ متأخرة", "en": "Break-glass review is overdue"}. Test: the sweep run twice on an overdue review leaves one warning and one `access_review.overdue` event.
+
+=== F46 REP (from fixes/25.txt)
+OLD: 'version_not_newer', 'policy_bundle_hash_mismatch')),
+NEW: 'version_not_newer', 'policy_bundle_hash_mismatch', 'help_article_invalid')),
+
+=== F47 REP (from fixes/25.txt)
+OLD: is refused with `E_VALIDATION` `article_text_invalid`
+NEW: ends the verify job with the release `refused` and `refusal_code = help_article_invalid`
+
+=== F48 BLOCK (from fixes/25.txt)
+### 7.N A malformed help article refuses the release (V-25-08-a, HIGH; DR-413)
+Lead decision. The articles are part of a signed vendor bundle, so one that fails the schema or holds a refused bidirectional-control character (section 3.9) is a defect of the bundle. The verify job checks every article before step 5; a failure ends the job as step 4 does, with `refusal_code = help_article_invalid` (new value of the CHECK of section 1.2; the last check in the refusal order of this phase) and audit `release.refused`. No article of that bundle is inserted. It is not an HTTP error: the import route has already answered 202 (section 3.11).
+
+=== F49 REP (from fixes/25.txt)
+OLD: outside the Arabic and Latin ranges (SP-70)
+NEW: outside the Arabic and Latin ranges (UX-20)
+
+=== F50 REP (from fixes/25.txt)
+OLD: Route 19 (`GET /help/articles?kind=`) returns
+NEW: `GET /help/articles?kind=` returns
+
+=== F51 REP (from fixes/25.txt)
+OLD: The KV entry `akr/keys/auth-hmac` (DR-356) holds
+NEW: The KV entry `keys/auth-hmac` (DR-356; the path is relative to the mount `akr/`, as in 7.1) holds
+
+=== F52 REP (from fixes/25.txt)
+OLD: 1. Write a new KV version of `akr/keys/auth-hmac` with a fresh random value, under the operator's OpenBao policy.
+NEW: 1. Write a new KV version of `keys/auth-hmac` with a fresh random value, under the operator's OpenBao policy.
+
+=== F53 BLOCK (from fixes/25.txt)
+### 7.N Test of the excluded tables (V-25-10-a, LOW; DR-413)
+Section 6 check 4 gains the database test that 7.3 cites: the row-count list of the support bundle fixture (section 3.8 step 1) holds none of the seven table names of 7.3.
+
+=== F54 BLOCK (from fixes/25.txt)
+### 7.N Upload route of the rollout record (V-25-12-a, HIGH; DR-413)
+Section 7.8 says the operator first uploads `rollout.json`; no route did that. The route table of section 2 gains one row:
+| POST | `/api/v1/admin/releases/{id}/evidence` | `admin.system` | Upload the `rollout.json` of the apply (multipart, `EvidenceStore::stage`): kind `package`, owner kind `release`, owner id this release, retention R10, classification `internal`; answers 201 with the evidence id; IDEM (added; Cedar `release.applied`) |
+The release must be `approved` or `applied` (else 409 `E_NOT_ALLOWED_IN_STATE`). Audit: the phase 02 evidence event of `stage`; no new kind.
+
+=== F55 REP (from fixes/25.txt)
+OLD: `RecordReleaseApplied { }`
+NEW: `RecordReleaseApplied { rollout_evidence_id: Option<Uuid> }`
+
+=== F56 REP (from fixes/25.txt)
+OLD: pub async fn record_applied(&self, ctx: &RequestCtx, idem: &IdemKey, release: Uuid, expected: i32, header: StepUpHeader)
+NEW: pub async fn record_applied(&self, ctx: &RequestCtx, idem: &IdemKey, release: Uuid, expected: i32, cmd: RecordReleaseApplied, header: StepUpHeader)
+
+=== F57 REP (from fixes/25.txt)
+OLD: the status must be `approved`.
+NEW: the status must be `approved` (else 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `release_not_approved`). One transaction, in this order: consume the step-up assertion; lock the release; check the status; when `rollout_evidence_id` is given, read it with `EvidenceRepository::get` and refuse with 422 `E_VALIDATION` unless its owner kind is `release` and its owner id is this release (section 7.8); then write and audit.

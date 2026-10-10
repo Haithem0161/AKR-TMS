@@ -1,0 +1,10 @@
+API.md rows 581; owned by a phase route table 581; not owned 0; phase routes absent from API.md 5
+
+## API.md rows with no phase route row (line, section, method path)
+
+## Phase route rows absent from API.md (method path: phases)
+GET /healthz: 00
+GET /metrics: 00
+GET /readyz: 00
+POST /_dev/detections: 17
+POST /_echo: 00

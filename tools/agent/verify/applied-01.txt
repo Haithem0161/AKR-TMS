@@ -1,0 +1,76 @@
+Fixes applied to docs/plan/phase-01.md by the verification pass (DR-413). 12 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/01.txt)
+OLD: the CBI password, lockout and session minima as floors
+NEW: the CBI password and lockout minima as floors and the session limits as hard bounds (DR-34)
+
+=== F2 REP (from fixes/01.txt)
+OLD: Nothing is changed silently (phase 03 section 4.5)
+NEW: Nothing is changed silently (phase 03 section 4)
+
+=== F3 REP (from fixes/01.txt)
+OLD: (phase 03 section 4.4; phase 00 7.4)
+NEW: (phase 03 section 4; phase 00 7.4)
+
+=== F4 REP (from fixes/01.txt)
+OLD: (phase 23 sections 1.2 and 4.4)
+NEW: (phase 23 sections 1.2 and 4.5)
+
+=== F5 REP (from fixes/01.txt)
+OLD: (phase 07 section 4.5)
+NEW: (phase 07 section 4)
+
+=== F6 REP (from fixes/01.txt)
+OLD: (phase 24 section 4.5; grant valid one day)
+NEW: (phase 24 section 6; grant valid one day)
+
+=== F7 REP (from fixes/01.txt)
+OLD: `common::scopes::scopes_for_roles` (line 436)
+NEW: `common::scopes::scopes_for_roles` (section 2)
+
+=== F8 BLOCK (from fixes/01.txt)
+### 7.N Service client commands, step by step (V-01-02-a, MEDIUM; DR-413)
+The three `akr-ctl identity client` commands of section 3 run as follows (the Hydra admin API through `common::ory`,
+`HYDRA_ADMIN_URL`).
+1. `client create`: validate (the owner is an active human; scopes within the token allow-list; `--expires` in the
+   future, else exit 2 with the field named). Create the Hydra client (grant `client_credentials`, the scopes,
+   audience `akr-api`, a generated secret). Then in one transaction insert the `admin.users` row (`kind = 'service'`,
+   `hydra_client_id`, `owner_user_id`, `expires_at`) and audit `service_client.created {client_id, owner_user_id,
+   scopes, expires_at}`. A failed transaction deletes the Hydra client. The secret is printed once; AKR-TMS stores no
+   copy.
+2. `client rotate --name`: Hydra replaces the client's secret with a new generated one. The old secret stops working at
+   once; access tokens already issued run to their expiry (15 minutes). Audit `service_client.rotated {client_id}`;
+   the new secret is printed once. No `admin.users` row changes.
+3. `client disable --name`: in one transaction set the principal's `status = 'disabled'` with `disabled_reason =
+   'admin'` and audit `service_client.disabled {client_id}`; after commit delete the Hydra client (the order phase 03
+   uses when offboarding disables a user's service principals). `authenticate` already refuses a principal that is not
+   active, so a failed Hydra call leaves no access and the command can be run again.
+
+=== F9 BLOCK (from fixes/01.txt)
+### 7.N Actions for heartbeat and logout (V-01-04-a, MEDIUM; DR-413)
+The pinned list of section 3 covers every route of this phase but two. `POST /auth/session/heartbeat` uses
+`session.read` (it returns the `SessionView` of the caller's own session) and `POST /auth/logout` uses `session.revoke`
+on the current session (the same act as `DELETE /me/sessions/{id}` for the current one). No action is added; the
+phase 03 retrofit registers both `RouteAction` rows with resource `User(self)`.
+
+=== F10 BLOCK (from fixes/01.txt)
+### 7.N The token limit is counted under a lock (V-01-05-a, MEDIUM; DR-413)
+`TokenService::create`: the `pat.max_per_user` test of step 2 moves into the transaction of step 3. After `consume`
+the transaction takes `pg_advisory_xact_lock(hashtext('pat:' || user_id))`, counts the user's active tokens and
+answers the same 422 (`limit_reached`) before the insert. Two concurrent creates with two step-up assertions can
+then not both pass the count. The other tests of step 2 stay where they are.
+
+=== F11 BLOCK (from fixes/03.txt)
+### 7.N The Kratos admin port gains a traits update (V-03-05-a, MEDIUM; DR-413)
+From phase 03 on the admin API of `IdentityProvider` (section 2) has `update_traits(id, traits)`, with the same
+`traits` type as `create_identity`: Kratos `PUT /admin/identities/{id}` with the identity's current state and schema
+and the new traits. `UserAdminService::update` (phase 03 section 3.7) calls it for an e-mail change before its commit;
+a Kratos failure aborts the request. When a later step of the same request fails, the handler calls `update_traits`
+again with the old traits before it returns the error (the compensation pattern `create` uses with
+`delete_identity`).
+
+=== F12 BLOCK (from fixes/08.txt)
+### 7.N SessionView carries the heartbeat interval (V-08-06-a, MEDIUM; DR-413)
+`SessionView` (section 2) gains `heartbeat_min_interval_s` (seconds), the current value of the setting `session.heartbeat_min_interval_s`, as `warning_s` carries `session.warning_s`. `GET /auth/session` and `POST /auth/session/heartbeat` return it, so the client applies the heartbeat rule of phase 08 section 3.6 from the session view alone. The idle timeout reaches the client as `idle_expires_at`. No route is added and no setting changes.

@@ -1,0 +1,24 @@
+Replacements made in docs/plan/phase-14.md by the first re-check (DR-413). 4 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-14-1]
+WHY: R-14-1 | CONFIRMED MEDIUM (raised HIGH) | 7.x says a step-up constant's name is the Cedar action of its route, and that the bulk decision reuses the constant named `screening.alert.decide`; the bulk route's action is `screening.alert.bulk_decide` | the bulk route declares its own constant
+OLD: the bulk decision uses the same constant.
+NEW: the bulk decision declares its own constant, `StepUpAction::BulkDecision`, `{ name: "screening.alert.bulk_decide", class: decision }`, consumed once for the batch with no resource reference.
+
+=== F2 [R-14-2a]
+WHY: R-14-2 | CONFIRMED LOW (raised MEDIUM) | the revoke body is called "the second form of `GoodGuyProposal`", a struct with one form | a second DTO `GoodGuyRevoke` is named in section 2.3 and at the route
+OLD: (the second form of `GoodGuyProposal`;
+NEW: (a second body type, `GoodGuyRevoke { action, rule_id, reason_codes, reason_text }`, which the route tells from `GoodGuyProposal` by the `action` field;
+
+=== F3 [R-14-2b]
+WHY: R-14-2 | CONFIRMED LOW (raised MEDIUM) | the revoke body is called "the second form of `GoodGuyProposal`", a struct with one form | a second DTO `GoodGuyRevoke` is named in section 2.3 and at the route
+OLD: `GoodGuyProposal { list_codes: Vec<ListCode>, rule: GoodGuyRuleInput, reason_codes, expires_on, reason_text }`.
+NEW: `GoodGuyProposal { list_codes: Vec<ListCode>, rule: GoodGuyRuleInput, reason_codes, expires_on, reason_text }`; `GoodGuyRevoke { action, rule_id, reason_codes, reason_text }` (the revoke body of `POST /screening/good-guys`).
+
+=== F4 [R-14-3]
+WHY: R-14-3 | CONFIRMED LOW | the claim that no feed format carries a delisting date cites a step that does not say so | marked as a decision of the phase
+OLD: No feed format of this release carries one (section 3.2 `list_parse` step 3), so
+NEW: No feed format of this release carries one (a decision of this phase: no parser of the closed `feed_format` set of section 3.2 reads such a field), so

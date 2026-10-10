@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-31.md by the first re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-31-1]
+WHY: R-31-1 | CONFIRMED MEDIUM (raised HIGH) | the e-mail mismatch count sits under the item for offboarded accounts, so a run with no such account would not record an e-mail mismatch of an active account | item 3 audits when either count is above zero; `email_count` covers every linked row
+OLD: 3. Linked, account offboarded, `directory_active = TRUE`: audit `directory.mismatch {count, email_count}` (SIEM true). Local wins; nothing is changed. `email_count` is the second mismatch of DR-351:
+NEW: 3. Mismatches: audit `directory.mismatch {count, email_count}` (SIEM true), written on a run where either count is above zero. `count` is the linked rows whose account is offboarded while `directory_active = TRUE`. Local wins; nothing is changed. `email_count` is the second mismatch of DR-351, counted over every linked row whatever the state of its account:

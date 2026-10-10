@@ -1,0 +1,95 @@
+@@ REP 04
+reverted_at, updated_at, version)
+@@ WITH
+reverted_at, updated_at, version, evidence)
+@@ END
+# V-04-08-a | HIGH | grep -c -F gave 1 | names used and where they exist: `evidence` column of `admin.change_requests` phase-04.md:135; GRANT UPDATE list on `admin.change_requests` phase-04.md:206-208 | NEW: none | the comment above the GRANT (phase-04.md:202-203) says content columns are INSERT-only; the lead may add `evidence` to it, since 7.2 allows an upload while `submitted`
+
+@@ REP 04
+(`escalated` event)
+@@ WITH
+(`task_escalated` event)
+@@ END
+# V-04-01-b | LOW | grep -c -F gave 1 | names used and where they exist: `task_escalated` phase-04.md:985 (3.4 event list); `escalate` action writes `task_escalated {task_id, escalation_task_id, to}` phase-04.md:1117 | NEW: none
+
+@@ REP 04
+`review_recorded`, `effect_ran`, `effect_deferred`.
+@@ WITH
+`review_recorded`, `post_review_recorded`, `effect_ran`, `effect_deferred`.
+@@ END
+# V-04-03-a | LOW | grep -c -F gave 1 | names used and where they exist: `post_review_recorded` phase-04.md:944 (3.2 post-change review, written as an instance event); the kind is read from `admin.instance_events` by phase-24.md:665 | NEW: none
+
+@@ REP 04
+with no `approve` or `reject` event in
+@@ WITH
+with no task of the request's instance whose `outcome` is `approved` or `rejected` in
+@@ END
+# V-04-08-d | MEDIUM | grep -c -F gave 1 | names used and where they exist: `outcome` of `admin.tasks` with values approved and rejected phase-04.md:398; `pass` of `admin.tasks` phase-04.md:383; `instance_id` of `admin.tasks` phase-04.md:379; the review action sets task `outcome` (phase-04.md:1001); the engine's approve and reject outcome values are named only by that CHECK, so the lead should confirm 3.4 writes them | NEW: none
+
+@@ REP 08
+polled every 30 s while visible
+@@ WITH
+polled every 60 s while visible
+@@ END
+# V-04-05-a | LOW | grep -c -F gave 1 | names used and where they exist: `GET /inbox/counts` every 60 seconds phase-04.md:1178 (3.7 Live updates, owner of the route); phase-17.md:1267 takes the same 60 s cadence from it | NEW: none
+
+@@ BLOCK 04
+### 7.N Names in the change-request signatures (V-04-01-a, MEDIUM; DR-413)
+`StepUpAssertionId` is the `id` (a UUID) of a phase 01 `StepUpAssertion` (section 2); the request and its task
+store it in `stepup_id` (section 1). `ActorRef` in sections 2 and 3 is the phase 02 `Actor` enum (section 2:
+`User`, `System` or `Anonymous`). The `d` argument of `decide` is the `TaskAction` of section 3.4 with the value
+Approve or Reject, not the phase 03 `Decision` struct. `Activated` is a unit marker with no field; step 3 of
+`activate` reads nothing from it.
+@@ END
+# V-04-01-a | MEDIUM | names used and where they exist: `StepUpAssertion` phase-01.md:420; `Actor` phase-02.md:556; `stepup_id` phase-04.md:149 and phase-04.md:400; `TaskAction` phase-04.md:1040; `decide` phase-04.md:860; `activate` step 3 phase-04.md:915 | NEW: none | `Activated` is drafted as a unit marker because no step reads a field of it; the lead may decide instead to carry the new object version, which is a design choice, not a fix
+
+@@ BLOCK 04
+### 7.N Create: order of checks and the owner refusal (V-04-02-a, MEDIUM; DR-413)
+Section 3.9 Create runs these steps in order:
+1. Authorize: Cedar `inventory.create` (role MRO, section 3.10) on route `POST /inventory` (scope `model.risk`).
+2. State: one item per `(kind, object_id)`, else 409 `E_NOT_ALLOWED_IN_STATE`, reason `already_registered`.
+3. Validation: the owner is an active human user, else 422 `E_VALIDATION`, reason `owner_not_active` (the code
+   phase 12 section 3.4 uses for an owner who is not an active human); the validator, when one is given, is an active human user, else
+   422 `E_VALIDATION`, reason `validator_not_active`; the validator is not the owner (422 `E_VALIDATION`,
+   `validator_is_owner`); `user_roles` are role codes.
+4. Write: insert the item with status `registered`.
+5. Audit: `inventory_item.created {kind, object_id, tier, owner_id, validator_id}`.
+@@ END
+# V-04-02-a | MEDIUM | names used and where they exist: `inventory.create` phase-04.md:1430; `POST /inventory` phase-04.md:785; `already_registered` phase-04.md:1342; `validator_is_owner` phase-04.md:1341; `owner_not_active` phase-12.md:758 (section 3.4); `inventory_item.created` phase-04.md:1345 | NEW: `validator_not_active` (no reason in 3.10 covers an inactive validator; `owner_not_active` is the owner's code)
+
+@@ BLOCK 04
+### 7.N The change subject returns the target's refusal as a WorkflowError (V-04-07-a, MEDIUM; DR-413)
+The change subject's `check_before_decision` (section 7.1) returns a refusal of `ChangeTarget::check_before_decision`
+as `WorkflowError::Change(ChangeError)`, a variant of the `thiserror` enum `WorkflowError` (section 3.10), converted
+with `#[from]` so that `?` works. `api::error` maps `Change` to the codes of section 3.2: 409 `E_STALE_BASE`,
+422 `E_EVIDENCE_STALE` or 422 `E_VALIDATION`.
+@@ END
+# V-04-07-a | MEDIUM | names used and where they exist: `WorkflowError` phase-04.md:1371 (3.10); `ChangeError` and `ChangeTarget::check_before_decision` phase-04.md:651; subject `check_before_decision` phase-04.md:1644 (7.1); the codes phase-04.md:898 (3.2) | NEW: `WorkflowError::Change` (the plan gives no WorkflowError variant that carries a ChangeError)
+
+@@ BLOCK 04
+### 7.N Evidence route: Cedar action and repository method (V-04-08-b, V-04-08-c, MEDIUM; DR-413)
+The route `POST /change-requests/{id}/evidence` (section 7.2) is authorized by the Cedar action
+`change_request.evidence_add` on resource ChangeRequest: `principal == resource.maker` and status `draft` or
+`submitted`. The decided-task test of 7.2 stays a service check (409 `E_NOT_ALLOWED_IN_STATE`, `evidence_closed`).
+Section 3.10's action table gains this row. `ChangeRequestRepository` gains
+`append_evidence(tx, id, item: EvidenceRef, expected_version)`: it appends the item to `evidence` and sets `version`
+to `expected_version + 1` in one UPDATE that matches `version = expected_version`; no row matched gives 409
+`E_VERSION_CONFLICT`. The append step of 7.2 calls it.
+@@ END
+# V-04-08-b, V-04-08-c | MEDIUM | names used and where they exist: `change_request.submit` phase-04.md:1419 (maker and status row shape); `EvidenceRef` phase-04.md:631; `set_withdrawn(tx, id, expected_version)` phase-04.md:720 (repository style); `E_VERSION_CONFLICT` phase-04.md:1363; `evidence` column phase-04.md:135; route row phase-04.md:1658 | NEW: `change_request.evidence_add` (no action covers attaching evidence; submit and withdraw are other acts) and `append_evidence` (no repository method appends evidence)
+
+@@ BLOCK 08
+### 7.N Risk or capacity tag on the change-request screens (V-04-06-a, MEDIUM; DR-413)
+Screen G10 (section 3.8) shows the risk or capacity tag of the reason (`ReasonTag`, phase 04 section 2;
+`ref.reason_codes.tag`, phase 04 section 1) beside the reason code, on the list and on the detail, as a badge with
+words. UX-60 requires the tag on every volume-reducing change. A capacity tag carries the capacity-wording flag of
+DESIGN-SYSTEM section 7.17.
+@@ END
+# V-04-06-a | MEDIUM | names used and where they exist: `ReasonTag` phase-04.md:631; `ref.reason_codes.tag` phase-04.md:62; UX-60 phase-04.md:31; G10 phase-08.md:406; capacity-wording flag DESIGN-SYSTEM.md:641 (section 7.17, line 636) | NEW: none
+
+# DECIDE V-04-12-a | option A: the rework returns to the step that the reject's `to` names, as the DBS rework routine does; the task of that step is created with pass + 1; the AKR reject example then gains `to` (evidence: digital-banking-system docs/plan/phase-06.md:290 and :767; phase-04.md:976 ported unchanged; phase-04.md:1019 pass rule; phase-04.md:1302 has no `to`) | option B: the maker receives the task (phase-04.md:1760 "returns the instance to the maker"), which needs a new `maker` value in the `assignee_kind` CHECK and a holder rule, because no assignee kind names the maker (evidence: phase-04.md:385 assignee kinds; phase-04.md:1308 and phase-04.md:1318 assignee examples)
+# NOTE (DSL side of the rework item) | the reject example at docs/DSL.md:1542 has no rework entry. docs/DSL.md is not a phase file, so no entry here; the lead decides with option A or B.
+
+# REFUTED V-04-10-a | no fix; the refuter's verdict stands (7.10 and DR-361 win over the base text). For the lead: the seed row of `access.assessor_max_days` at phase-04.md:590 still reads '90' with floor NULL; an edit there is outside this draft.
+
+# SUMMARY: fixes written 10 (REP 5, BLOCK 5); DECIDE 1; DROP 0; claims covered: V-04-01-a, V-04-01-b, V-04-02-a, V-04-03-a, V-04-05-a, V-04-06-a, V-04-07-a, V-04-08-a, V-04-08-b, V-04-08-c, V-04-08-d, V-04-12-a

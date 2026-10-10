@@ -1,0 +1,81 @@
+@@ BLOCK 06
+### 7.N One-row insert of a bank scenario (V-16-01-a, MEDIUM; DR-413)
+From phase 16 on, `ScenarioRepository` gains `async fn insert(&self, tx: &mut Tx, s: &NewScenario) -> Result<Scenario, RepoError>`: one plain `INSERT` into `scn.scenarios`, with no `ON CONFLICT`. `insert_missing` stays the bulk method of the pack seed. The bank create (phase 16 section 3.15, step 2) calls `insert`. A `code` already in use breaks the unique constraint on `code`; the repository returns `RowConflict`, and the create answers 409 `E_NOT_ALLOWED_IN_STATE` with reason `code_taken`, as phase 05 section 3.1 step 1 does for a source code. Nothing is written.
+@@ END
+# V-16-01-a | MEDIUM | names used and where they exist: `ScenarioRepository` phase-06.md:401; `insert_missing` phase-06.md:402; `NewScenario` phase-06.md:402 and phase-16.md:728; `Scenario` phase-06.md:407; `code` UNIQUE phase-06.md:74; `RowConflict` phase-16.md:790 (the repository's unique-violation error, mapped to 409 there); `code_taken` phase-05.md:711; `ParameterSetRepository::insert` phase-16.md:755 (style of a single-row insert) | NEW: `insert` (one new method on `ScenarioRepository`; the single-row name the neighbour traits use, since `insert_missing` is the bulk seed method)
+
+@@ REP 16
+`ScenarioCreate`, `ScenarioView` (register fields plus the
+@@ WITH
+`ScenarioCreate { code, family, name, summary, typologies, needs, external_needs, observational, visibility, document }` (`owner_id` is the caller and `research_grade` is `D`, section 3.15 step 1), `ScenarioView` (register fields plus the
+@@ END
+# V-16-01-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `NewScenario` phase-16.md:728 (fields less `owner_id` and `research_grade`); `NewScenarioVersion` phase-16.md:729 (`document`); `ScenarioCreate` phase-16.md:868 | NEW: none
+
+@@ BLOCK 16
+### 7.N Refusals of the owner and reason checks when drafting (V-16-01-c, V-16-03-a, MEDIUM; DR-413)
+Section 3.15 step 1: an owner who is not an active CFG user answers 422 `E_VALIDATION` with reason `owner_not_active`, as phase 06 section 3.4 step 3 does for a declaration owner.
+Section 3.5 step 4: a reason code that is inactive, or not of family `tuning` or `change`, answers 422 `E_VALIDATION` with reason `reason_not_allowed`, and no draft is inserted. Phase 04 section 3.2 step 2 gives the same answer at proposal.
+Section 3.17: the `E_VALIDATION` entry gains the reasons `owner_not_active` and `reason_not_allowed`; its `errors[]` codes stay the DSL codes.
+@@ END
+# V-16-01-c + V-16-03-a | MEDIUM | names used and where they exist: `E_VALIDATION` phase-16.md:1575 and API.md:985; reason `owner_not_active` phase-06.md:611 and phase-12.md:758; reason `reason_not_allowed` phase-04.md:873 and phase-04.md:1368; reason-code active check phase-16.md:1100; `E_VALIDATION` with reasons as the plan's form phase-05.md:1238 | NEW: none. Note for the lead: the refuter asked for an `errors[]` code; phases 04, 05, 06 and 12 all give this kind of refusal as an `E_VALIDATION` reason, so the fix uses that form.
+
+@@ REP 16
+5. Insert `draft` with `set_version` = the next number for the version (`ParameterSetRepository::next_version`).
+@@ WITH
+5. Lock the scenario row (`FOR UPDATE`, as section 3.13 step 3 does), then insert `draft` with `set_version` = the next number for the version (`ParameterSetRepository::next_version`). A unique violation on `uq_parameter_set_version` answers 409 `E_VERSION_CONFLICT`, the race answer of phase 06 section 3.4 step 4.
+@@ END
+# V-16-03-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `uq_parameter_set_version` phase-16.md:132; `FOR UPDATE` on the scenario row phase-16.md:1420 (section 3.13 step 3); `E_VERSION_CONFLICT` as the race answer phase-06.md:615 (section 3.4 step 4); `E_VERSION_CONFLICT` 409 API.md:977 | NEW: none. The lock is chosen over a retry because the plan already locks the scenario row for per-scenario writes (section 3.13 step 3); the lead may prefer a retry instead, which would change this text only.
+
+# DECIDE V-16-03-d | option A: a minor risk-tagged set (inside the band, not loosening) needs a replay only, as the change-class table says and as phase 04 derives `required_evidence` by class; the below-the-line sample stays with material sets and capacity reasons (DSL.md:926 and DSL.md:927; phase-04.md:661; phase-16.md:1101) | option B: every parameter change records a below-the-line sample, as L-18 says, so the replay-only row for minor changes in DSL.md:926 would change (research/20-enforcement-failures-lessons.md:2080). DR-113 (docs/plan/research.md:124) says the band decides minor or material and does not say which evidence a minor set needs, so it does not settle the point.
+
+@@ BLOCK 16
+### 7.N Reasons of the shadow start and of the pack refusal (V-16-04-a, V-16-06-a, LOW; DR-413)
+Section 3.11 step 1: a version that is not `testing` answers 409 `E_NOT_ALLOWED_IN_STATE` with reason `not_testing`. No separate refusal is needed for unit cases that did not pass, because the status CHECK of section 1.1 keeps `tests_passed_at` set on every `testing` version.
+Section 3.17: `not_testing` (section 3.11) and `pack_not_enabled` (block 7.2, G9) join the reason list of `E_NOT_ALLOWED_IN_STATE`.
+@@ END
+# V-16-04-a + V-16-06-a | LOW | names used and where they exist: `E_NOT_ALLOWED_IN_STATE` phase-16.md:1577 and API.md:982; `pack_not_enabled` phase-16.md:1952 (block 7.2); `pack_not_agreed` phase-16.md:1078 (G9 row, same status); `tests_passed_at` CHECK phase-16.md:97 (section 1.1); reason shape `not_live` phase-16.md:1577 and `not_draft` phase-04.md:1365 | NEW: `not_testing` (the reason for a version that is not `testing`; same shape as `not_live` and phase 04 `not_draft`)
+
+@@ BLOCK 16
+### 7.N Run of the unit cases on `POST .../test` (V-16-05-a, MEDIUM; DR-413)
+1. Authorize: Cedar `scenario.version.write` for CFG, scope `config.author` (the route row of section 2). Otherwise 403 (`E_SCOPE` or `E_FORBIDDEN`).
+2. State: the version must be `draft` (the move to `testing` in the table of section 3.3; `VersionStatus::transition_allowed` refuses any other source). Otherwise 409 `E_NOT_ALLOWED_IN_STATE`.
+3. Validate: section 3.1 rules 1 to 16 run first. Any error answers 422 `E_VALIDATION` with the `errors[]` of section 3.1, and the version stays `draft`.
+4. Run: for each entry of `tests.unit` (`name`, `fixture`, `expect`), run section 3.12 step 2 on the named fixture of the version's `fixtures` (rule 16) and read the alert count and the severity; the sink is not called. A case passes when its alert count, and its severity where `expect` gives one, equal `expect` (the criterion of section 3.12 step 3). The studio's automatic cases of DSL A.9 (null, currency, reversal and late-data) are added to these cases.
+5. Write: when every case passes and the three positive and three negative counts hold (section 3.3), the version moves to `testing` and `tests_passed_at` is set. Otherwise the guard is not met: 422 `E_VALIDATION` with the `errors[]` code `E_TESTS_MISSING`, and the version stays `draft`.
+6. Audit: `scenario.version_tested` (section 3.17), once for the run.
+@@ END
+# V-16-05-a | MEDIUM | names used and where they exist: `tests.unit` DSL.md:418 (A.9); `POST .../test` route row phase-16.md:890; `VersionStatus::transition_allowed` phase-16.md:719 (section 2 value objects); rule 16 phase-16.md:971-973; section 3.12 steps 2 and 3 phase-16.md:1393-1397; guard row phase-16.md:1027; G2 row (`tests_passed_at` set; `E_TESTS_MISSING`) phase-16.md:1071; `E_TESTS_MISSING` phase-16.md:1576; `scenario.version_tested` phase-16.md:1591; automatic kinds DSL.md:431 | NEW: none | Open for the lead, not decided here: whether an automatic case must pass for step 4 to hold. DSL.md:431 names the four kinds and gives no expected result, and the plan does not choose. The text adds them to the run and leaves their pass rule open.
+
+@@ REP 16
+a finding refuses the decision.
+@@ WITH
+a finding refuses the decision as 422 `E_VALIDATION` with the `errors[]` code `E_PROTECTED_ATTRIBUTE` (DSL.md s.7; the code of section 3.1 rule 6).
+@@ END
+# V-16-07-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `E_PROTECTED_ATTRIBUTE` phase-16.md:939 (section 3.1 rule 6) and DSL.md:1104 (s.7 table); `E_VALIDATION` with `errors[]` for `check_before_decision` phase-16.md:1465; `check_before_decision` returns a list of issues phase-04.md:651; the check's output is "a list of refusals" phase-24.md:671 | NEW: none. The refuter found no protected-attribute code in phase 16, but section 3.1 rule 6 has one; phase 24 names no code of its own for its refusals, so the existing code is reused.
+
+@@ REP 16
+'mode','batch_id','trigger_ref','window_from',
+@@ WITH
+'mode','batch_id','touch_id','trigger_ref','window_from',
+@@ END
+# V-16-10-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `touch_id UUID` phase-16.md:1986 (block 7.9, migration 0055); `scenario_runs` `internal` list phase-16.md:634 (migration 0057); every column needs a classification row phase-00.md:797-798 | NEW: none
+
+@@ BLOCK 16
+### 7.N touch_id in the fan-out and run payloads (V-16-10-b, MEDIUM; DR-413)
+Section 4.1: the payload of `scenario_touch_fanout` is `{batch_id, touch_id, source_id, entity_kinds, business_date}`, and the payload of `scenario_run` gains `touch_id?` for the incremental, settled and shadow runs, as block 7.9 says. Section 3.6 step 1 reads `touch_id` from the payload with the batch fields.
+@@ END
+# V-16-10-b | MEDIUM | names used and where they exist: `touch_id` phase-16.md:1986 and 1988 (block 7.9); `canon.touched` payload that carries `touch_id` phase-11.md:1544; section 4.1 rows phase-16.md:1749-1750; section 3.6 step 1 phase-16.md:1130 | NEW: none
+
+@@ BLOCK 16
+### 7.N Where "not operating as intended" is defined (V-16-11-b, LOW; DR-413)
+The phrase is a rule of DSL A.3, not of section 3.16. Section 3.6 step 6 and block 7.10 replace their reference to section 3.16 for the phrase with DSL A.3, as sections 3.4 and 3.8 already cite it.
+@@ END
+# V-16-11-b | LOW | names used and where they exist: DSL A.3 (DSL.md, "## A.3 Data requirements and readiness", the rule on "not operating as intended"); section 3.6 step 6 phase-16.md:1156-1158; block 7.10 phase-16.md:1996-2009; sections 3.4 and 3.8 cite DSL A.3 phase-16.md:1084 and phase-16.md:1239; section 3.16 has no such phrase (grep over its lines: none) | NEW: none
+
+@@ BLOCK 17
+### 7.N The fold skips a key whose alert sits in a closed case (V-16-12-a, MEDIUM; DR-413)
+Section 3.1 step 2 runs under the bucket fold of phase 16 section 3.7. From this phase on, the fold's `open_bucket` skips a key whose alert sits in a case with status `closed` (phase 16 block 7.11). The join is `alert.alert_index` to `alert.alerts` to `casework.case_alerts` to `casework.cases`. A repeat after closure therefore gets a new bucket and a new fingerprint; section 3.1 step 2 then finds the key new, so step 3 continues, and section 3.5 opens a case beside the closed one with `case.linked_prior`.
+@@ END
+# V-16-12-a | MEDIUM | names used and where they exist: `open_bucket` phase-16.md:811 (`DetectionKeyRepository`) and phase-16.md:2011; block 7.11 of phase 16 phase-16.md:2010-2020; `alert.alert_index` phase-17.md:181; `casework.case_alerts` phase-17.md:899 (section 3.1 step 7); `casework.cases` phase-17.md:24; `case.linked_prior` phase-17.md:1035 and phase-17.md:1361 | NEW: none
+
+# SUMMARY: fixes written 11 (REP 4, BLOCK 7); DECIDE 1; DROP 0; claims covered: V-16-01-a, V-16-01-b, V-16-01-c, V-16-03-a, V-16-03-b, V-16-03-d, V-16-04-a, V-16-05-a, V-16-06-a, V-16-07-a, V-16-10-a, V-16-10-b, V-16-11-b, V-16-12-a

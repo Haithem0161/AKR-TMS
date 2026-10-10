@@ -25,7 +25,7 @@ Principles:
 4. **Bilingual by construction.** Every human-visible string is an `I18nString`; Arabic is the original. Publishing
    with a missing `ar` or `en` is an error.
 5. **Governed, not configured.** Nothing in a document takes effect until a change request (Part D) is approved by a
-   second person with a fresh step-up. The maker never approves (D20, GV-53).
+   second person with a fresh step-up. The maker never approves (D20, GV-32).
 6. **Unknown is never low.** Every document kind states what happens when an input is missing, and the answer is
    never "treat as zero" or "skip silently" (S-10, K-04, D21).
 7. **Never tuned to capacity.** No field can cap the number of alerts, cases or reviews (S-39). Capacity is handled
@@ -118,7 +118,7 @@ numbered scenarios, articles 4-14 indicators; DATA-MODEL `scn.cbi_catalogue_item
 that do not resolve to a catalogue item are refused (`E_CBI_REF_UNKNOWN`).
 
 **ReasonCodeRef** — a stable reason code id from the reason-code library (`ref.reason_codes`, family `detection`),
-for example `CASH02_SPLIT_BELOW_LIMIT`. The library holds the bilingual templates, the typology tag, the CBI mapping
+for example `DET_CASH02_SPLIT_BELOW_LIMIT`. The library holds the bilingual templates, the typology tag, the CBI mapping
 and the fields to display (T-44); documents reference codes and pass facts into their placeholders.
 
 **SegmentRef** — `segment:<key>` (a row of the admin-managed segment register, DATA-MODEL `feat.segments`), a risk
@@ -172,7 +172,7 @@ scenario card, the CBI coverage report and the assessor pack (S-07).
 |---|---|---|---|
 | `id` | string | yes | `SCN-<FAMILY>-NN`. Families from file 27 B4-B21: CASH, XFER, TRADE, ISL, DIGI, LOAN, ACCT, PEP, PUB, CORR, TF, PF, INS, DORM, CHQ, FX, OTH, OBS. Bank scenarios use `NN` 901-999 (`E_NAMESPACE`, S-05) |
 | `family` | enum | yes | Must match the id prefix |
-| `pack` | enum | yes | `cbi` (baseline, never removed), `akr` (library), `islamic`, `regime` (PUB, PF-Iran, TF district), `bank` |
+| `pack` | enum | yes | `cbi` (baseline, never removed), `akr` (library), `islamic`, `regime` (a foreign regime's pack, ROADMAP P3: US, UK, EU; none ships before P3; the PUB, PF and TF families are in the `cbi` and `akr` packs, DR-406), `bank` |
 | `typology` | string[] | yes | Tags from the shared typology set used by the risk assessment and the STR typology field (S-55) |
 | `cbi_refs` | CbiRef[] | no | Required for `pack: cbi`. A bank scenario may implement CBI items too |
 | `classification` | Classification | yes | `restricted` limits alert visibility to the suspicion tier and named owners |
@@ -201,8 +201,13 @@ scenario card, the CBI coverage report and the assessor pack (S-07).
 - Required inputs (no `?`) must be mapped and above their minimum completeness for the scenario to reach `shadow` or
   `live` (S-47). When a required input later falls below its minimum, the scenario stays live but is shown as "not
   operating as intended" on the card, the readiness view and the command centre; it is never switched off silently.
-- Optional inputs (`?`) degrade the scenario when absent. The readiness grade (A-D, `admin.readiness_grades`) is
-  computed from the requirements and the field availability of the bank's sources; grade D produces a "not covered"
+- A source whose business date or newest posting is older than its freshness class allows (F1-F5, ARCHITECTURE.md
+  5.5) is shown as `stale source` on the card, the readiness view and the command centre, with the source business
+  date as `data_as_of` (DR-39). The state is raised as a `dq.stale` event; scenarios that read the stale source are
+  shown as "not operating as intended" and are never scored low because of it.
+- Optional inputs (`?`) degrade the scenario when absent. The readiness grade (A-D, `scn.readiness_grades`) is
+  computed from the requirements and the field availability of the bank's sources (a present-but-unpopulated field
+  counts as absent, DR-38); grade D produces a "not covered"
   declaration with owner, reason, interim route and review date (S-03).
 - The studio picks data fields from the readiness view; a field that is not available at the bank is shown with the
   vendor request text.
@@ -366,7 +371,7 @@ income missing" as a data gap.
 ## A.7 Exclusions and suppression
 
 ```json
-"exclusions": { "register": true, "static": [ { "field": "account.type", "in": ["government_payroll_pool"], "reason_code": "EXCL_POOL_ACCOUNT" } ] },
+"exclusions": { "register": true, "static": [ { "field": "account.type", "in": ["government_payroll_pool"], "reason_code": "EXC_POOL_ACCOUNT" } ] },
 "suppression": { "hibernation": { "allowed": true, "default_period": { "value": 90, "unit": "days" },
                                   "envelope": ["n", "total"], "margin": 0.2 },
                  "dedupe": { "same_entity_within": { "value": 7, "unit": "days" } } }
@@ -391,7 +396,7 @@ income missing" as a data gap.
   "severity": { "base": "medium",
                 "uplift": [ { "when": "branches >= 2", "to": "high", "reason_code": "CASH02_MULTI_BRANCH" },
                             { "when": "feat.limit_enquiry_logged_7d == true", "to": "high", "reason_code": "CASH02_LIMIT_ENQUIRY" } ] },
-  "reason_codes": [ { "code": "CASH02_SPLIT_BELOW_LIMIT", "facts": { "n": "n", "total": "total", "days": ":window" } } ],
+  "reason_codes": [ { "code": "DET_CASH02_SPLIT_BELOW_LIMIT", "facts": { "n": "n", "total": "total", "days": ":window" } } ],
   "case_family": "cash",
   "evidence": { "transactions": "all_in_window", "fields": ["txn.branch_id", "cash_event.depositor_id?", "txn.channel_id"] },
   "template": "cash_structuring_v1"
@@ -432,7 +437,8 @@ what makes the "why was this an alert" and "why was this not an alert" what-if r
 
 ## A.10 Versioning and lifecycle
 
-Statuses: `draft` -> `testing` -> `shadow` -> `live` -> `retired` (DATA-MODEL `scn.scenario_versions.status`).
+Statuses: `draft` -> `testing` -> `shadow` -> `live` -> `retired` (DATA-MODEL `scn.scenario_versions.status`), plus
+`superseded` for a live version replaced by a newer one; it is the fallback a kill switch returns to (phase 16, DR-108).
 
 | Rule | Detail |
 |---|---|
@@ -488,9 +494,9 @@ mapping is the bank's data.
   "name": { "ar": "...", "en": "..." },
   "owner": "role:DS",
   "entity": "txn",
-  "source": { "source": "ics_core", "object": "AKR_V_TXN", "format": "relational", "key": ["TXN_ID"] },
-  "change": { "strategy": "poll", "watermark": { "kind": "timestamp_column", "field": "LAST_UPD" },
-              "overlap": "PT10M", "settle": "PT2M", "lookback": "auto" },
+  "source": { "source": "ics_core", "object": "AKR_V_TXN", "format": "relational", "key": ["BR_CODE", "BOOK_DT", "DOC_SEQ", "LEG_SEQ"] },
+  "change": { "strategy": "poll", "watermark": { "kind": "business_date", "field": "BOOK_DT" },
+              "overlap": "P31D", "settle": "PT2M", "lookback": "auto", "deletes": "key_reconcile" },
   "filter": [ { "expr": "row.GL_ONLY != 'Y'", "reason_code": "MAP_EXCL_GL_INTERNAL" } ],
   "fields": { "<canonical attribute>": { "from": "...", "do": ["..."] } },
   "validate": [ { "rule": "not_null", "field": "account_id", "on_fail": "quarantine" } ],
@@ -508,7 +514,8 @@ mapping is the bank's data.
 | `source.source` | string | yes | Key of a registered source (`admin.sources`) |
 | `source.object` | string | yes | A bank-owned view (CT2) or replica object (CT1) on the source's approved object list (the footprint register); anything else is refused (`E_OBJECT_NOT_APPROVED`, C-30) |
 | `source.format` | enum | yes | `relational` (columns), `t24_xmlrecord` (Transact record text decoded in AKR-TMS, never in the CBS, C-14), `t24_multivalue`, `landing_file` (CT4 contract with manifest, C-39), `iso20022`, `mt` (raw message parsed by a versioned parser, C-41) |
-| `source.key` | string[] | yes | The source primary key; lands as `(source, table, pk)` for idempotent loading (C-24) |
+| `source.record` | string | for the four text formats | The column that holds the record text (`t24_xmlrecord`, `t24_multivalue`) or the raw message (`iso20022`, `mt`); required for these four formats and refused as an unknown key for the others (phase 11 section 7.21) |
+| `source.key` | string[] | yes | The source primary key, often composite (a sequence that restarts each day and branch is never a key alone); lands as `(source, table, pk)` with the parts joined in this order for idempotent loading (C-24, DR-41) |
 | `change` | object | yes | B.2 |
 | `filter` | list | no | Expr over the source row; each filter needs a reason code and appears in the coverage statement as an exclusion, so no row is dropped silently (C-27) |
 | `fields` | map | yes | B.3. Every attribute the canonical entity marks as required must be mapped (`E_REQUIRED_TARGET_UNMAPPED`) |
@@ -521,10 +528,11 @@ mapping is the bank's data.
 | Field | Values | Notes |
 |---|---|---|
 | `strategy` | `poll` (default), `stream`, `file` | The change-source interface (C-06): a bank moves between tiers CT1-CT4 by configuration. `stream` only where the bank agreed to CDC (Debezium sidecar, CT3, C-11) |
-| `watermark.kind` | `timestamp_column`, `rowversion`, `sequence_id`, `t24_date_time`, `business_date`, `cdc_position`, `manifest` | Per table class (file 25 s.7.2). `none` is refused for fact tables; small reference tables may use `full_compare` with a key-set reconciliation |
+| `watermark.kind` | `timestamp_column`, `rowversion`, `sequence_id`, `t24_date_time`, `business_date`, `cdc_position`, `manifest`, `full_compare` | Per table class (file 25 s.7.2) and DR-37. `none` is refused for fact tables. `full_compare` reads the table in full on a schedule and diffs it on the row hash, keeping the snapshot as the audit trail: for master tables with no indexed change date and for small reference tables, with a key-set reconciliation. A time-of-day column without a date is never a watermark |
 | `overlap` | ISO 8601 duration | Re-read window behind the watermark (commit-order problem, file 25 s.7.3) |
 | `settle` | ISO 8601 duration | Rows younger than this wait for the next poll |
-| `lookback` | `auto` or a duration | `auto` derives the window from measured late-arrival percentiles and widens it automatically (C-21) |
+| `deletes` | `none` (default), `key_reconcile` | Where the source can remove rows, a scheduled key-set comparison of the source against the landing (within the load budget) finds keys that have gone; each becomes a `deleted` event, the raw row is kept, and the batch receipt counts the deletes (DR-37, C-27) |
+| `lookback` | `auto` or a duration | `auto` derives the window from measured late-arrival percentiles, is never narrower than the source's trailing re-read window (default 31 days of business date, a per-source setting, DR-37), and widens it automatically (C-21) |
 
 Every batch records the as-of marker the engine offers (SCN, row version, LSN, timestamp or none), the mapping
 version and the watermark move, landed with the follow-up jobs in one transaction (C-20).
@@ -535,7 +543,7 @@ version and the watermark move, landed with the follow-up jobs in one transactio
 "fields": {
   "booking_date":  { "from": "BOOK_DT", "do": ["parse_date:yyyy-MM-dd"] },
   "amount":        { "from": "AMT", "do": ["parse_decimal", "abs"] },
-  "dr_cr":         { "from": "AMT", "do": ["dr_cr_from_sign"] },
+  "dr_cr":         { "from": "DR_CR_IND", "do": ["code_map:ics_dr_cr"] },
   "currency":      { "from": "CCY", "do": ["code_map:ics_currency"] },
   "txn_type":      { "from": "TRN_CODE", "do": ["code_map:ics_txn_type"] },
   "narrative_raw": { "from": "NARR", "do": ["digits_western", "trim"] },
@@ -547,7 +555,7 @@ version and the watermark move, landed with the follow-up jobs in one transactio
 
 | Key | Notes |
 |---|---|
-| `from` | `COLUMN` (view or replica column), `field:NAME` (dictionary field, resolved to its position through the bank's own dictionary at generation, C-37), `local:NAME` (local reference field), `meta:source`, `meta:batch_as_of` |
+| `from` | `COLUMN` (view or replica column), `field:NAME` (dictionary field, resolved to its position through the bank's own dictionary at generation, C-37), `local:NAME` (local reference field), `meta:source`, `meta:batch_as_of`; for `iso20022` an element path and for `mt` a field tag, in the grammar of phase 11 section 7.21 |
 | `do` | Ordered list of transforms from the closed library (B.4), written `name` or `name:arg` |
 | `expr` | Expr over `row` (the source row) for small computed fields; used instead of `from` |
 | `default` | A literal used only when the source value is null; a default on a field that feeds a scenario threshold is refused (`E_DEFAULT_ON_MONITORED`) so a missing value never becomes a plausible one |
@@ -563,6 +571,7 @@ personal field that the catalogue marks `enc` or `hk` is encrypted or keyed-hash
 | `parse_date` | format | Text to date; invalid input is a validation failure, never a guessed date |
 | `parse_timestamp` | format, zone | Text to timestamp in the bank's zone, stored with derived UTC (C-18) |
 | `tz_convert` | zone | Re-zone a timestamp |
+| `combine_date_time` | time field, zone | Builds a local timestamp from a date column and a six-character HHMMSS text column; the result fills `source_local_ts` with precision second only where the bank has confirmed what the time column records, and never `posted_at` otherwise (DR-37) |
 | `parse_decimal` | none | Text or engine numeric to decimal |
 | `decimal_scale` | n | Divide by 10^n (implied decimals) |
 | `currency_minor_units` | none | Scale by the currency's minor unit from `ref.currencies` |
@@ -617,7 +626,11 @@ so it is explainable; party merge and split across sources are maker-checker act
 
 Code maps are separate admin data (`admin.code_maps`, `admin.code_map_entries`): effective-dated rows `source_code ->
 canonical_code`, each added or changed by change request. Kinds: `txn_type`, `product`, `channel`, `country`,
-`id_type`, `branch`, `purpose`, `currency`, `status`.
+`id_type`, `branch`, `purpose`, `currency`, `status`, `dr_cr`.
+
+A debit/credit indicator held in its own column (for example an ICS BANKS `DEB_CRE_IND`) is mapped through a `dr_cr`
+code map to canonical `D` or `C`; an unmapped value is unknown plus a data-quality issue. `dr_cr_from_sign` is only for
+sources that store a signed amount.
 
 - An unmapped value becomes `unknown` plus a data-quality issue, never a failed batch (C-50).
 - For kinds marked `gate: quarantine` (default for `txn_type`), a row with an unmapped code is quarantined until the
@@ -629,6 +642,9 @@ canonical_code`, each added or changed by change request. Kinds: `txn_type`, `pr
 - The SQL generator builds only `SELECT` statements from the mapping, per dialect plugin (Oracle, SQL Server,
   PostgreSQL, generic ODBC for Db2 and Sybase, C-61), with keyset pagination on the key and watermark, bind
   variables and fetch sizes from the signed load budget (C-13).
+- Row counts for the load budget come from a counted or sampled read, never from catalogue statistics, which a source
+  may not have (DR-40). A generated statement reads one approved object; a join of two large tables is not generated,
+  and where a join is unavoidable it runs on a bank-owned view or in the AKR-TMS store.
 - Before any statement is sent, a SQL parser verifies it is a single read-only `SELECT` over approved objects
   (C-54). A failure is a product defect: the statement is refused and an incident opened.
 - **Drift** (C-52): each run compares the catalogue hash of the columns used with `approved_catalogue_hash`. On a
@@ -736,7 +752,11 @@ Bands are half-open (`from` inclusive, `to` exclusive; the top band includes 100
 The shipped model has 27 factors in six blocks (file 26 s.14d). Factors may not use protected attributes: names,
 tribe, religion, sect, region of origin and gender are refused (`E_PROTECTED_ATTRIBUTE`, K-33). Nationality and
 residence are allowed because the CBI controls name them as customer factors. No commercial data (revenue, product
-profitability) is a rating input (K-17).
+profitability) is a rating input (K-17). A factor whose input is suspicion-tier data (STR filed, exit for financial
+crime, alert and case history, network links to an STR party, authority requests) is withheld: it is never scored into
+the stored rating, and suspicion-derived risk reaches the rating only as an upward override by a person on the case's
+access list (DR-103). A factor whose input no phase supplies yet is excluded from its block and listed on the model
+version as not yet in use.
 
 ## C.3 Floors
 
@@ -754,6 +774,10 @@ profitability) is a rating input (K-17).
 | `decay` | Duration after which the floor stops applying (FL-08 24 months, FL-09 36 months, FL-07 12 to 36 months by severity). Expiry creates a review, never an automatic downgrade (K-30) |
 | `exception` | Optional governed exception (for example FL-05 allows a documented sub-segment such as a registered domestic NPO with local donors to drop to 3 with EDD and senior approval kept); the exception is itself a change request |
 | `action` | Optional process action (`block_onboarding` for FL-11, `remediation_task` for FL-12) |
+
+Floors on PEP facts read `pep.tier`, `pep.former`, `pep.assessment_documented` and `pep.related_tier` (the highest
+confirmed tier of a relative or close associate); the decay of a former PEP's floors runs from the office end for the
+months the document sets per tier in `pep.persistence_months` (`{"P1": n, "P2": n, "P3": n}`, values from the bank).
 
 Floors cannot be overridden per customer; the schema has no field that would allow it (K-07). A sanctions near-match
 is a hold and freeze workflow (M9, M14), not a floor.
@@ -830,7 +854,8 @@ For each party, nightly and immediately on a trigger (K-01, K-26):
 1. Extract each applicable factor's value; a value older than its `freshness` counts as unknown.
 2. Score each factor from its anchors; an unknown applicable factor scores `unknown_score`.
 3. Block score = weighted average of the applicable factors.
-4. Inherent score = `(1 - p) x sum(block weight x block score) + p x max(block score)`.
+4. Inherent score = `(1 - p) x sum(block weight / 100 x block score) + p x max(block score)`, over the blocks with an
+   applicable factor (a block with none is dropped and the other weights renormalise; DR-104).
 5. Score level from `levels`.
 6. Level = max(score level, highest floor that fires).
 7. Apply the completeness cap.
@@ -877,12 +902,12 @@ settings, models and workflow definitions (research 32 s.11.4; file 29 s.9f; D20
 
 | Field | Notes |
 |---|---|
-| `object_kind` | `scenario`, `parameter_set`, `mapping`, `code_map`, `rating_model`, `policy_pack`, `fail_policy`, `list_setting`, `goaml_profile`, `role_grant`, `setting`, `model`, `workflow_definition` |
+| `object_kind` | An open set registered in code by each phase (docs/plan research DR-53): `role_grant`, `setting`, `policy_bundle`, `workflow_definition`, `task_assignment` (phase 04); `mapping`, `code_map` (10); `scenario`, `parameter_set`, `segment` (16); `rating_model` (15); `policy_pack`, `fail_policy`, `list_setting`, `goaml_profile`, `model` with their phases. Some kinds are created only through their dedicated route (a role grant through `POST /admin/users/{id}/grants`). The system derives `object_key`, the natural key: one open request per object |
 | `base_version` | The object version the change was made against. If the object moves before activation, the request goes stale and must be rebased (`E_STALE_BASE`) |
 | `proposed` | A reference to the draft version (scenario version, parameter set, mapping version, model version), or an inline patch for small objects (setting, role grant) |
 | `reason_code` | From `ref.reason_codes` family `tuning` or `change`. Every code is tagged `risk` or `capacity`; a `capacity` reason needs below-the-line evidence and an approver outside operations (S-39) |
 | `reason_text` | Free text in the maker's language |
-| `evidence` | References to replay, below/above-the-line samples, shadow comparisons, validation records, test runs, impact analyses. Each item must be younger than `settings.cr_evidence_max_age_days` when the checker approves (`E_EVIDENCE_STALE`) |
+| `evidence` | References to replay, below/above-the-line samples, shadow comparisons, validation records, test runs, impact analyses. Each item must be younger than the setting `change.evidence_max_age_days` when the checker approves (`E_EVIDENCE_STALE`) |
 | `effective_at` | Optional future time; null means "on approval". Material changes cannot be back-dated |
 | `emergency` | D.3 |
 
@@ -893,7 +918,7 @@ settings, models and workflow definitions (research 32 s.11.4; file 29 s.9f; D20
 | `change_class` | `minor`, `material` or `emergency` from the rules in D.3. The maker may raise the class, never lower it (`E_CLASS_LOWERED`) |
 | `volume_effect` | `increase`, `neutral`, `decrease` or `unknown`, from the attached replay (alerts before and after over the same period). A scenario or parameter change with no replay is `unknown` and cannot be approved as material |
 | `impact` | Alert volume and coverage before and after, scenarios and coverage cells touched (mappings), tier migration (rating model) |
-| `route` | The workflow definition that will carry the approval (Part E), chosen from `object_kind`, `change_class` and `volume_effect` |
+| `route` | The workflow definition that will carry the approval (Part E), chosen by the ordered rules of the governed setting `change.route_map` (kind, class, maker role, setting key prefix, validated flag; first match wins; DR-54) and fixed at submit |
 
 ## D.3 Change classes
 
@@ -910,28 +935,37 @@ settings, models and workflow definitions (research 32 s.11.4; file 29 s.9f; D20
 | Rating model version | Material | Shadow run, disagreement list, tier migration (K-06) |
 | Segment definition | Material | Alert-volume impact by segment |
 | goAML profile, policy pack, fail policy | Material | Validation run (goAML checker), policy test cases |
-| Role grant, setting, list setting | Minor (raised to material when the setting carries a CBI floor) | None beyond the diff |
+| Role grant, setting, list setting, task reassignment | Minor (raised to material when the setting carries a CBI floor) | None beyond the diff |
+| Cedar policy bundle | Material | Shadow report (generated at decision time; the bundle runs in shadow at least `change.policy_shadow_min_h`) |
+| Workflow definition | Material | Validation run (generated); test run |
 | Sanctions-list driven or regulator-ordered change | Emergency | The order or list reference |
 
-**Emergency**: applied on the approval of one named officer (MLRO or deputy) who is not the maker, then reviewed on
-the material route within 5 working days (file 27 B26.2). If the review rejects, a rollback task opens. The maker
-still never approves.
+**Emergency** (DR-55): applied on the approval of one named officer (MLRO or deputy) who is not the maker, then
+reviewed on the material route by two further people (the emergency approver is excluded). A loosening or
+unknown-effect change not confirmed within `change.emergency_review_h` (at most 24 hours, SP-22) is reverted
+automatically; any other emergency change is reviewed within `change.emergency_review_working_days` (at most 5, file
+27 B26.2) and escalated to the compliance head when overdue, never reverted by the clock (reverting a sanctions
+addition would loosen a control). A review that rejects reverts the change. Only kinds that can revert allow
+emergency. The maker still never approves.
 
 ## D.4 Invariants
 
-- **Maker is never checker**: enforced in Cedar and by the database check `checker_id <> maker_id`
-  (DATA-MODEL `admin.change_requests`; GV-53).
+- **Maker is never checker**: enforced in Cedar, by the engine (including a delegate acting for the maker) and by the
+  database checks and unique indexes on `admin.change_requests` and `admin.tasks` (GV-32, DR-57).
 - **Fresh step-up**: the approving action needs AAL2 from the single-use step-up ledger.
-- **Atomic activation**: at `effective_at` a job writes the new object version's status, the audit event and the
-  outbox event in one transaction (the DBS policy-bundle activation pattern). `If-Match` on the object version is
-  checked at submit and again at activation.
+- **Atomic activation** (DR-58): in the transaction of the final approval, or at `effective_at` by a timer, the new
+  object version, the audit event and the outbox event are written together (the DBS policy-bundle activation
+  pattern). The base version is checked at submit, at every decision and at activation; a moved base refuses the
+  approval (`E_STALE_BASE`) or fails the request at the timer.
 - **Versions on outputs**: every later alert, rating or batch records the versions it ran under (S-52).
-- **Post-change review**: timers open review tasks for the approver at 30 and 90 days after a material change
-  (file 29 s.9f; S-46).
+- **Post-change review**: timers open review tasks for the approvers at 30 and 90 days after a material change
+  (`change.post_review_days`; file 29 s.9f; S-46).
 - **Volume-reducing changes** are flagged on the request and routed to a second approver in the compliance function
   (research 32 s.11.4).
 
-Statuses: `draft` -> `submitted` -> `approved` | `rejected` | `withdrawn` -> `effective` (DATA-MODEL).
+Statuses: `draft` -> `submitted` -> `approved` | `rejected` | `withdrawn`; `approved` -> `effective` | `failed` (stale
+base at a scheduled activation); `effective` -> `reverted` (emergency review). Rollback of an effective change is a
+new request (DATA-MODEL).
 
 ---
 
@@ -960,10 +994,14 @@ workflow engine carries the decisions around it.
 { "kind": "pool", "pool": "pool:central_l2" }
 { "kind": "named_officer", "officer": "mlro" }
 { "kind": "case_acl", "grant": "decide" }
+{ "kind": "subject_party", "party": "approvers" }
 ```
 
-- `role` resolves through `admin.role_grants` (with delegations); `case_acl` only to principals on the case's access
-  list with the `decide` grant, so a suspicion-tier approval never reaches someone outside the case.
+- `role` resolves through `admin.role_grants` (with delegations; `scope: branch` uses the subject's branch); `case_acl`
+  only to principals on the case's access list with the `decide` grant, so a suspicion-tier approval never reaches
+  someone outside the case; `subject_party` to a party the subject declares (`maker`, `approvers` for change
+  requests). A task with no eligible holder is parked until one appears or an administrator reassigns it by change
+  request.
 - Every `approve` and `sign` step excludes the maker of the change, the proposer of the decision and earlier deciders
   of the same instance. The exclusion cannot be switched off (`E_FOUR_EYES_OFF`).
 - Deciding steps require step-up (AAL2); `sign` steps always do (DBS `E_STEPUP_DISABLED`).
@@ -971,8 +1009,10 @@ workflow engine carries the decisions around it.
   visible only to the case access list, and task titles shown in shared inboxes use neutral wording. Human-visible
   strings in definitions that branch-tier roles can see are checked against the admin-managed tipping-off term list
   (`E_TIPPING_OFF_TERM`).
-- Timers use the bank calendar; decision steps carry a timeout with `notify_superior` or `reassign`, never an
-  automatic outcome.
+- Timers use the bank calendar (calendar days until phase 09); decision steps carry a timeout with `remind`,
+  `escalate { to }` (a non-blocking notice task for the escalation holder, who decides only if eligible) or
+  `reassign { to }`, never an automatic outcome. DBS `notify_superior` is replaced by `escalate` (AKR has no reporting
+  line).
 
 ## E.3 AKR terminal effects
 
@@ -982,22 +1022,30 @@ workflow engine carries the decisions around it.
 | `record_decision` | Writes the case decision (`casework.decisions`, with `decider_id <> proposer_id`) and its case event |
 | `release_for_filing` | Marks an STR, TFR or other report package ready for the named officer to file; filing itself is a person's act (D9) |
 | `create_ops_task` | Creates an operations task for bank staff with neutral wording (M14); never a CBS write |
-| `open_review` | Opens a follow-up review task (emergency changes, post-change reviews) |
-| `notify` | In-app notification only; no external channel for suspicion-tier content |
+| `open_review` | Opens the emergency review instance on the material route, excluding the emergency approver |
+| `record_post_review` | Records a post-change review outcome (`effective`, `concern`, `rollback_needed`) on the change request |
+| `notify` | In-app notification only; no external channel for suspicion-tier content (deferrable until phase 22) |
+
+Effects register in code with the resource kinds they serve; a definition naming an unregistered effect that is not
+deferrable cannot be published (`E_EFFECT_UNAVAILABLE`). An effect error rolls the whole approval back.
 
 ## E.4 Shipped definitions
 
-Seeded as data at install; a bank changes them through a `workflow_definition` change request approved by two
-administrators. The bank's authority matrix (`admin.authority_matrix`) supplies who may sit at each step.
+Seeded as data at install (`akr-ctl workflow seed`); a bank changes them through a `workflow_definition` change
+request (route `cr_workflow`: the administrator proposes, the MLRO approves). From phase 09 the bank's authority matrix
+(`admin.authority_matrix`) supplies who may sit at each step.
 
 | Key | Used for | Steps (summary) |
 |---|---|---|
 | `cr_minor` | Minor change requests | `approve` (CHK, not the maker) -> `activate_change` |
 | `cr_material` | Material change requests | `parallel` [`approve` MLRO, `approve` second approver outside operations (CHK)] -> if `volume_effect = decrease`: `approve` compliance head (CH) -> `activate_change` |
 | `cr_material_validated` | Material changes to CBI-baseline scenario logic and to the rating model | `approve` independent validator (MRO, or an outside firm entered as a named user) -> then as `cr_material`. An `approve`, not a `review`: a DBS `review` step does not stop the request |
-| `cr_emergency` | Emergency changes | `approve` (MLRO or deputy) -> `activate_change` -> `open_review` on the material route within 5 working days |
+| `cr_emergency` | Emergency changes | `approve` (MLRO or deputy) -> `activate_change`, `open_review` on the material route (D.3) |
 | `cr_mapping` | Mapping and code-map changes | `approve` (bank compliance or IT officer, not of the implementer's organisation) -> `activate_change` |
-| `cr_access` | Role grants and delegations | `approve` (ADM) -> `approve` (SEC) -> `activate_change` |
+| `cr_access` | Role grants, policy bundles, task reassignments, access settings (the maker is ADM) | `approve` (SEC) -> `activate_change`. Delegations are self-service with step-up, outside change requests |
+| `cr_access_adm` | The same kinds when the maker acted as SEC | `approve` (ADM) -> `activate_change` |
+| `cr_workflow` | Workflow definition publication | `approve` (MLRO or deputy) -> `activate_change` |
+| `cr_post_review` | Post-change reviews at 30 and 90 days | `form` (one of the approvers: outcome and notes) -> `record_post_review` |
 | `case_close_no_report` | Closing an alert or case without a report | `approve` (A2 or M from `case_acl`, not the proposer) -> `record_decision` |
 | `case_report_approval` | STR, SAR, TFR, UTR decisions | `sign` (MLRO from `case_acl`, step-up) -> `record_decision` -> `release_for_filing` |
 | `kyc_override_down` | Downward rating override | `approve` (compliance, not the relationship owner) -> `record_decision` |
@@ -1018,7 +1066,7 @@ Each instance pins its definition version; publishing a new version never moves 
 | Code map entry | effective-dated rows | (follows the change request) | Canonical row lineage | A new entry effective forward |
 | Rating model | semver | draft, shadow, live, retired | `kyc.ratings.model_version_id` | Activate the previous version by change request |
 | Workflow definition | int | draft, published, archived | Instance | Publish the previous content as a new version |
-| Change request | none | draft, submitted, approved, rejected, withdrawn, effective | Each activated version names its change request | Rollback is a new change request |
+| Change request | none | draft, submitted, approved, rejected, withdrawn, effective, failed, reverted | Each activated version names its change request | Rollback is a new change request |
 
 ## 7. Validation errors
 
@@ -1076,9 +1124,14 @@ API.
 | `E_COST_GUARD` | error | Compiled statement over the cost guard for the bank's data (at compile or replay) |
 | `E_NO_REASON_CODE` | error | No reason code in `outputs` |
 | `E_HIBERNATION_SKIPS_EVALUATION` | error | A suppression rule that stops evaluation instead of display |
-| `E_TESTS_MISSING` | error | Fewer than 3 positive and 3 negative unit cases when leaving `testing` |
+| `E_TESTS_MISSING` | error | Fewer than 3 positive and 3 negative unit cases when leaving `draft` |
 | `E_TWO_LIVE` | error | A second `live` version for one scenario |
 | `E_BASELINE_RETIRE` | error | Retiring, disabling or deleting a `pack: cbi` scenario |
+| `E_LOGIC_VERSION_BUMP` | error | A `logic_version` lower than the bump the change requires (A.10 semver rules; phase 16) |
+| `E_FEATURE_KIND` | error | A feature definition names an expression kind outside the nine closed kinds (phase 13, DR-98) |
+| `E_SEGMENT_MIN_SIZE` | error | A segment `min_size` below the governed `segments.min_size` floor (phase 13) |
+| `E_SEGMENT_INPUT_NOT_ALLOWED` | error | A segment rule reads alert, case, screening, watch, STR or decision data (phase 13) |
+| `E_MERGE_CYCLE` | error | A segment `merge_into` chain returns to itself (phase 13) |
 | `W_OUTSIDE_BAND` | warning | A parameter-set value inside the hard bounds but outside the approved band; the change request becomes material |
 | `W_DEGRADED_INPUT` | warning | An optional input whose readiness grade is C or D at this bank |
 | `W_DP_EXPIRED` | warning | A `DP` value past its review date |
@@ -1125,11 +1178,12 @@ API.
 |---|---|---|
 | `E_CLASS_LOWERED` | error | The maker set a lower class than the computed one |
 | `E_EVIDENCE_MISSING` | error | Evidence required for the class (D.3) is not attached |
-| `E_EVIDENCE_STALE` | error | Evidence older than `settings.cr_evidence_max_age_days` at approval |
+| `E_EVIDENCE_STALE` | error | Evidence older than `change.evidence_max_age_days` at approval |
 | `E_CAPACITY_NO_BTL` | error | A `capacity` reason without a below-the-line sample |
 | `E_STALE_BASE` | error | The object moved past `base_version`; rebase the draft |
 | `E_BACKDATED` | error | `effective_at` in the past for a material change |
-| `E_SELF_APPROVAL` | error | The maker tried to approve (also refused by Cedar with 403 and by the database check) |
+| `E_SELF_APPROVAL` | error | The maker, an earlier decider or a delegate of either tried to approve (refused by Cedar with 403, by the engine and by the database) |
+| `E_INVENTORY_MISSING` | error | The kind needs an `approved_for_use` inventory record for the object (GV-01) and none exists |
 
 **Workflow definitions (Part E)** — the DBS catalogue applies; AKR adds:
 
@@ -1139,12 +1193,17 @@ API.
 | `E_FOUR_EYES_OFF` | error | A deciding step that does not exclude the maker, the proposer or earlier deciders |
 | `E_TIPPING_OFF_TERM` | error | A string visible to branch-tier roles contains a term from the tipping-off list |
 | `E_ACL_ASSIGNEE_REQUIRED` | error | A `restricted` definition with a deciding step not assigned through `case_acl` |
+| `E_ASSIGNEE_UNAVAILABLE` | error | An assignee kind the family's resource kinds cannot resolve (`case_acl` outside cases and reports, an undeclared `subject_party`) |
+| `E_EFFECT_UNAVAILABLE` | error | A terminal effect not registered and not deferrable, or not serving the family's resource kinds |
+| `E_SUBJECT_ATTR_UNKNOWN` | error | A condition path the declared resource kinds do not provide, or of the wrong type |
+| `E_STEPUP_DISABLED` | error | (DBS rule widened) `stepup: false` on any `approve` or `sign` step |
+| `W_ROLE_WITHOUT_HOLDERS` | warning | A step assigned to a role or office with no active holder today |
 
 ## 8. Authoring API (summary; the full catalogue is in API.md)
 
 | Call | Purpose |
 |---|---|
-| `GET /api/v1/dsl/{kind}/schema` | The JSON Schema for `scenario`, `mapping`, `rating_model`, `change_request` |
+| `GET /api/v1/dsl/{kind}/schema` | The JSON Schema for `scenario`, `mapping`, `rating_model`, `change_request`, `workflow` |
 | `POST /api/v1/scenarios`, `POST /api/v1/scenarios/{id}/versions` | Create a bank scenario; open a new draft version |
 | `PUT /api/v1/scenarios/{id}/versions/{v}` | Replace the draft content |
 | `POST /api/v1/scenarios/{id}/versions/{v}/validate` | Schema and semantic validation; returns the error list without changing state |
@@ -1210,7 +1269,7 @@ Every mutation carries `Idempotency-Key` and `If-Match` and writes an audit even
     "severity": { "base": "medium",
                   "uplift": [ { "when": "branches >= 2", "to": "high", "reason_code": "CASH02_MULTI_BRANCH" },
                               { "when": "feat.limit_enquiry_logged_7d == true", "to": "high", "reason_code": "CASH02_LIMIT_ENQUIRY" } ] },
-    "reason_codes": [ { "code": "CASH02_SPLIT_BELOW_LIMIT", "facts": { "n": "n", "total": "total", "days": ":window" } } ],
+    "reason_codes": [ { "code": "DET_CASH02_SPLIT_BELOW_LIMIT", "facts": { "n": "n", "total": "total", "days": ":window" } } ],
     "case_family": "cash",
     "evidence": { "transactions": "all_in_window", "fields": ["txn.branch_id", "txn.channel_id", "cash_event.depositor_id?"] },
     "template": "cash_structuring_v1"
@@ -1244,7 +1303,7 @@ only the band below it.
   "cbi_refs": [ { "article": 3, "no": 1, "rel": "implements" }, { "article": 1, "no": 6, "rel": "implements" } ],
   "owner": "role:M", "classification": "confidential", "evidence_label": "S",
   "phase2_candidate": true, "latency_class": "L1",
-  "data_requirements": ["txn.amount_usd", "account.type", "feat.dormant_days", "feat.p99_single_txn_usd_segment"],
+  "data_requirements": ["txn.amount_usd", "account.type", "feat.dormant_days", "feat.p99_single_credit_usd_segment"],
   "parameters": {
     "dormant_days": { "type": "int", "default": 180, "min": 180, "max": 180, "basis": "CBI" },
     "min_usd": { "type": "decimal", "default": 5000, "min": 1000, "max": 50000, "band": [3000, 7000], "basis": "DP", "review_by": "2027-04-30" },
@@ -1252,12 +1311,12 @@ only the band below it.
   },
   "logic": {
     "kind": "event", "on": "txn.posted",
-    "context": ["txn", "account", "feat.dormant_days", "feat.p99_single_txn_usd_segment"],
-    "condition": "account.type == 'current' && feat.dormant_days >= :dormant_days && txn.amount_usd >= max(:min_usd, :seg_multiple * feat.p99_single_txn_usd_segment)"
+    "context": ["txn", "account", "feat.dormant_days", "feat.p99_single_credit_usd_segment"],
+    "condition": "account.type == 'current' && feat.dormant_days >= :dormant_days && txn.amount_usd >= max(:min_usd, :seg_multiple * feat.p99_single_credit_usd_segment)"
   },
   "outputs": {
     "severity": { "base": "high", "uplift": [] },
-    "reason_codes": [ { "code": "DORM01_LARGE_FIRST_MOVE", "facts": { "days": "feat.dormant_days", "amount": "txn.amount_usd" } } ],
+    "reason_codes": [ { "code": "DET_DORM01_LARGE_FIRST_MOVE", "facts": { "days": "feat.dormant_days", "amount": "txn.amount_usd" } } ],
     "case_family": "dormant",
     "evidence": { "transactions": "triggering_and_previous_30d", "fields": ["account.dormant_since", "txn.channel_id"] },
     "template": "dormant_reactivation_v1"
@@ -1303,7 +1362,7 @@ Saved as a draft with `tests.unit` empty, it validates; leaving `testing` withou
   },
   "outputs": {
     "severity": { "base": "medium", "uplift": [] },
-    "reason_codes": [ { "code": "ACCT01_ABOVE_DECLARED", "facts": { "actual": "measure", "declared": "customer.expected_profile.monthly_income" } } ],
+    "reason_codes": [ { "code": "DET_ACCT01_ABOVE_DECLARED", "facts": { "actual": "measure", "declared": "customer.expected_profile.monthly_income" } } ],
     "case_family": "profile",
     "evidence": { "transactions": "credits_in_period", "fields": ["customer.expected_profile"] },
     "template": "profile_deviation_v1"
@@ -1324,9 +1383,9 @@ degraded (S-10); the case shows "declared income missing" as a data gap.
   "name": { "ar": "حركات الحسابات", "en": "Account transactions" },
   "owner": "role:DS",
   "entity": "txn",
-  "source": { "source": "ics_core", "object": "AKR_V_TXN", "format": "relational", "key": ["TXN_ID", "BOOK_DT"] },
-  "change": { "strategy": "poll", "watermark": { "kind": "timestamp_column", "field": "LAST_UPD" },
-              "overlap": "PT10M", "settle": "PT2M", "lookback": "auto" },
+  "source": { "source": "ics_core", "object": "AKR_V_TXN", "format": "relational", "key": ["BR_CODE", "BOOK_DT", "DOC_SEQ", "LEG_SEQ"] },
+  "change": { "strategy": "poll", "watermark": { "kind": "business_date", "field": "BOOK_DT" },
+              "overlap": "P31D", "settle": "PT2M", "lookback": "auto", "deletes": "key_reconcile" },
   "filter": [ { "expr": "row.GL_ONLY != 'Y'", "reason_code": "MAP_EXCL_GL_INTERNAL" } ],
   "fields": {
     "account_id":       { "from": "ACC_NO", "do": ["keyed_hash:account_number"] },
@@ -1334,7 +1393,7 @@ degraded (S-10); the case shows "declared income missing" as a data gap.
     "value_date":       { "from": "VAL_DT", "do": ["parse_date:yyyy-MM-dd"] },
     "source_local_ts":  { "from": "POST_TS", "do": ["parse_timestamp:yyyy-MM-dd HH:mm:ss,Asia/Baghdad"] },
     "amount":           { "from": "AMT", "do": ["parse_decimal", "abs"] },
-    "dr_cr":            { "from": "AMT", "do": ["dr_cr_from_sign"] },
+    "dr_cr":            { "from": "DR_CR_IND", "do": ["code_map:ics_dr_cr"] },
     "currency":         { "from": "CCY", "do": ["code_map:ics_currency"] },
     "txn_type":         { "from": "TRN_CODE", "do": ["code_map:ics_txn_type"] },
     "channel_id":       { "from": "CHANNEL", "do": ["code_map:ics_channel"] },
@@ -1357,6 +1416,9 @@ degraded (S-10); the case shows "declared income missing" as a data gap.
 ```
 
 The object name, columns and codes are illustrative; the real ones come from the bank's view DDL pack and dictionary.
+In the ICS BANKS installation studied the postings key was BRA_CODE, TRA_DATE, TRA_SEQ1, TRA_SEQ2, the direction was
+DEB_CRE_IND, and there was no dated timestamp, so `source_local_ts` would come only from `combine_date_time` once the
+bank confirms the time column (DR-37).
 The account number itself is never stored in clear here: the `account_id` link is resolved through the keyed hash to
 the canonical account.
 
@@ -1460,7 +1522,8 @@ an error: the value is inside the hard bounds, so once the sample is attached th
   "dsl_version": "1",
   "key": "cr_material",
   "name": { "ar": "اعتماد تغيير جوهري", "en": "Material change approval" },
-  "classification_default": "confidential",
+  "resource_kinds": ["change_request"],
+  "classification_default": "internal",
   "start": "approvals",
   "steps": {
     "approvals": {
@@ -1475,33 +1538,39 @@ an error: the value is inside the hard bounds, so once the sample is attached th
       "label": { "ar": "موافقة مسؤول الإبلاغ", "en": "MLRO approval" },
       "assignee": { "kind": "named_officer", "officer": "mlro" },
       "stepup": true,
-      "timeout": { "after": { "value": 3, "unit": "business_days" }, "action": { "kind": "notify_superior" } },
+      "timeout": { "after": { "value": 3, "unit": "business_days" },
+                   "action": { "kind": "escalate", "to": { "kind": "role", "role": "CH", "scope": "bank" } } },
       "reject": { "comment_required": true, "mode": "end" },
-      "next": [ { "else": true, "to": "@join" } ]
+      "next": "@join"
     },
     "second_approval": {
       "type": "approve",
       "label": { "ar": "موافقة ثانية من خارج العمليات", "en": "Second approval outside operations" },
       "assignee": { "kind": "role", "role": "CHK", "scope": "bank" },
       "stepup": true,
-      "timeout": { "after": { "value": 3, "unit": "business_days" }, "action": { "kind": "notify_superior" } },
+      "timeout": { "after": { "value": 3, "unit": "business_days" },
+                   "action": { "kind": "escalate", "to": { "kind": "role", "role": "CH", "scope": "bank" } } },
       "reject": { "comment_required": true, "mode": "end" },
-      "next": [ { "else": true, "to": "@join" } ]
+      "next": "@join"
     },
     "compliance_approval": {
       "type": "approve",
       "label": { "ar": "موافقة رئيس الامتثال", "en": "Compliance head approval" },
       "assignee": { "kind": "role", "role": "CH", "scope": "bank" },
       "stepup": true,
+      "timeout": { "after": { "value": 2, "unit": "business_days" },
+                   "action": { "kind": "remind", "every": { "value": 1, "unit": "business_days" } } },
       "reject": { "comment_required": true, "mode": "end" },
-      "next": [ { "else": true, "to": "activate" } ]
+      "next": "activate"
     },
     "activate": { "type": "terminal", "outcome": "approved", "effects": [ { "kind": "activate_change" } ] }
-  }
+  },
+  "changelog": { "ar": "الإصدار الأول", "en": "First release" }
 }
 ```
 
 The maker of the change request and anyone who already decided on this instance are excluded from every `approve`
 step by the engine (E.2); the definition cannot switch that off. `cr_material_validated` is the same definition with
-an `approve` step for the independent validator (MRO) placed before `approvals`. The authority matrix decides who
-holds CHK and CH at each bank.
+an `approve` step for the independent validator (MRO) placed before `approvals`. From phase 09 the authority matrix
+decides who holds CHK and CH at each bank. `resource_kinds` and `changelog` are read by the seed loader and stripped
+before validation; the escalation timeouts add a notice task for CH and never decide.

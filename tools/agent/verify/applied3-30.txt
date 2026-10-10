@@ -1,0 +1,19 @@
+Replacements made in docs/plan/phase-30.md by the second re-check (DR-413). 3 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-30-1]
+WHY: S-30-1 | CONFIRMED LOW | the recovery table of section 3.8 still cites "(section 3.11)" for the bundle on offline media, the pointer R-30-6 removed from 7.7; section 3.11 is upgrades and rollback | the row cites section 7.7 item 1
+OLD: the signed bundle at the DR site and on offline media (section 3.11) |
+NEW: the signed bundle at the DR site and on offline media (section 7.7 item 1) |
+
+=== F2 [S-30-2]
+WHY: S-30-2 | CONFIRMED HIGH | block 7.5 item 1 (the R-30-10a text) lets the allows select every pod of `akr-restore`; item 2 runs the known-bad probe of section 3.3 there, an unlabelled pod that must reach nothing, and its rows must pass before the restore starts. With every pod selected the probe reaches the repository, the object store and OpenBao, so the stated check fails: a fault of the lead's own fix | the allows select a membership label that only the Job and the scratch pod carry
+OLD: The allows select every pod of the namespace `akr-restore` (the Job and the scratch pod are its only pods), so no membership label is needed.
+NEW: The allows select the pods that carry the label `akr.io/net-restore: "true"` (the label form of section 3.3; a membership of this namespace only, not a network of `zones.yaml`), which the Job and the scratch pod carry and no other pod does, so the unlabelled known-bad probe of item 2 reaches nothing.
+
+=== F3 [S-30-3]
+WHY: S-30-3 | CONFIRMED LOW (raised MEDIUM) | section 4.4 still says `zones.yaml` gains three keys that the renderer reads; `backup.repository` (the R-30-10b text) is a fourth | the bullet names four
+OLD: gains three keys that the renderer reads (`cluster.apiserver`, `cbs.listeners`, `gateway.cidrs`),
+NEW: gains four keys that the renderer reads (`cluster.apiserver`, `cbs.listeners`, `gateway.cidrs`, and `backup.repository` of section 7.5),

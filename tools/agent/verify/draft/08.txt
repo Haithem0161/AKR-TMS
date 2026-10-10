@@ -1,0 +1,91 @@
+@@ REP 08
+polled every 30 s while visible;
+@@ WITH
+polled every 60 s while visible;
+@@ END
+# V-08-01-b | HIGH | grep -c -F gave 1 | names used and where they exist: `GET /inbox/counts` phase-04.md:1178 ("polls `GET /inbox/counts` every 60 seconds"), phase-17.md:1266-1267 (cadence of `GET /inbox/counts`, phase 04); the 30 s in phase-17.md:1266 is the stream-down threshold, not the poll | NEW: none
+
+@@ REP 08
+`E_CLAIMED`, `E_STALE_ASSIGNEE` and `E_SELF_APPROVAL` are explained in words
+@@ WITH
+`E_CLAIMED` and `E_STALE_ASSIGNEE` are explained in words, and 403 `E_SELF_APPROVAL` is explained in words
+@@ END
+# V-08-01-c | LOW | grep -c -F gave 1 | names used and where they exist: `E_SELF_APPROVAL` 403 API.md:971 and phase-00.md:493; `E_CLAIMED` 409 API.md:975; `E_STALE_ASSIGNEE` 409 API.md:979 | NEW: none
+
+@@ REP 08
+The preferences it writes (`density`, `locale`,
+@@ WITH
+The preferences it writes (`density`,
+@@ END
+@@ REP 08
+`prose_digits`, `shortcuts`, `theme`) are the phase 01 `PreferencesV1` fields through `PATCH /me/preferences`.
+@@ WITH
+`prose_digits`, `shortcuts`, `theme`) are the phase 01 `PreferencesV1` fields through `PATCH /me/preferences`. `locale` is not a `PreferencesV1` field: it is the `admin.users.locale` column of phase 01, written by the same `PATCH /me/preferences`.
+@@ END
+# V-08-07-a | LOW | grep -c -F gave 1 for both old texts | names used and where they exist: `admin.users` phase-01.md:52 (CREATE TABLE) with `locale` column phase-01.md:65; `PreferencesV1` phase-01.md:428 (fields prose_digits, density, default_queue_id, shortcuts, theme; no locale); `UpdatePreferences { locale, ... }` phase-01.md:440; route API.md:140 | NEW: none
+
+@@ BLOCK 01
+### 7.N SessionView carries the heartbeat interval (V-08-06-a, HIGH; DR-413)
+`SessionView` (section 2) gains `heartbeat_min_interval_s` (seconds), the current value of the setting
+`session.heartbeat_min_interval_s`, as `warning_s` carries `session.warning_s`. The routes `GET /auth/session` and
+`POST /auth/session/heartbeat` return it, so the client can apply the rule of phase 08 section 3.6 from the session view
+alone. No route is added and no setting changes.
+@@ END
+# V-08-06-a | HIGH | names used and where they exist: `SessionView` phase-01.md:498-499 (its list already carries `warning_s`); setting `session.heartbeat_min_interval_s` phase-01.md:363; `GET /auth/session` phase-01.md:518; `POST /auth/session/heartbeat` phase-01.md:519 (returns SessionView); phase 08 consumers at section 3.6 (phase-08.md:318) and section 3.10 (phase-08.md:514) | NEW: field `heartbeat_min_interval_s` on SessionView (the setting key without its `session.` prefix; the setting exists) | note: no other carrier fits, since no non-admin route reads the setting (API.md:820 is `admin.system`) and MeView has no settings (phase-01.md:503); the field follows the `warning_s` pattern. Outside the claim, not fixed: phase-08.md:513 also says `session.idle_timeout_s` is read through `GET /auth/session`, and SessionView does not carry it either (the shell uses `idle_expires_at`)
+
+@@ REP 08
+API refuses otherwise and the screen says why).
+@@ WITH
+API answers 202 with the check id and the source stays paused until that check passes, and the screen says why).
+@@ END
+@@ REP 08
+resume is refused until a fresh check passes, with the reason in words.
+@@ WITH
+resume answers 202 and the source stays paused until a fresh check passes, with the reason in words.
+@@ END
+# V-08-05-a | HIGH | grep -c -F gave 1 for each old text | names used and where they exist: `resume(ctx, id, ResumeRequest)` phase-05.md:743-748 (only from paused; 202 with the check id; state stays paused until the check passes; a refused check moves to `refused`); `POST /sources/{id}/resume` phase-05.md:663 and API.md:257 (202); phase 05 section 6 test "`POST .../resume` -> 202, then `active`" phase-05.md:1463 | NEW: none
+
+@@ REP 08
+a 401 `E_STEPUP_REQUIRED` on any request (an assertion spent or expired meanwhile) reopens the
+@@ WITH
+a 401 `E_STEPUP_REQUIRED` on any request except `POST /auth/step-up/verify` (an assertion spent or expired meanwhile) reopens the
+@@ END
+@@ REP 08
+dialog with the class from the problem body and retries once with the same `Idempotency-Key`. Assertions are held only
+@@ WITH
+dialog with the class from the problem body and retries once with the same `Idempotency-Key`. A refused proof on `POST /auth/step-up/verify` is not resent: the dialog asks for a new code. Assertions are held only
+@@ END
+# V-08-03-a | MEDIUM | grep -c -F gave 1 for each old text | names used and where they exist: `POST /auth/step-up/verify` phase-01.md:522 (flow ids and single-use ledger, phase-01.md:544, no Idempotency-Key); verify steps 1 and 4 (`stepup_fail`, `stepup.max_failures`, 401 `E_STEPUP_REQUIRED`) phase-01.md:722-726; stash deleted only on success, step 5, phase-01.md:727; the revoke then gets 401 `E_UNAUTHENTICATED`, routed to sign-in at phase-08.md:211 | NEW: none | open point for the lead, not settled by the draft: after a refused proof the stash stays (only step 5 deletes it, phase-01.md:727), so the next code could go to the same flow until its 10-minute expiry (phase-01.md:718); if the stash is gone, verify answers the same 401 again, so the lead may want the dialog to start again with `POST /auth/step-up` on any verify 401. The REP text ("asks for a new code") fits both readings
+
+@@ BLOCK 08
+### 7.N The code points of scanControls (V-08-08-a, LOW; DR-413)
+`scanControls(s)` in the section 3.3 `bidi.ts` row returns offsets only and changes no text. `bidi` flags U+202A to
+U+202E, U+2066 to U+2069, U+200E, U+200F and U+061C. `zero_width` flags U+200C, U+200D and U+FEFF. The sets are those
+of research/31-analyst-ux.md, section 4.2, rule 4 (bidi controls and zero-width joiners), and of
+research/22-arabic-name-matching.md, section 6.2, row "Invisible format characters". Removal for matching is phase 14 N3
+(section 3.1).
+@@ END
+# V-08-08-a | LOW | names used and where they exist: `scanControls` and `bidi.ts` phase-08.md:169; removal set N3 phase-14.md:900 (section 3.1); the bidi set also appears as NORM-03 phase-07.md:604 | NEW: none | note for the lead: the zero_width set takes ZWNJ and ZWJ from research/31 and BOM U+FEFF from research/22 (its Cf list); drop U+FEFF if the flag should cover joiners only. Phase 07 NORM-03 (phase-07.md:604) omits U+061C, which research/31 includes; not changed here (outside the claim)
+
+@@ REP 04
+`comment?` (approve), `comment` (reject)
+@@ WITH
+`comment?` (approve and sign, section 3.4 step 3), `comment` (reject)
+@@ END
+# V-08-01-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `DecideRequest` phase-04.md:751; `TaskAction::Sign{comment}` phase-04.md:1040 (section 3.4 act); route `POST /tasks/{id}/actions/sign` phase-04.md:794; `sign` = an approval that always needs step-up, phase-04.md:998-999 (section 3.4 step 3) | NEW: none | note: the optional comment follows from the plan's own definition of sign as an approval (phase-04.md:998); if the lead wants the sign comment required, the REP word changes to `comment` (reject and sign), which the plan does not say, so the draft does not choose it
+
+@@ BLOCK 08
+### 7.N The board pack rail entry (V-08-10-a, LOW; DR-413)
+The CH rail entry `board pack` of DESIGN-SYSTEM 8.2 is the R4 screen (`/packs`, the board pack and evidence pack builder
+of DESIGN-SYSTEM 8.1). It takes `RailGroup` `reports`, the group of the R series; the closed union of section 7.2 gains
+no value.
+@@ END
+# V-08-10-a | LOW | names used and where they exist: `RailGroup` phase-08.md:651-654 (value `reports`); DESIGN-SYSTEM.md:766 (CH entry `board pack`); DESIGN-SYSTEM.md:717 (R4 `/packs`) and :714-718 (the R series) | NEW: none | note: the alternative `governance` (the CH entry "Governance (read)" is its own group) is not chosen; R4 is a report builder in the R series; phase-24.md:1211 (section 5.7) names no group for R4, so nothing else conflicts
+
+# DECIDE V-08-02-a | option A, a header sort is a server sort: the keyset list routes with text columns gain a sort parameter with one cursor per sort key (precedent: `QuarantineFilter` gains the order `oldest`, docs/plan/phase-11.md:1490, used as `order=oldest` at phase-12.md:1276); the DataTable row (phase-08.md:335) says so; DESIGN-SYSTEM.md:485-486 (section 7.2, "Server sorts use the matching collation") and research/32-tech-stack-mapping.md:885 ("with server-side keyset pagination and sorting") agree; cost: a sort parameter and a parity test on every list route with text columns | option B, a header sort reorders only the rows loaded so far: the DataTable row (phase-08.md:335) says so and DESIGN-SYSTEM.md:485-486 drops its server-sort sentence; API.md:46 ("Cursor only") and the list routes stay; the default name order stays the server's (`ORDER BY ... COLLATE akr_ar` on name lists, phase-00.md:84); cost: a header sort on a "Load more" list sorts only the part of the list already loaded
+
+# DECIDE V-08-08-b | option A, names only (no DDL): `bidi_control` and `zero_width` join the `quality_flags` values of `canon.party_name` under the name data-quality rule N-12 (phase-10.md:1875-1877; the column has no CHECK, phase-10.md:508; the values are listed at DATA-MODEL.md:375); the canonical writer that inserts party names during ingestion (`CanonicalWriter::write`, phase-11.md:799) sets them, and phase 08's pointer (phase-08.md:27-28) moves to phase 10 section 3.3 | option B, all incoming text (research/31-analyst-ux.md:198 item 4 names CBS data, payments and documents): a new `dq_issues` kind in the CHECK of phase-12.md:176-178 (a phase 12 migration change) and a recording step in phase 11 section 3 (row outcomes at phase-11.md:798-802); phase 08 keeps its pointer to phase 11 | option C, phase 08 drops the persisted flag and keeps the display marks from `scanControls()` (phase-08.md:338); the persisted flag is then not built anywhere. Note for the lead: the refute missed the `quality_flags` carrier (phase-10.md:508, 1875), so option A needs no DDL
+
+# DECIDE V-08-11-a | option A, what the source gives (no generated form): a Latin form is a second `canon.party_name` row of the same party and name type with `script = 'lat'` and its own `source_field`, which the unique index allows (phase-10.md:777); the source label (card, passport, typed; DESIGN-SYSTEM.md:524-525, section 7.6) needs a column or a mapping from the source table (not drafted); no `generated` kind; cost: names the source lacks have no Latin form | option B, the product generates the Latin form: a named Arabic-to-Latin function for display (none exists; phase 14 has back-transliteration only, through the N-17 given-name lexicon with Latin variants at phase-14.md:925, and VC-09 at phase-14.md:11) plus a `generated` label value; the Name component prose is at phase-08.md:338, phase-08.md:659, phase-14.md:1257 and phase-14.md:1261; cost: new scope and a function to test in both languages
+
+# SUMMARY: fixes written 12 (REP 9, BLOCK 3); DECIDE 3; DROP 0; claims covered: V-08-01-a, V-08-01-b, V-08-01-c, V-08-02-a, V-08-03-a, V-08-05-a, V-08-06-a, V-08-07-a, V-08-08-a, V-08-08-b, V-08-10-a, V-08-11-a

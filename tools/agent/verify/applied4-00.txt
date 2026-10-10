@@ -1,0 +1,11 @@
+Replacements made in docs/plan/phase-00.md by the third re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [L3-00-1]
+WHY: L3-00-1 | CONFIRMED LOW (lead) | phase 00 section 7.7 lists the keys that phase 30 section 4.4 adds to `deploy/zones.yaml` and names three; that section names four since S-30-3 (`backup.repository`, which R-30-10b brought in). A mirror list out of step, found while checking T-30-1 | the phase 00 list names `backup.repository` (phase 30 sections 4.4 and 7.5)
+OLD: - Keys read by the renderer, added to `deploy/zones.yaml`: `cluster.apiserver`, `cbs.listeners`, `gateway.cidrs`
+  (phase 30 section 4.4) and `egress.proxy` (phase 07 section 4).
+NEW: - Keys read by the renderer, added to `deploy/zones.yaml`: `cluster.apiserver`, `cbs.listeners`, `gateway.cidrs` and
+  `backup.repository` (phase 30 sections 4.4 and 7.5) and `egress.proxy` (phase 07 section 4).

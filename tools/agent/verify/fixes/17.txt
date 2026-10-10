@@ -1,0 +1,152 @@
+Fixes for phase 17 (verification pass, lead-reviewed 2026-10-10). 21 claims, all confirmed: 1 HIGH, 15 MEDIUM, 5 LOW.
+Lead choices: the alert quarantine service and repository are renamed (phase 11 owns `QuarantineService` and the
+AppState field `quarantine`); a refused release writes nothing (phase 00 section 7.17); `alert_events.seq` needs no
+column; "the queue's pool" on the assign routes is the pool of a queue that admits the item; `CaseEventKind` is a
+checked string, not the phase 02 catalogue type; two bulk reasons are new (`not_allowed_in_state`, `conflict_refused`).
+
+@@ REP 17
+GRANT UPDATE (status, resolution_code, resolved_by, resolved_at, released_alert_id, revalidated_at, updated_at, version)
+@@ WITH
+GRANT UPDATE (status, resolution_code, resolved_by, resolved_at, released_alert_id, revalidated_at, reason_detail, updated_at, version)
+@@ END
+
+@@ REP 17
+ResolveQuarantine { reason_code?: String }
+@@ WITH
+ResolveQuarantine { resolution_code?: String }
+@@ END
+
+@@ REP 17
+/// QuarantineService::record_standalone in its own transaction
+@@ WITH
+/// AlertQuarantineService::record_standalone in its own transaction
+@@ END
+
+@@ REP 17
+(`AlertValidator`, `QuarantineService`; M-07, L-05)
+@@ WITH
+(`AlertValidator`, `AlertQuarantineService`; M-07, L-05)
+@@ END
+
+@@ REP 17
+`QuarantineService::record_standalone(request)` runs in the caller's own transaction:
+@@ WITH
+`AlertQuarantineService::record_standalone(request)` runs in the caller's own transaction:
+@@ END
+
+@@ REP 17
+`queues: Arc<QueueService>`, `quarantine: Arc<QuarantineService>`,
+@@ WITH
+`queues: Arc<QueueService>`, `alert_quarantine: Arc<AlertQuarantineService>`,
+@@ END
+
+@@ REP 17
+`quarantine: Arc<QuarantineService>`, `alert_clock:
+@@ WITH
+`alert_quarantine: Arc<AlertQuarantineService>`, `alert_clock:
+@@ END
+
+@@ REP 17
+`QuarantineService::record_standalone` in a new transaction, then the run continues.
+@@ WITH
+`AlertQuarantineService::record_standalone` in a new transaction, then the run continues.
+@@ END
+
+@@ REP 16
+through phase 17 `QuarantineService::record_standalone` in a new transaction
+@@ WITH
+through phase 17 `AlertQuarantineService::record_standalone` in a new transaction
+@@ END
+
+@@ BLOCK 17
+### 7.N Alert quarantine repository and service methods (V-17-01-b, MEDIUM; DR-413)
+Phase 11 owns the names `QuarantineService`, `QuarantineRepository` and the AppState field `quarantine` (the data quality quarantine). The service of section 3.2 is therefore `AlertQuarantineService` (AppState field `alert_quarantine`), and its repository is `AlertQuarantineRepository`.
+Section 2, after `CaseRepository`: `AlertQuarantineRepository` has `insert(tx, r: &QuarantineRequest, party_id: Option<Uuid>) -> Result<bool, RepoError>` (`ON CONFLICT DO NOTHING`; false on a replay), `lock(tx, id: Uuid) -> Result<QuarantineRow, RepoError>` (`FOR UPDATE`, with the version), `update(tx, q: &QuarantineRow, expected: i32) -> Result<QuarantineRow, RepoError>` (version + 1, compare and set), `page(conn, status: Option<QuarantineStatus>, page: Keyset) -> Result<Page<QuarantineRow>, RepoError>` (the list route) and `open_retryable(conn, limit: i64) -> Result<Vec<Uuid>, RepoError>` (open rows of the four retryable reasons, oldest first). `QuarantineStatus` is the enum of section 2.
+Section 3.2, service methods: `release(&self, tx: &mut Tx, principal: &Principal, id: Uuid, if_match: i32, stepup_id: Uuid) -> Result<QuarantineRow, AlertError>` (steps 1 to 3; the route consumes the step-up first), `reject(&self, tx: &mut Tx, principal: &Principal, id: Uuid, if_match: i32, req: &ResolveQuarantine) -> Result<QuarantineRow, AlertError>` and `retry(&self, pool: &PgPool) -> Result<u32, AlertError>` (the job `quarantine_retry`; it returns the number of rows found valid). Release step 4 is the handler of the job `quarantine_release` (section 4.1).
+@@ END
+
+@@ BLOCK 17
+### 7.N Reject and the retry job lock the row (V-17-01-d, V-17-01-e, MEDIUM; DR-413)
+Section 3.2 Reject, before its write: lock the row `FOR UPDATE`; status must be `open`, else 409 `E_NOT_ALLOWED_IN_STATE`; `If-Match` on the row version, as release step 1 does.
+Section 3.2 Retry job, for each open row: lock it `FOR UPDATE` in a transaction of its own and skip it when it is no longer `open`. Then run `AlertValidator::check`. When the row is valid, set `reason_detail.valid_now = true` and write audit `alert.quarantine_revalidated` in that transaction. A row that a person released or rejected a moment earlier is therefore never written by the retry.
+@@ END
+
+@@ REP 17
+Still invalid: set `revalidated_at`, audit `alert.quarantine_revalidated`,
+@@ WITH
+Still invalid: write nothing (a refused request is rolled back, phase 00 section 7.17; the phase 03 decision row records the attempt, and `revalidated_at` is set by the retry job and by step 4 only) and
+@@ END
+
+@@ BLOCK 17
+### 7.N Alert trail writes and the event number (V-17-02-a, V-17-02-b, MEDIUM; DR-413)
+Section 2, `AlertRepository` gains `append_event(&self, tx: &mut Tx, alert: &Alert, e: NewAlertEvent) -> Result<AlertEvent, RepoError>`. The caller holds the alert's row lock (`lock`), or has just inserted the alert in this transaction (section 3.1).
+`pub struct NewAlertEvent { pub actor: Actor, pub kind: &'static str, pub payload: serde_json::Value }`. `kind` is an `alert.<verb>` name that passes the CHECK of `alert.alert_events.kind`; the payload carries ids and codes only.
+`seq` is `COALESCE(max(seq), 0) + 1` over the alert's rows of `alert.alert_events`, read under that lock; `at` is the database time. No counter column is added: every writer of an alert event locks the alert first (claim step 4, 7.9, 7.12), and `uq_alert_events_seq` refuses a writer that missed the lock.
+@@ END
+
+@@ BLOCK 17
+### 7.N CaseEventKind and NewCaseEvent (V-17-02-c, MEDIUM; DR-413)
+Section 2: `pub struct CaseEventKind(pub &'static str);` holds a `case.<verb>` name that passes the CHECK of `casework.case_events.kind`. Each phase that writes case events declares its kinds as constants of this type (this phase: the kinds of sections 3.4 to 3.8 and 3.13; phases 18 and 19 add theirs). It is not the phase 02 `EventKind`: the case chain has no catalogue row, and the audit kinds of section 3.16 are a separate list.
+`pub struct NewCaseEvent { pub actor: Actor, pub kind: CaseEventKind, pub payload: serde_json::Value }`. `CaseRepository::append_event` sets the case, `seq`, `at`, `prev_hash` and `hash` (section 3.7).
+@@ END
+
+@@ REP 17
+Assign to a user or pool; conflict check;
+@@ WITH
+Assign to a user (a pool target is 422); conflict check;
+@@ END
+
+@@ REP 17
+`AssignAlert { to: { user_id } | { pool_id }, reason_code?: String }`; `AssignCase` the same shape.
+@@ WITH
+`AssignAlert { to: { user_id }, reason_code?: String }` (a user only, section 3.8); `AssignCase { to: { user_id } | { pool_id }, reason_code?: String }`.
+@@ END
+
+@@ BLOCK 17
+### 7.N Assignment: methods, the pool test and the accepted states (V-17-03-a, V-17-03-b, V-17-03-c, MEDIUM; DR-413)
+Section 3.8 Assign, the two entry points, each in the request transaction: `AssignmentService::assign_alert(&self, tx: &mut Tx, principal: &Principal, id: Uuid, if_match: i32, req: &AssignAlert) -> Result<AlertView, AlertError>` and `AssignmentService::assign_case(&self, tx: &mut Tx, principal: &Principal, id: Uuid, if_match: i32, req: &AssignCase) -> Result<CaseView, AlertError>`.
+Step 1, "the queue's pool": for an alert, the target is a member of the pool of at least one active `alerts` queue whose filter admits the alert (`families`, `min_priority`, `states`). For a case, the target is a member of the case's `assignee_pool_id`, or of the pool of an active `alerts` queue whose filter admits the case's family and class (the routing test of section 3.5). The bulk route tests the pool of the queue in its URL.
+Step 3, alerts: the state must be `queued` or `claimed` (a push may take over another person's claim, 7.12). Any other state answers 409 `E_NOT_ALLOWED_IN_STATE`, checked under the alert lock of 7.12 before the write.
+@@ END
+
+@@ BLOCK 17
+### 7.N Bulk: the method, the item checks and one reason list (V-17-04-a, V-17-04-b, MEDIUM; V-17-04-c, LOW; DR-413)
+Section 3.9 Bulk: `QueueService::bulk(&self, tx: &mut Tx, principal: &Principal, network: &str, queue_id: Uuid, req: &BulkRequest) -> Result<BulkResult, AlertError>` serves both runs. `req.dry_run = true` runs the checks below and writes nothing; `false` applies each item in its own savepoint.
+Checks, in this order; the first failing check gives the item's reason:
+1. Target, once for the request (`assign` only): assign step 1 of section 3.8 against the pool of the queue in the URL. A failure is 422 `E_VALIDATION` at `/to`, and no item runs. The real run then takes the target's `wip:` lock once (7.12).
+2. Visibility: a hidden or missing id is `not_found`.
+3. Lock the alert `FOR UPDATE` (both alerts in ascending `id` for `mark_duplicate`, 7.11); the dry run reads without the lock. A claim by a person other than the caller is `claimed_by_other`.
+4. A state other than `queued` or `claimed` is `not_allowed_in_state`.
+5. `mark_duplicate`: a P0 or P1 alert is `p0_or_p1_duplicate`; a target in state `duplicate` is `target_is_duplicate` (7.11).
+6. `assign`: a target at the work limit (claim step 6) is `wip_limit`.
+7. `assign`: a declared or detected conflict of the target with the subject party (claim step 7) is `conflict_refused`; the real run writes audit `alert.conflict_refused`.
+Closed list of reasons, which replaces the lists of section 3.9 and of 7.14: `not_found`, `claimed_by_other`, `not_allowed_in_state`, `p0_or_p1_duplicate`, `target_is_duplicate`, `wip_limit`, `conflict_refused`, `lower_refused`. Every reason except `not_found` is given only for a visible id (7.14).
+@@ END
+
+@@ REP 17
+async fn tx_rows(&self, conn: &mut PgConnection, ids: &[Uuid]) -> Result<Vec<TxRow>, RepoError>;
+@@ WITH
+async fn tx_rows(&self, conn: &mut PgConnection, ids: &[Uuid], fields: &[String]) -> Result<Vec<TxRow>, RepoError>;
+@@ END
+
+@@ BLOCK 17
+### 7.N Snapshot method and TxRow (V-17-05-a, LOW; V-17-05-b, MEDIUM; DR-413)
+Section 3.3: `SnapshotService::seal(&self, tx: &mut Tx, alert_id: Uuid, d: &DetectionPayload) -> Result<(Uuid, [u8; 32]), AlertSinkError>` runs steps 1 to 4 in `tx` for the alert it seals (the new alert at intake, or the existing alert on an amendment, section 3.13) and returns the object id and the sha256. The actor of step 3 is the job's system actor. A storage failure of step 3 is `AlertSinkError::Storage`.
+Section 2: `pub struct TxRow { pub id: Uuid, pub booking_date: NaiveDate, pub fields: BTreeMap<String, Canon> }` (`Canon` is the phase 02 value type). `fields` holds only the `txn.*` inputs that the scenario version names in `evidence.fields`; `ReferenceReader::tx_rows` receives those names in its `fields` parameter and reads no other column of `canon.txn`. An `evidence.fields` entry of another entity is not read here.
+@@ END
+
+@@ REP 17
+created_at, touch_hours)
+@@ WITH
+created_at, casework.touch_by_hours[class])
+@@ END
+
+@@ BLOCK 17
+### 7.N Assignment writes the case_acl rows itself (V-17-07-a, LOW; DR-413)
+7.2, second bullet: `AssignmentService` inserts and revokes the `casework.case_acl` rows itself, in the assignment transaction, under the `case.assign` check of section 3.8. It does not call the phase 18 `grant` or `revoke`: both need `case.access.change`, which A1 does not hold, and their steps 3 to 5 are for manual grants. Each row it writes or revokes gets the chain and audit event of `grant` step 6 (`case.acl_granted {principal_id, access, reason}`) or of `revoke` (`case.acl_revoked {principal_id}`).
+@@ END
+
+@@ BLOCK 17
+### 7.N Keyset cursor of the queue order (V-17-08-a, MEDIUM; DR-413)
+Section 3.9 Items item 3: the keyset cursor is the signed cursor of phase 00 and carries every sort key of the active order, in order: `priority_class, score, created_at, id` for `class_score_age`, and from phase 27 on `priority_class, model_rank, score, created_at, id` (7.5). A null `score` or `model_rank` is carried as null, and the next-page test places it after every value of its key (`NULLS LAST`). A cursor made under one order is refused under another with 422 `E_VALIDATION` at `/cursor`.
+@@ END

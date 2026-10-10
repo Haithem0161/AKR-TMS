@@ -1,0 +1,161 @@
+Fixes for the claims of tools/agent/verify/refute-21.md (phase 21).
+@@ REP 21
+AND OLD.status NOT IN ('draft', 'validated') THEN
+@@ WITH
+AND OLD.status NOT IN ('draft', 'validated') AND NOT (OLD.status IN ('rejected', 'returned') AND NEW.status = 'draft') THEN
+@@ END
+# V-21-03-a | HIGH | grep -c -F gave 1 | names used and where they exist: `reports_guard` phase-21.md:418 (migration 0070, section 1.3); statuses `rejected`, `returned` phase-21.md:84-85 (CHECK, section 1.1); revise edge section 3.5a phase-21.md:843; section 6 k expects 200 phase-21.md:1322 | NEW: none
+# The guard now allows the signature to be cleared only on the revise edge. The other reading (keep signed_* on revise) would contradict section 3.5a, which says revise clears them.
+
+@@ REP 21
+Lock the filing. `ack_at IS NULL`
+@@ WITH
+Lock the report, then the filing (section 3.24 step 3). `ack_at IS NULL`
+@@ END
+# V-21-04-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `ReportRepository::lock` phase-21.md:642; `FilingRepository::lock` phase-21.md:668; section 3.24 step 3 phase-21.md:1203 | NEW: none
+
+@@ REP 21
+`EvidenceStore::stage` of the receipt (kind `upload`, owner kind `filing`, owner id = the filing)
+@@ WITH
+`EvidenceStore::stage` of the receipt (kind `upload`, owner kind `filing`, owner id = the filing, retention_class: R6)
+@@ END
+# V-21-04-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: `NewEvidence` phase-02.md:611-612 (fields kind, owner_kind, owner_id, retention_class); R6 lock policy in `evidence.lock_days` phase-02.md:510-511; owner kind `filing` phase-21.md:900 and phase-21.md:1266 | NEW: none
+
+@@ REP 21
+(`facts`, `suppressed_cells`, `evidence_id`, `generated_by`)
+@@ WITH
+(`facts`, `suppressed_cells`, `evidence_id`)
+@@ END
+# V-21-05-a | HIGH | grep -c -F gave 1 | names used and where they exist: `generated_by` phase-21.md:354 (column of rpt.periodic_reports); UPDATE grant phase-21.md:507 | NEW: none
+# The grant is not widened on purpose: a grant on generated_by would let akr_app change the value the sign check compares against. The value is stored at insert by the REP that adds generated_by to step 1, which must be applied with this one.
+
+@@ REP 21
+The row is inserted as `draft` with the period bounds, and
+@@ WITH
+The row is inserted as `draft` with the period bounds and `generated_by` = the requesting actor (never NULL, so the sign check of step 3 always has a value to compare), and
+@@ END
+# V-21-05-b | HIGH | grep -c -F gave 1 | names used and where they exist: `generated_by` phase-21.md:354; sign check `signed_by` differs from `generated_by` phase-21.md:1000; job payload `{ periodic_id }` phase-21.md:1223 (no actor needed in the payload) | NEW: none
+# No NULL refusal is added to step 3: the insert now always sets the column. If the lead wants a belt-and-braces refusal, it is a separate line in step 3 with E_INTERNAL (phase-00.md:504).
+
+@@ REP 21
+computes whole months from the newest booking date of the report's transactions to `filed_at`.
+@@ WITH
+computes whole months from the newest booking date of the report's transactions to `filed_at`; a report with no transaction gets NULL (the column allows it, section 1.1).
+@@ END
+# V-21-06-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: `activity_age_months` nullable, phase-21.md:194 (rpt.filings, section 1.1) | NEW: none
+# The rounding half was refuted (whole months answers it). Not included: section 3.17 item 3 (phase-21.md:1008) should count only filings with a value; the lead may add that.
+
+@@ REP 21
+Write the findings (`insert_run`, one row per finding, `source = validation`, typed `params`) and `set_validated(run, summary, now)`.
+@@ WITH
+Under the lock of section 3.24 step 3 (the report, then the version), and only when the version is still the current one and its `content_sha256` equals the value read at start, write the findings (`insert_run`, one row per finding, `source = validation`, typed `params`) and `set_validated(run, summary, now)`; otherwise complete the job as `superseded` and write nothing.
+@@ END
+# V-21-08-a | HIGH | grep -c -F gave 1 | names used and where they exist: `ReportRepository::lock` phase-21.md:642; `ReportVersionRepository::lock` phase-21.md:654; `set_validated` phase-21.md:656; `content_sha256` phase-21.md:123; step 1 start check phase-21.md:810; PATCH clears `validated_run_id` phase-21.md:835 | NEW: none
+# Alternative (lock the version from start to step 9) not taken: it would hold a row lock for the whole validation run.
+
+@@ REP 21
+and a new version of the content only when the version is not frozen.
+@@ WITH
+and the content of the current version is replaced in place while that version is not frozen (`set_content`, section 2); only revise (section 3.5a) creates a new version.
+@@ END
+# V-21-08-e | MEDIUM | grep -c -F gave 1 | names used and where they exist: `set_content` phase-21.md:655 (refused once frozen); a correction is a new version phase-21.md:116-117; section 3.5a phase-21.md:843 | NEW: none
+
+@@ BLOCK 21
+### 7.N Links are written by the draft (V-21-01-a, HIGH; DR-413)
+Section 3.1 step 8, in the same transaction as the insert of the report: for each `earlier_reports` entry of the proposal whose `goaml_ref` equals the `goaml_reference` of a filing of this system (`rpt.filings` joined to `rpt.reports`), `ReportRepository::insert_link` writes one `rpt.report_links` row from the new report to that report. The relation is `escalated_from_utr` when the new report is an STR and the entry's `type` is `utr`, and `previous` otherwise. Each row is audited `report.linked {report_id, related_report_id, relation}` (section 3.20). An entry with no matching filing stays in the content only. No act of this phase writes `amending` or `superseding` (Open doubts 12 and 6).
+@@ END
+# V-21-01-a | HIGH | names used and where they exist: `insert_link` phase-21.md:647 (ReportRepository); `rpt.report_links` phase-21.md:173-182 (relation CHECK line 177); `goaml_reference` phase-21.md:190; `report.linked` phase-21.md:1069; `earlier_reports` entries with `goaml_ref`, `date`, `type` phase-18.md:741; step 8 phase-21.md:779 | NEW: none
+# The escalation the claim names is the UTR-to-STR link that phase 18 hands over (phase-18.md:10). Matching by goAML reference is the only key an earlier report has here: phase 18 stores references, not report ids.
+
+@@ BLOCK 21
+### 7.N Report link types (V-21-01-b, MEDIUM; DR-413)
+Section 2, domain entities: `ReportLink { id, report_id, related_report_id, relation: ReportLinkRelation, created_by, created_at }`, the row of `rpt.report_links` (section 1.1). Create DTO: `NewReportLink { id, report_id, related_report_id, relation: ReportLinkRelation, created_by }`, the input of `ReportRepository::insert_link`. `ReportRepository::links` returns `Vec<ReportLink>`.
+@@ END
+# V-21-01-b | MEDIUM | names used and where they exist: `ReportLinkRelation` phase-21.md:632 (enum); `ReportRepository::insert_link` and `links` phase-21.md:647-648; `rpt.report_links` columns phase-21.md:173-182 | NEW: none
+
+@@ BLOCK 21
+### 7.N Version create type and sealed content (V-21-02-a, MEDIUM; DR-413)
+Section 2, repository create types: `SealedContent { content_enc: Vec<u8> (sealed with AAD = the version id), content_sha256: [u8; 32] }`, the two columns of section 1.1 that hold the sealed builder content and the SHA-256 of its plaintext canonical JSON (section 3.1 step 8). `NewReportVersion { id, report_id, version, content: SealedContent, created_by }` is the input of `ReportVersionRepository::insert`. The other columns of `rpt.report_versions` take their defaults or NULL at insert.
+@@ END
+# V-21-02-a | MEDIUM | names used and where they exist: `NewReportVersion` and `SealedContent` phase-21.md:652 and :655; `rpt.report_versions` columns phase-21.md:118-132; section 3.1 step 8 phase-21.md:779 | NEW: none
+
+@@ BLOCK 21
+### 7.N The approval binds to the frozen content hash (V-21-03-b, MEDIUM; DR-413)
+Section 3.6 step 3: the sign act binds the approval to the frozen version's `content_sha256` (section 1.1), which does not change once the version is frozen. The manifest of section 3.8 step 4 is built from that same content and the profile version, and the package job already checks the content against this hash (section 3.8 step 1). The `report.signed` event (section 3.7 step 4) carries `content_sha256`.
+@@ END
+# V-21-03-b | MEDIUM | names used and where they exist: `content_sha256` phase-21.md:123; `frozen_version` phase-21.md:87; `report.signed` phase-21.md:1060; package step 1 check phase-21.md:877; manifest phase-21.md:880 | NEW: none
+# The alternative (a manifest computed before the sign) is not possible in this design: the manifest holds the PDF hash, and the PDF is rendered after the sign (section 3.8 step 5).
+
+@@ BLOCK 21
+### 7.N Two more edges of the report state machine (V-21-03-c, HIGH; DR-413)
+Section 3.5 state list gains two edges. `validated` to `packaged` for a CTR file, written by the package job of the batch (section 3.14 step 3; the database CHECK allows `packaged` without `signed_at` for `type = 'ctr'`). `filed` to `returned` on a poor grade given before the receipt (section 3.12 step 2). The section 6 state-machine test covers both, because it names every transition of section 3.5.
+@@ END
+# V-21-03-c | HIGH | names used and where they exist: `validated`, `packaged`, `filed`, `returned` (CHECK) phase-21.md:84-85; CHECK `status IN ('draft', 'validated') OR signed_at IS NOT NULL OR type = 'ctr'` phase-21.md:106; section 3.14 step 3 phase-21.md:964; section 3.12 steps 1-2 phase-21.md:927-928; section 6 state-machine test phase-21.md:1305 | NEW: none
+
+@@ BLOCK 21
+### 7.N Generate takes a lock first (V-21-05-c, MEDIUM; DR-413)
+Section 3.16 step 1: the transaction of `POST /reports/periodic` takes `pg_advisory_xact_lock(hashtext('periodic:' || kind || ':' || period))` before it reads the live pack, and it supersedes the live draft and inserts the new one under that lock. The lock is taken before any row of `rpt.periodic_reports` and takes no report or case row. A unique violation of `uq_periodic_live` after the lock is an invariant break and maps to `E_INTERNAL` (section 3.19).
+@@ END
+# V-21-05-c | MEDIUM | names used and where they exist: `uq_periodic_live` phase-21.md:365; `pg_advisory_xact_lock(hashtext(kind))` pattern phase-00.md:851; `E_INTERNAL` (`Internal` row) phase-21.md:1048 and phase-00.md:504; step 1 phase-21.md:992 | NEW: none
+# E_INTERNAL is used because the lock makes a violation a bug, not a race. A 409 sub-code would need a new name.
+
+@@ BLOCK 21
+### 7.N The supersede of a draft is audited (V-21-05-d, MEDIUM; DR-413)
+Section 3.16 step 1: a live draft replaced by the new draft writes `periodic.superseded {periodic_id, kind, period}` in the same transaction. Section 3.20 gains the row: `periodic.superseded` | a live draft replaced by a new draft (3.16 step 1) | periodic pack.
+@@ END
+# V-21-05-d | MEDIUM | names used and where they exist: `periodic.generated` and `periodic.signed` phase-21.md:1083-1084 (section 3.20 table); `ctr.superseded` phase-21.md:1077 (style); step 1 phase-21.md:992 | NEW: `periodic.superseded` (style of `ctr.superseded`: a replaced live record)
+
+@@ BLOCK 21
+### 7.N Periodic service methods and create types (V-21-05-e, MEDIUM; DR-413)
+Section 2, services: `PeriodicReportService::generate(tx, req: &GeneratePeriodic, actor: &Principal) -> Result<PeriodicReport, ReportError>` (section 3.16 step 1) and `PeriodicReportService::sign(tx, id: Uuid, expected: i32, actor: &Principal) -> Result<PeriodicReport, ReportError>` (step 3). The handler consumes the step-up of `periodic.sign` (section 3.22) before `sign` is called. `NewPeriodic { id, kind: PeriodicKind, period: PeriodKey, period_start: NaiveDate, period_end: NaiveDate, template_version: String, generated_by: Uuid }` is the input of `PeriodicRepository::insert`. `PeriodicFilter { kind: Option<PeriodicKind>, period: Option<PeriodKey> }` is the filter of `PeriodicRepository::list`, the register of section 5.3.
+@@ END
+# V-21-05-e | MEDIUM | names used and where they exist: `GeneratePeriodic` phase-21.md:635; `PeriodicKind` and `PeriodKey` phase-21.md:632-633; `Principal` phase-21.md:646; `PeriodicRepository::insert` and `list` phase-21.md:707, :710; `periodic.sign` phase-21.md:1135; register section 5.3 phase-21.md:1286 | NEW: none
+
+@@ BLOCK 21
+### 7.N Filing create type (V-21-06-b, MEDIUM; DR-413)
+Section 2, repository create types: `NewFiling { id, report_id, report_version, package_id, goaml_reference, filed_by, filed_at, portal_capture_evidence_id, activity_age_months: Option<i32> }`, the input of `FilingRepository::insert` (section 3.10). The acknowledgement columns of `rpt.filings` are NULL at insert.
+@@ END
+# V-21-06-b | MEDIUM | names used and where they exist: `FilingRepository::insert` phase-21.md:667; `rpt.filings` columns phase-21.md:185-200; `RecordFiling` fields phase-21.md:635; filing step phase-21.md:897-902 | NEW: none
+
+@@ BLOCK 21
+### 7.N The account rule has its own code (V-21-07-b, MEDIUM; DR-413)
+The account rule of section 3.4 step 7 (every transaction's accounts appear among the subjects' accounts, RP-30) is coded `CONS-05`, which is new in this phase. `CONS-04` is phase 07's chronological-order info code (phase 07 has `CONS-01` to `CONS-04`) and is not new here. This block wins over section 3.4 step 7, section 4.5 item 6 and DR-171, which name `CONS-04` as new.
+@@ END
+# V-21-07-b | MEDIUM | names used and where they exist: `CONS-04` phase-07.md:613 (info, chronological order); `CONS-01` to `CONS-03` phase-07.md:610-612; section 3.4 step 7 phase-21.md:816; section 4.5 item 6 phase-21.md:1261; DR-171 phase-21.md:1399; block 7.1 phase-21.md:1342-1343 (already says CONS-04 is not new) | NEW: `CONS-05` (grep of docs/plan finds no CONS-05; phase 07 rule codes are CONS-01 to CONS-04 only)
+
+# DECIDE V-21-07-a | option A: fixed numbers in the rule, stated in a 7.x block (an extreme-amount bound and a roundness unit; the lead chooses them) | option B: two governed settings with floors in migration 0070 (for example `ctr.amount_warn_max_usd` and `ctr.amount_round_unit`), the bank sets the values, as for the other CBI-facing values of this phase (evidence: docs/plan/phase-07.md:982 CTR-03 row with empty Parameters; docs/plan/phase-07.md:974 table header; research/23-regulatory-reporting-goaml.md:498 "CTR amounts that are extreme or odd (not round)" with no number; docs/plan/phase-21.md:951 section 3.13 step 12)
+
+@@ BLOCK 21
+### 7.N Draft edits are audited (V-21-08-c, MEDIUM; DR-413)
+Section 3.2 and block 7.2: each PATCH writes `report.edited {report_id, version, changed_fields}` in the same transaction as the write. `changed_fields` lists the field keys that the PATCH wrote, never a value: `suspicion_formed_on` appears by its key, and its date is not written, since the event can reach the SIEM. Section 3.20 gains the row `report.edited` | draft edit (3.2) | report.
+@@ END
+# V-21-08-c | MEDIUM | names used and where they exist: PATCH phase-21.md:735 and :784; block 7.2 phase-21.md:1347-1350 (`ReportService::update_draft`); section 3.20 table phase-21.md:1054-1087 | NEW: `report.edited` (style of `report.created` phase-21.md:1056 and `report.revised` phase-21.md:1059; no existing `report.edited` or `report.updated`)
+
+@@ BLOCK 21
+### 7.N The drafter, the authors and the submitter cannot sign (V-21-10-a, MEDIUM; DR-413)
+Section 4.5 item 1: `CaseWorkflowSubject::check_before_decision` (phase 18 section 3.8 d), for an instance of `case_report_approval`, also refuses the sign with 403 `E_SELF_APPROVAL` when the actor is the report's `created_by`, the `created_by` of any version (`ReportVersionRepository::summaries`, section 2) or the report's `submitted_by`. Phase 04's `excluded` set knows only the instance maker and the earlier deciders, so the subject check carries these three, as the subject-only rule of the phase 18 review requires. The Cedar forbid of block 7.4 item 2 stays as it is.
+@@ END
+# V-21-10-a | MEDIUM | names used and where they exist: `check_before_decision` phase-18.md:758 (section 3.8 d) and phase-04.md:669 (`WorkflowSubject`); phase 04 excluded set phase-04.md:1080 (maker and earlier deciders only); four-eyes set of section 3.6 step 3 phase-21.md:850; `created_by` phase-21.md:97 and :128; `submitted_by` phase-21.md:94; `summaries` phase-21.md:658 | NEW: none
+# Phase 04 computes `excluded` in one place with no subject hook for extra exclusions, so the subject check is the place. The subject-only rule is the phase 18 review item in tools/agent/b3-conventions.md (lines 101-102). The refuter's Holders wording and this check reach the same refusal.
+
+@@ BLOCK 21
+### 7.N Version summary type (V-21-10-b, MEDIUM; DR-413)
+Section 2, `ReportVersionRepository`: `ReportVersionSummary { version: i32, created_by: Option<Uuid>, created_at: DateTime<Utc>, validated_at: Option<DateTime<Utc>>, frozen_at: Option<DateTime<Utc>> }`, the row of `summaries`. The query serves `GET /reports/{id}/versions` (section 2 route table) and the author check of section 3.6 step 3 as extended by the exclusion block of section 7+.
+@@ END
+# V-21-10-b | MEDIUM | names used and where they exist: `summaries` phase-21.md:658; route row `GET /reports/{id}/versions` phase-21.md:736 (frozen and validated times); `created_by` phase-21.md:128 (rpt.report_versions); `validated_at` and `frozen_at` phase-21.md:126-127 | NEW: none
+
+@@ BLOCK 21
+### 7.N Freeze delivery is read from its letter (V-21-12-a HIGH, V-21-12-d MEDIUM, V-21-12-e LOW, V-21-12-f MEDIUM; DR-413)
+No freeze method and no freeze column record the delivery. Phase 20 block 7.3 reads the state of the letter in `committee_report_letter_id`, and it answers Open doubts 4 (in its own words: "Phase 21 Open doubts 4 is answered by this rule"). This block withdraws `FreezeService::letter_delivered` from block 7.5 and from section 4.5 item 9, and the call that section 3.15 (delivery) makes to a freeze. A freeze write and its audit event therefore do not exist. Open doubts 4 is closed by the letter-state rule.
+@@ END
+# V-21-12-a | HIGH | names used and where they exist: `committee_report_letter_id` phase-20.md:135 (the freezes table, phase-20.md:130-161, has no delivery column); phase 20 block 7.3 phase-20.md:1074-1081; `letter_delivered` phase-21.md:1264 and :1389; section 3.15 delivery phase-21.md:982; Open doubts 4 phase-21.md:1432 | NEW: none
+# V-21-12-d (freeze side has no audit event): resolved by the removal of the freeze write, so no freeze event is needed. V-21-12-e (item 10 pointer): the sentence that names item 10 is withdrawn, so the pointer goes with it. V-21-12-f (Open doubts 4 answered two ways): one answer remains, the phase 20 letter-state rule, which is the owner's rule (the freezes table is phase 20's).
+
+@@ BLOCK 21
+### 7.N Foreign key on the committee letter of a freeze (V-21-12-b, MEDIUM; DR-413)
+Migration 0070 (section 1.3) ALTERs the phase 20 table `casework.freezes` and adds this constraint: `ALTER TABLE casework.freezes ADD CONSTRAINT fk_freezes_committee_letter FOREIGN KEY (committee_report_letter_id) REFERENCES rpt.letters (id) ON DELETE RESTRICT NOT VALID;`. The `letter_backfill` job of section 3.15 validates it after its inserts: `ALTER TABLE casework.freezes VALIDATE CONSTRAINT fk_freezes_committee_letter;`, because a stub id that the backfill has not yet inserted would fail the check at migration time.
+@@ END
+# V-21-12-b | MEDIUM | names used and where they exist: `committee_report_letter_id` phase-20.md:135 ("phase 21 letter id; no FK until phase 21"); `rpt.letters` phase-21.md:307 (created by migration 0069, so it exists when 0070 runs); `letter_backfill` phase-21.md:986 and :1226; ON DELETE RESTRICT as in phase-21.md:164 | NEW: constraint name `fk_freezes_committee_letter` (style of `fk_report_findings_version`, phase-21.md:151)
+# Same gap, not claimed here: `second_report_letter_id` (phase-20.md:138), `referral_letter_id` (phase-20.md:140) and `refrain_instructions.referral_letter_id` (phase-20.md:180) have no FK either. The lead may add them to the same migration line.
+
+# SUMMARY: fixes written 23 (REP 8, BLOCK 15); DECIDE 1; DROP 0; claims covered: V-21-01-a, V-21-01-b, V-21-02-a, V-21-03-a, V-21-03-b, V-21-03-c, V-21-04-a, V-21-04-c, V-21-05-a, V-21-05-b, V-21-05-c, V-21-05-d, V-21-05-e, V-21-06-a, V-21-06-b, V-21-07-a, V-21-07-b, V-21-08-a, V-21-08-c, V-21-08-e, V-21-10-a, V-21-10-b, V-21-12-a, V-21-12-b, V-21-12-d, V-21-12-e, V-21-12-f (27 STANDS and PARTLY claims; REFUTED claims V-21-04-b, V-21-08-b, V-21-08-d and V-21-12-c are not drafted)

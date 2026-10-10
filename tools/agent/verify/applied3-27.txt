@@ -1,0 +1,24 @@
+Replacements made in docs/plan/phase-27.md by the second re-check (DR-413). 4 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [S-27-1]
+WHY: S-27-1 | CONFIRMED MEDIUM | section 3.16 still says "each batch is one transaction" for the sweep, and section 3.4 step 6 (the R-27-5 text) commits one transaction per chunk of a batch | section 3.16 names the chunk for the sweep and keeps the batch for the monitor
+OLD: The sweep and the monitor never hold a lock across the batch: each batch is one transaction.
+NEW: The sweep and the monitor never hold a lock across the batch: a sweep chunk (section 3.4 step 6) and a monitor batch are each one transaction.
+
+=== F2 [S-27-2a]
+WHY: S-27-2 | CONFIRMED HIGH | test l (the R-27-7e text) still expects 422 `E_PURPOSE_REQUIRED` for a team member with step-up and no purpose on a suspicion-tier alert, and the error row of section 3.11 says the same. Rule 5 of phase 17 admits no caller without a purpose code, so step 1 of the route (the R-27-7a text) answers the masked 404 "whatever header is missing", as phase 17 section 3.10 and phase 03 section 7.14 say; 422 is the answer on a restricted alert only. The stated check and the stated rule cannot both hold: the lead's own half-finished R-27-7 fix | test l expects the masked 404; the error row names the restricted tier only
+OLD: on the team with step-up and a missing purpose: 422 `E_PURPOSE_REQUIRED`; as an `a1` outside the team,
+NEW: on the team with step-up and a missing purpose: 404 `E_NOT_FOUND`, the masked answer (rule 5 of phase 17 admits no caller without a purpose code; 422 `E_PURPOSE_REQUIRED` is the answer on a restricted alert only); as an `a1` outside the team,
+
+=== F3 [S-27-2b]
+WHY: S-27-2 | CONFIRMED HIGH | test l (the R-27-7e text) still expects 422 `E_PURPOSE_REQUIRED` for a team member with step-up and no purpose on a suspicion-tier alert, and the error row of section 3.11 says the same. Rule 5 of phase 17 admits no caller without a purpose code, so step 1 of the route (the R-27-7a text) answers the masked 404 "whatever header is missing", as phase 17 section 3.10 and phase 03 section 7.14 say; 422 is the answer on a restricted alert only. The stated check and the stated rule cannot both hold: the lead's own half-finished R-27-7 fix | test l expects the masked 404; the error row names the restricted tier only
+OLD: | `E_PURPOSE_REQUIRED` (422) | none | `GET /alerts/{id}/model-score` on a restricted or suspicion-tier alert without the purpose phase 17 requires |
+NEW: | `E_PURPOSE_REQUIRED` (422) | none | `GET /alerts/{id}/model-score` on a restricted alert without the purpose rule 4 of phase 17 requires (on a suspicion-tier alert a missing purpose is the masked 404 of section 3.4, as for any caller rule 5 does not admit) |
+
+=== F4 [S-27-3]
+WHY: S-27-3 | CONFIRMED LOW | test l (the R-27-7e text) cites phase 03 section 7.14 right after the latency floor; the floor is phase 03 section 3.6 step 3, and 7.14 is the source of the answer | both are cited, each for its part
+OLD: and the latency within the phase 03 floor (phase 03 section 7.14).
+NEW: and the latency within the phase 03 floor (phase 03 section 3.6 step 3 for the floor, section 7.14 for the answer).

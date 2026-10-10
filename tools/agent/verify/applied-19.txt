@@ -1,0 +1,110 @@
+Fixes applied to docs/plan/phase-19.md by the verification pass (DR-413). 23 entries.
+A REP replaced the OLD text by the NEW text in place. A BLOCK was appended under '## 7+. Gap Additions' with its
+header renumbered from '7.N' to the next free number (find it by its title).
+
+=== F1 REP (from fixes/19.txt)
+OLD: cursor (Owned; `watch.read`)
+NEW: cursor (Owned; `watch.list`)
+
+=== F2 REP (from fixes/19.txt)
+OLD: and Cedar `watch.read` are unchanged.
+NEW: and Cedar `watch.list` are unchanged.
+
+=== F3 REP (from fixes/19.txt)
+OLD: `If-Match`): the watch is `under_review`
+NEW: `If-Match`), served by `WatchService::review(ctx, id, ReviewWatch, if_match)`, which writes the outcome with `WatchRepository::set_review`: the watch is `under_review`
+
+=== F4 BLOCK (from fixes/19.txt)
+### 7.N Parties of a canonical batch (V-19-01-c, MEDIUM; DR-413)
+Section 2, `CanonNetworkReader` gains `batch_parties(conn, batch_id: Uuid) -> Result<Vec<Uuid>, RepoError>` (SELECT only): the distinct party ids of the rows that carry this `batch_id` (the lineage column of phase 10) in `canon.party` (`id`), `canon.party_contact` (`party_id`), `canon.party_relationship` (`from_party` and `to_party`) and `canon.account_party_role` (`party_id`). The `canon.touched` handler calls it once per event: the result is the `party_ids` of the `network_edge_build` payload and the `batch_parties` of `EdgeBuilder::rebuild` (section 3.7), and `watch_trigger_dispatch` runs the `profile_change` trigger of sections 3.5 and 3.6 for each party in it.
+
+=== F5 BLOCK (from fixes/19.txt)
+### 7.N Bulk reopen: the finding, its window and the candidate list (V-19-02-a, V-19-02-b, MEDIUM; V-19-02-c, LOW; DR-413)
+Section 3.9 Bulk reopen:
+1. `QaFindingRepository` gains `get(conn, id) -> Option<QaFinding>`. A missing finding is 404 `E_NOT_FOUND`. A finding whose severity is not `critical` is 422 `E_VALIDATION` at `/finding_id`, sub-code `not_critical_finding`, which joins the closed list of section 3.11.
+2. The window of the finding is the 30 days that end at `completed_at` of the review that recorded it, the window of the `same_closer_30d` draw of the review's step 7. No setting is added.
+3. `QaSampleRepository` gains `closed_by(conn, analyst_id, from, to, limit) -> Vec<ClosedCaseRow>`, with `ClosedCaseRow { case_id, case_ref, closed_at }`: the cases with `closed_at` in the window whose latest decision has `decider_id = analyst_id` or whose `assignee_id` is the analyst, newest first. The `not_bulk_case` test reads it.
+4. The dialog of section 5.5 reads its list from a new route, which joins the route table of section 2 (the thirty-second product route of DR-157): `GET /api/v1/qa/findings/{id}/reopen-candidates?analyst_id=<uuid>`, scope `qa.review`, Cedar `qa.bulk_reopen` on System (M only; the action of the reopen, so no action is added). It applies the checks of item 1 and returns at most 100 rows of `ClosedCaseRow`, with no total.
+
+=== F6 REP (from fixes/19.txt)
+OLD: cursor (Owned; `rfi.read`)
+NEW: cursor (Owned; `rfi.list`)
+
+=== F7 REP (from fixes/19.txt)
+OLD: pre-fill when `rfi.pre_fill` is on,
+NEW: the pre-fill switch `rfi.pre_fill` only (the pre-fill itself is P2, section 7+),
+
+=== F8 BLOCK (from fixes/19.txt)
+### 7.N The RFI pre-fill is P2 (V-19-03-b, MEDIUM; DR-413)
+M-44 is carried in part. The desk, the log, the deadline clock, the four-eyes release, the tipping-off flag and the missed-by-monitoring signal are built here. The pre-fill of an incoming correspondent RFI from the replica is P2: it needs a map from each question key of the bank's template to canonical fields, and the plan holds none. In P1 the pack switch `rfi.pre_fill` stays `false` and no code reads it. An answer that the desk takes from AKR-TMS records is recorded by hand through `record_answers` with `source_kind = replica` (section 3.3).
+
+=== F9 BLOCK (from fixes/19.txt)
+### 7.N QA grant revocation path (V-19-04-a, MEDIUM; DR-413)
+Section 3.9 step 8 and the grant expiry revoke a QA grant with `QaService::revoke_review_access(tx, grant_id, revoked_by, at)`, the counterpart of `grant_review_access` (section 3.8 step 7). It runs in the caller's transaction, in the lock order of section 3.15 (case, sample, grant), and sets `revoked_by` and `revoked_at` with `CaseAccessRepository::revoke(tx, id, by, at)` (phase 18 section 2). It does not call phase 18 `CaseAccessService::revoke`, whose step 2 refuses a closed case with `E_CASE_SEALED`, so the revocation works on a sealed case. Its audit event is `qa.grant_revoked {sample_id}`; it writes no case event.
+
+=== F10 REP (from fixes/19.txt)
+OLD: the supervisor's first list sets `notified_at` (New; `alarm.read`)
+NEW: the supervisor's first list sets `notified_at` (New; `alarm.list`)
+
+=== F11 BLOCK (from fixes/19.txt)
+### 7.N Alarm list for IA and SEC (V-19-05-a, HIGH; DR-413)
+Section 3.13: `GET /alarms` is decided by `alarm.list` on System. Two permits are added: `@id("followup.ia.alarms") @role("IA") permit (principal, action == Akr::Action::"alarm.list", resource is Akr::System) when { principal.roles.contains("IA") };` and `@id("followup.sec.alarms") @role("SEC") permit (principal, action == Akr::Action::"alarm.list", resource is Akr::System) when { principal.roles.contains("SEC") };`. `AlarmRepository::list_visible` then returns the `chain_broken` alarms to IA and the `chain_broken` and `conflict_declared` alarms to SEC, the kinds that `followup.alarm.audit.chain` and `followup.alarm.sec.conflict` allow them to read. This is the readers column of section 3.10 and check (p) of section 6.
+
+=== F12 REP (from fixes/19.txt)
+OLD: `list_visible(conn, principal, filter, page)`; `mark_notified(tx, id, at)`;
+NEW: `list_visible(conn, principal, filter, page)`; `get_for_update(tx, id, principal) -> Option<Alarm>` (one alarm under a row lock and the predicate of 7.11; `None` when the predicate hides it, which answers 404; acknowledge and close use it); `mark_notified(tx, id, at)`;
+
+=== F13 REP (from fixes/19.txt)
+OLD: (no party name, no account, no text except the decision text for an analyst network reader)
+NEW: (no party name, no account, no text except the decision text for an analyst network reader and, from phase 28 on, the verified output of an `assistant_draft` item, section 7+)
+
+=== F14 BLOCK (from fixes/19.txt)
+### 7.N Assistant items: enums, the weekly draw and the item view (V-19-07-a, LOW; V-19-07-b, V-19-07-d, MEDIUM; V-19-07-c, LOW; DR-413)
+From phase 28 on (migration `0089`), with 7.2:
+- The enums of section 2 follow the widened CHECK lists: `SamplePopulation` gains `AssistantGolden` (`assistant_golden`) and `AssistantAssisted` (`assistant_assisted`); `SampleSource` gains `AssistantDraft` (`assistant_draft`).
+- "The weekly draw" of 7.2 is the job `qa_suppression_sample` (section 4.1, Monday 06:00). In the same run it also draws the population `assistant_assisted` at `assistant.qa_sample_percent` (phase 28 section 1.3), with the draw of section 3.8 (no actor, `drawn_by` NULL) and the skip rule of 7.2. No job kind or setting is added.
+- `QaItemView` gains `assistant: Option<AssistantItem>`, with `AssistantItem { draft_id: Uuid, output: String, source_ids: Vec<SourceRef>, cited_panels: Vec<String> }` (`SourceRef` and the two lists are phase 28 section 2). It is set only for an item of source kind `assistant_draft`: `output` is the verified output, decrypted from `output_enc` for the sample's reviewer, who is on the case's access list through the time-boxed grant.
+
+=== F15 REP (from fixes/19.txt)
+OLD: `last_suppressed_at` falls in the ISO week.
+NEW: `last_suppressed_at` falls in the ISO week: a 5 per cent draw (`qa.suppression_sample_percent`) plus every row whose `list_kind` is `freeze`, whatever the draw gives (the rule of phase 14 section 7.3, which holds where the population row of section 3.8 says 5 per cent only).
+
+=== F16 REP (from fixes/19.txt)
+OLD: `kpi_rows(conn, window)`.
+NEW: `kpi_rows(conn, window)`; `count_missed_outreach(conn, rfi_id) -> i64` (the `prior_failures` of 7.9: the party's `customer_outreach` RFIs created before this one whose `deadline_at` has passed with `answered_at` NULL).
+
+=== F17 REP (from fixes/19.txt)
+OLD: | `graph.link` | `{party_id, kind}` | phase 15 (section 3.3 of phase 15, trigger `graph.link`) |
+NEW: | `graph.link` | `{party_id, kind}` | phase 15 (section 3.3 of phase 15, trigger `graph.link`) |
+| `outreach.failed` | `{party_id, rfi_id, prior_failures}` (7.9) | phase 15 (TR-20 trigger) |
+
+=== F18 REP (from fixes/19.txt)
+OLD: `unknown_party`, `forbidden_term`.
+NEW: `unknown_party`, `forbidden_term`, `rfi_open`.
+
+=== F19 REP (from fixes/19.txt)
+OLD: `case_chain_check` (section 4.1) raises `chain_broken` through `AlarmService::raise` for each break (phase 17 open doubt 22 closed here).
+NEW: `case_chain_check` (section 4.1) raises `chain_broken` through `AlarmService::raise` for each break (phase 17 open doubt 22 closed here).
+   - The merge validation of phase 17 section 3.6 refuses a source case with a `released` RFI (sub-code `rfi_open`, 7.10 step 3).
+
+=== F20 BLOCK (from fixes/22.txt)
+### 7.N An RFI closes with its case (V-22-10-a, MEDIUM; DR-413)
+No step set an RFI to `closed` or wrote `closed_at`, and phase 22 lists a closed item for `branch.item_closed_days` from `closed_at`. `CaseService::close` (the extension of section 4.5 item 5), after the closure gate and in the same transaction, sets every `released` or `answered` RFI of the case to `closed` with `closed_at = now()` (`RfiRepository::set_status`; the guard of section 1.2 allows both moves), cancels the RFI's timers and writes audit `rfi.closed {rfi_id}` for each (new; no chain event, because the case is closing). The rows are locked in ascending id order after the case row. A closed RFI is final: a reopened case drafts a new RFI.
+
+=== F21 BLOCK (from fixes/28.txt)
+### 7.N Assistant golden items in the QA draw (V-28-02-b, V-28-02-c, MEDIUM; DR-413)
+From phase 28 on, `DrawQaSample` (section 2) gains `eval_run_id: Option<Uuid>`. It is required for population
+`assistant_golden` and refused with 422 `E_VALIDATION` for any other population. The population is then the
+`casework.assistant_drafts` rows whose `eval_run_id` is that value; each becomes an item with `source_kind`
+`assistant_draft`, `source_id` the draft id, `case_id` the draft's case and `source_at` the draft's `requested_at`, and
+the sample row keeps the run in `casework.qa_samples.eval_run_id` (the column phase 28 adds). Step 7 of the draw
+(section 3.8) also applies to an `assistant_draft` item: the same time-boxed read grant on the draft's case, reason
+`qa_review`, so `GET /qa/samples/{id}/item` can show the verified output and the records it cites.
+
+=== F22 REP (from fixes/31.txt)
+OLD: -- branch, staff or unit id (canonical; no foreign key)
+NEW: -- branch, staff or unit id; from phase 31 on, the canon.account id of a correspondent (canonical; no foreign key)
+
+=== F23 REP (from fixes/31.txt)
+OLD: capacity.surge_qc_percent)`; no sample is removed by a surge. Open doubts 10 keeps the rest of M-54.
+NEW: capacity.surge_qc_percent)`; no sample is removed by a surge. Open doubts 10 keeps the rest of M-54. "Its rate" is the sampled share `n / N` of a draw that takes its size from the settings (section 3.8 step 2 with no requested `n`). During a surge that draw uses `n = min(N, max(n, ceil(N * capacity.surge_qc_percent / 100)))`. The percent is a share of the population, not a defect rate, so `qa.expected_defect_rate` is unchanged, and so is a draw with a requested `n` (V-31-12-a; DR-413).

@@ -1,0 +1,318 @@
+@@ BLOCK 13
+### 7.N Feature values read for the model sweep (V-27-01-a, MEDIUM; DR-413)
+From phase 27 on, phase 13 gains a read partner of `FeatureValueWriter`: `FeatureValueReader::read(conn, entity, entity_id, features, as_of)`. `features` is a list of `(feature_id, currency)` pairs and `as_of` is a closed month-end. The read takes the key columns of `feat.feature_values` and returns one row per feature with `currency`, `value` and `status`; `value` is NULL unless `status` is `value` (the other statuses are `no_history` and `beyond_window`). The existing grant `SELECT, INSERT ON feat.feature_values TO akr_app` covers the read. Phase 27 section 3.4 step 3 (the model sweep) and the feature PSI of section 3.8 call it, and a row whose status is not `value` is passed as missing.
+@@ END
+# V-27-01-a | MEDIUM | names used and where they exist: `FeatureValueWriter` phase-13.md:466 (the only trait on this table); `feat.feature_values` key and status CHECK phase-13.md:172-183; grant to `akr_app` phase-13.md:320; the sweep read phase-27.md:497 | NEW: `FeatureValueReader::read` (a grep of phases 13 and 16 to 19 finds no value reader; the phase 16 `ReaderCatalogue` at phase-16.md:1439 lists which scenarios read a feature, not its values); placed in phase 13 under the owner rule of the fix instructions (the refuter put it in section 2 of phase 27)
+
+@@ BLOCK 27
+### 7.N The missing-feature count has its own column (V-27-01-c, MEDIUM; DR-413)
+Migration 0086 (section 1.2) gains the column `missing_features SMALLINT CHECK (missing_features IS NULL OR missing_features >= 0)` on `alert.model_scores`: the number of features of a live row that were passed as missing (section 3.4 step 3). It is NULL for shadow and challenger rows. Step 3 stores the count in this column, not in `shap`, which holds only the five contributions of step 5. The grant `SELECT, INSERT ON alert.model_scores TO akr_app` (section 1.3) already covers the column, and the `detection-logic` list of the `alert.model_scores` classification row (section 1.3) gains `missing_features`.
+@@ END
+# V-27-01-c | MEDIUM | names used and where they exist: `shap` phase-27.md:187 (array CHECK, live rows only); `skipped_missing` phase-27.md:500 and :696 (batch audit, not per row); grant phase-27.md:291; classification row phase-27.md:352 | NEW: `missing_features` (no existing column can hold a per-row count). The other option, a batch total in `skipped_missing` only, drops a stored value that the plan asks for; the lead may prefer it
+
+@@ REP 27
+2. Batch (`model.sweep_batch`):
+@@ WITH
+2. Batch (`model.sweep_batch`, scored in chunks of 50 alerts; step 1 is applied again before each chunk, so an engaged scope stops the batch):
+@@ END
+# V-27-01-d | LOW | grep -c -F gave 1 | names used and where they exist: `model.sweep_batch` phase-27.md:496 (setting, section 3.15); the kill-state read phase-27.md:495; the 50-alert chunk phase-27.md:729 (section 3.15, a design constant) | NEW: none
+
+@@ REP 27
+forced low-score sample reused as the unbiased set, section 3.4)
+@@ WITH
+forced low-score sample reused as the unbiased set, section 3.6)
+@@ END
+# V-27-01-e | LOW | grep -c -F gave 1 | names used and where they exist: the forced sample text "Low-scored alerts enter this set through the phase 19 daily forced sample" phase-27.md:528 (section 3.6) | NEW: none
+
+@@ BLOCK 27
+### 7.N The inventory item is created before its object row (V-27-02-a, HIGH; DR-413)
+Section 3.1 step 2 and the version item paragraph are replaced in their order. In one transaction the item comes first and the row second:
+1. Generate the family id (or the version id, for a version item) app-side.
+2. Call phase 04 `InventoryService::create` with `kind = model`, `object_id` = that id, `name` = the family's bilingual `name` (for the family item), and the other fields of section 3.1.
+3. Insert `admin.models` (or `admin.model_versions`) with that id and `inventory_item_id` = the new item's id, and the other columns of section 1.1. For a family, insert its `admin.model_kill_state` row in the same transaction, as section 3.1 step 2 already says.
+
+The item must come first because `inventory_item_id` is `NOT NULL` and its foreign key is not deferrable (section 1.1; the family guard of section 1.3 also refuses a change of it). Phase 04 allows an item before its object (phase 04 section 3.9), so the object resolver of kind `model` checks the id when the item is first used (the use gate of section 3.1), not at create.
+@@ END
+# V-27-02-a | HIGH | names used and where they exist: `inventory_item_id` NOT NULL and not deferrable phase-27.md:45 and :63; `InventoryService::create` phase-04.md:1339; item before object phase-04.md:1344 (phase 04 section 3.9); use gate phase-27.md:443; family guard phase-27.md:251; step 2 phase-27.md:437; version item paragraph phase-27.md:441 and step 5 phase-27.md:473 | NEW: none. V-27-02-d (LOW) is covered here: the family item takes the family's bilingual `name`, which phase 04 requires (phase-04.md:1339) and step 2 does not name. The version item's name is not stated either; the lead may add the family's name for it. The resolver timing is the one design choice of this block; a nullable `inventory_item_id` with a second update would change migration 0085 instead
+
+@@ REP 27
+`closure_code_not_allowed` | sections 3.1, 3.3, 3.6, 3.8 |
+@@ WITH
+`closure_code_not_allowed`; `errors[]` codes `E_MISSING_I18N` (a name or purpose without `ar` or `en`, section 3.1 step 1), `E_SCHEMA` (a starter without `recalibration_due`, at `/recalibration_due`), and for an owner who is not an active human user the plain 422 that phase 04 section 3.9 gives (no sub-code) | sections 3.1, 3.3, 3.6, 3.8 |
+@@ END
+# V-27-02-b | LOW | grep -c -F gave 1 | names used and where they exist: the E_VALIDATION row phase-27.md:599 and docs/API.md:985 (`errors[]` are DSL.md section 7 codes); `E_MISSING_I18N` docs/DSL.md:1098; `E_SCHEMA` docs/DSL.md:1096; owner rule phase-04.md:1340 | NEW: none. Only the STANDS part is fixed: the status is the general 422 (refuted). `E_MISSING_I18N` is worded for leaving draft in DSL; the lead may judge its reuse for the create check
+
+@@ REP 27
+with the family's tier, owner, developer and committee.
+@@ WITH
+with the family's tier, `tier_basis`, owner, developer and committee.
+@@ END
+# V-27-02-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: `tier_basis` phase-27.md:13 (GV-03: required for kind `model`, so it applies to version items too); column default with no kind check phase-04.md:519; open doubts 5 phase-27.md:940 (the tier copy at import, which this does not contradict) | NEW: none. The copy is chosen over the omission because GV-03 names kind `model` in general
+
+@@ BLOCK 27
+### 7.N Reads of the daily monitor (V-27-03-a, MEDIUM; DR-413)
+Section 2 repository traits gain two reads for the metrics of section 3.8:
+- `ScoreRepository::score_window(conn, version_id, from, to)`: over the `alert.model_scores` rows of the version and its role in the window, it returns `scored` (rows), `top_band` (rows with `top_band` true), `bins` (ten counts for `score_psi`, over the same edges as `reference_bins`), and `entered` (alerts created in the window, a count over `alert.alerts`, for `scored_count`).
+- `MonitorRepository::override_window(conn, from, to)`: it returns `decisions` (the decisions of the window on cases with live-scored alerts) and `overrides` (those that meet the two rules of section 3.8), read from `casework.decisions` (`type`, `decided_at`), `casework.case_alerts` and the live `top_band` of `alert.model_scores`.
+The feature values of `feature_psi` are read by `FeatureValueReader::read` of the phase 13 block of this draft, the same read as section 3.4 step 3.
+@@ END
+# V-27-03-a | MEDIUM | names used and where they exist: `alert.model_scores` phase-27.md:183; `alert.alerts` created_at (phase 17 key); `casework.decisions` (`type`, `decided_at`) phase-18.md:575 (its repository has no window read); `casework.case_alerts` phase-17.md:352; `score_psi` bins phase-27.md:569; override rules phase-27.md:574; `scored_count` phase-27.md:572 | NEW: `score_window` and `override_window` (the claim is that neither exists; no struct of these names is needed, the counts are returned as fields). The bin edges are open: see the DECIDE for V-27-05-b
+
+@@ REP 27
+and a `body` with the metric, value, band, threshold and the five permitted decisions.
+@@ WITH
+a bilingual `title` (the family's `name`, section 1.1) and a `body` with the metric, value, band, threshold and the five permitted decisions.
+@@ END
+# V-27-03-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: `title` JSONB NOT NULL with `ar` and `en` phase-24.md:47; `RegisterRepository::insert` phase-24.md:533 (the insert is already named by its owner, so only the title is added); the family `name` phase-27.md:41 (bilingual) | NEW: none. Choice: the family's name is the title, because phase 24 has no label set for model metrics (`WarningTitle`, phase-24.md:1300, covers warnings only); the lead may prefer a metric label, which needs new Arabic text
+
+@@ BLOCK 27
+### 7.N One audit for the daily monitor run (V-27-03-c, MEDIUM; DR-413)
+Section 3.8: after its last batch, the daily run of `model_monitor` writes one audit `model.monitored {day, points, suppressed}` (counts only; no version, alert or party id). Section 3.13 gains its row: `model.monitored` | System (day) | false | `day`, `points`, `suppressed`. The kind follows the sweep's `model.scored`, which is also counts only and has the flag false.
+@@ END
+# V-27-03-c | MEDIUM | names used and where they exist: `model.scored` phase-27.md:500 and :696 (one audit per batch, counts only, flag false); `fairness.computed {period, rows, suppressed, review}` phase-24.md:680 (the monthly computed rows); the daily run phase-27.md:565; section 3.13 table phase-27.md:691-706 | NEW: `model.monitored` (no kind for a daily run; a grep of docs/plan finds none)
+
+# DECIDE V-27-03-e | A: `scored_count` is a live-role metric only, so shadow and challenger rows get no `scored_count` point (the monitor runs for them at phase-27.md:565; the metric's definition at phase-27.md:572 names live-scored alerts) | B: the same count is defined for shadow and challenger rows as their scored rows over alerts that entered the queue after `shadow_started_at`, the window the sweep already uses (phase-27.md:496: "scored on the same batch of alerts created after their shadow_started_at"; metric at phase-27.md:572)
+
+@@ REP 27
+override monitors with green, amber and red bands, section 3.7)
+@@ WITH
+override monitors with green, amber and red bands, section 3.8)
+@@ END
+# V-27-03-f | LOW | grep -c -F gave 1 | names used and where they exist: "### 3.8 Monitoring: drift, overrides and breaches" phase-27.md:563; "### 3.7 Promotion to live" phase-27.md:549 | NEW: none
+
+@@ REP 27
+`casework.decisions` with `type` and `decided_at`, `casework.case_alerts`)
+@@ WITH
+`casework.decisions` with `type` and `decided_at`; `casework.case_alerts` is phase 17's table)
+@@ END
+# V-27-03-g | LOW | grep -c -F gave 1 | names used and where they exist: `casework.case_alerts` CREATE TABLE phase-17.md:352; phase 18 only uses it (phase-18.md:440, "Existing grants used by this phase (phase 17)") | NEW: none
+
+@@ REP 27
+and the model-ladder read of route 15)
+@@ WITH
+and the model-ladder read of route 4)
+@@ END
+
+@@ REP 27
+Record an evaluation (route 6, `model.validation.record`, MRO).
+@@ WITH
+Record an evaluation (route 8, `model.validation.record`, MRO).
+@@ END
+
+@@ REP 27
+The model-ladder read (route 15) shows the gate of each family
+@@ WITH
+The model-ladder read (route 4) shows the gate of each family
+@@ END
+
+@@ REP 27
+**`prepare` (route 8, the change request is created and submitted in the request;
+@@ WITH
+**`prepare` (route 10, the change request is created and submitted in the request;
+@@ END
+
+@@ REP 27
+**Engage (route 10; Cedar `model.kill.engage`
+@@ WITH
+**Engage (route 12; Cedar `model.kill.engage`
+@@ END
+
+@@ REP 27
+**Release request (route 11; Cedar `model.kill.release_request`)
+@@ WITH
+**Release request (route 13; Cedar `model.kill.release_request`)
+@@ END
+
+@@ REP 27
+**Drill (route 13; `model.kill.drill`, MRO)
+@@ WITH
+**Drill (route 14; `model.kill.drill`, MRO)
+@@ END
+
+@@ REP 27
+**Pin (route 9;
+@@ WITH
+**Pin (route 11;
+@@ END
+
+@@ REP 27
+The drill is recorded by a person's statement (route 13)
+@@ WITH
+The drill is recorded by a person's statement (route 14)
+@@ END
+# V-27-04-a | LOW | grep -c -F gave 1 for each of the nine REPs above (header line 12, route 4; 3.6 validation, route 8; 3.6 ladder, route 4; 3.7 prepare, route 10; 3.9 engage, route 12; release, route 13; drill, route 14; 3.10 pin, route 11; open doubts 19, route 14) | names used and where they exist: route table rows of section 2 (ladder row 4 phase-27.md:409, validation row 8 phase-27.md:413, shadow row 9 phase-27.md:414, promote row 10 phase-27.md:415, pin row 11 phase-27.md:416, kill-switch row 12 phase-27.md:417, release row 13 phase-27.md:418, drill row 14 phase-27.md:419); the header (phase-27.md:12) and open doubts 19 (phase-27.md:954) carry the same offset and are not in the refuter's list, so the lead may drop those two | NEW: none
+
+@@ REP 27
+No route admits a role that its permits do not name.
+@@ WITH
+A route scope may admit a role that no permit names: SEC is admitted by `audit.read` on the six GET routes that carry it, and Cedar refuses it with `E_FORBIDDEN` (403).
+@@ END
+# V-27-04-b | LOW | grep -c -F gave 1 | names used and where they exist: the six GET rows with `audit.read` phase-27.md:406, 408, 409, 410, 412 and 420; SEC holds `audit.read` docs/API.md:100; `E_FORBIDDEN` (403, Cedar denial) phase-27.md:604; no SEC in phase 27 (grep finds none) | NEW: none. The alternative is to drop `audit.read` from those six rows (IA keeps `dashboard.read` on them); the lead may prefer that
+
+@@ BLOCK 27
+### 7.N ModelSwitch: the other ChangeTarget methods (V-27-04-c, LOW; DR-413)
+`ModelSwitch` implements phase 04 `ChangeTarget` with: `kind() = model_switch`; `reason_families() = ["change"]`; `generic_create() = false` (the only entry is the release route of section 3.9 step 3); `emergency_allowed() = false`; `inventory_kind() = None` (the GV-01 gate applies to promotion only, section 3.7); `revert` is not implemented. `current_version(conn, cr)` returns the `version` of the `admin.model_kill_state` row named by the change's `object_key` (`kill:<scope>`), which is the base version of the release, so phase 04's `E_STALE_BASE` applies when it has moved. `on_submitted` writes nothing. `diff(cr)` shows `engaged` going from `true` to `false`; the scope and its `reason_code` do not change. `on_closed` changes nothing: a rejected, withdrawn or failed release leaves the scope engaged.
+@@ END
+# V-27-04-c | LOW | names used and where they exist: `ChangeTarget` phase-04.md:642-655 (`kind`, `reason_families`, `generic_create`, `emergency_allowed`, `inventory_kind`, `current_version`, `on_submitted`, `revert`, `on_closed`, `diff`); `E_STALE_BASE` docs/API.md:980 (409); release object key phase-27.md:586; the ModelPromotion method list of section 3.7 phase-27.md:551 (same method set) | NEW: none. The engage, release and drill calls are already named (refuted part); this block fills in the trait only
+
+@@ REP 27
+the family's `model_monitor` findings must be closed (else `breach_open`).
+@@ WITH
+the family's `model_monitor` findings must be closed (else `breach_open`): the check reads the `admin.registers` rows with `source = 'model_monitor'`, `status <> 'closed'` and a `source_key` that starts with `model_monitor:<version id>:`, for each version of the family in any status.
+@@ END
+# V-27-04-d | LOW | grep -c -F gave 1 | names used and where they exist: `admin.registers` `source`, `status` (CHECK open, in_progress, accepted_risk, acknowledged, closed) and `source_key` phase-24.md:46-54; the open index `status <> 'closed'` phase-24.md:76; the key format phase-27.md:576; `RegisterRepository::find_by_source_key` is an exact match only (phase-24.md:533) | NEW: none. The lookup is a prefix read, so the owner's exact-match method does not serve it and the check reads the table
+
+@@ BLOCK 27
+### 7.N The shadow start is one repository call (V-27-05-a, MEDIUM; DR-413)
+`VersionRepository` (section 2) gains `begin_shadow(tx, id, role, shadow_criteria, top_band_cut, expected_version)`. It runs one `UPDATE` of `admin.model_versions` with `WHERE id = $1 AND version = $expected_version`, which sets `status` to the role, `shadow_started_at = now()`, `shadow_criteria`, `top_band_cut`, `retired_at = NULL` and `version = version + 1`. Section 3.6 step 4 is this one call; `set_status` is not used for it. Every column it sets is in the `UPDATE` grant of section 1.3, and the version guard admits the edges it uses (`registered` to `shadow`, and the rollback `retired` to `shadow` with new criteria).
+@@ END
+# V-27-05-a | MEDIUM | names used and where they exist: `set_status` phase-27.md:392 (no shadow field); `set_verified` phase-27.md:392; step 4 phase-27.md:545; `UPDATE` grant phase-27.md:284; version guard edges phase-27.md:228 and its criteria rule just above them; `set_shadow` is phase 03's policy-bundle method (phase-03.md:429), so the new name is `begin_shadow` | NEW: `begin_shadow`
+
+# DECIDE V-27-05-b | A: ten equal-width bins over [0, 1] (a score is in [0, 1]: section 3.4 step 4 and the `score` CHECK at phase-27.md:183); the provisional cut is the lower edge of the bin that holds the top `model.top_band_percent` share, scanning from the top bin down, with no interpolation (rule at phase-27.md:545; ten bins floored at phase-27.md:569) | B: the import manifest carries explicit edges for its ten bins (the manifest names `reference_bins` at phase-27.md:472), and the percentile is interpolated linearly inside the bin that holds it (the histogram counts at phase-27.md:79 carry no edges; the rule at phase-27.md:545)
+
+@@ REP 27
+with the success criteria frozen; `Idempotency-Key`
+@@ WITH
+with the success criteria frozen; `If-Match` on the version; `Idempotency-Key`
+@@ END
+
+@@ BLOCK 27
+### 7.N Shadow start checks If-Match (V-27-05-c, LOW; DR-413)
+Section 6 check 8 gains item q: `POST /models/{id}/shadow` without `If-Match` answers 428 `E_PRECONDITION_REQUIRED`; with a stale `If-Match` on the version it answers 409 `E_VERSION_CONFLICT`.
+@@ END
+# V-27-05-c | LOW | names used and where they exist: route row 9 phase-27.md:414 (the REP above adds `If-Match`, which section 3.6 step 1 requires, phase-27.md:541); section 6 check 8 items e and f phase-27.md:837-838 (the pattern); `E_PRECONDITION_REQUIRED` (428) and `E_VERSION_CONFLICT` (409) phase-27.md:608 | NEW: none
+
+@@ REP 27
+Start a shadow or challenger run (route 7, `ModelRegistry::start_shadow`
+@@ WITH
+Start a shadow or challenger run (route 9, `ModelRegistry::start_shadow`
+@@ END
+
+@@ REP 27
+frozen at start (route 7)
+@@ WITH
+frozen at start (route 9)
+@@ END
+
+@@ REP 27
+through `retired -> shadow` (route 7)
+@@ WITH
+through `retired -> shadow` (route 9)
+@@ END
+# V-27-05-d | LOW | grep -c -F gave 1 for each of the three REPs | names used and where they exist: the shadow row is row 9, `/models/{id}/shadow`, phase-27.md:414; the three steps at phase-27.md:541, :547 and :558 | NEW: none. The middle REP (the shadow summary, phase-27.md:547) is not in the refuter's list and carries the same wrong number
+
+@@ BLOCK 27
+### 7.N The pin step-up constant (V-27-06-a, MEDIUM; DR-413)
+`ModelPin` is the step-up constant of the pin route of section 3.10: `{name: "model.version_pin", class: approval}`, declared in section 2 beside `ModelKillSwitch` in the same shape. Its class is one of the closed classes of phase 01; no new class is added.
+@@ END
+# V-27-06-a | MEDIUM | names used and where they exist: `ModelKillSwitch` step-up constant phase-27.md:375 (section 2); the pin text phase-27.md:591 (the only use of `ModelPin`); each phase declares its action constants as `StepUpAction { name, class }` phase-01.md:711; class `approval` (phase 01 closed list) | NEW: `model.version_pin` (the name string; the Cedar action `model.pin` at phase-27.md:416 is kept as it is)
+
+@@ BLOCK 27
+### 7.N Pin targets are checked (V-27-06-b, MEDIUM; DR-413)
+Section 3.10 Pin, before `pinned_version_id` is set: (1) a version that is not a version of this family is refused with 422 `E_VALIDATION` (field `version_id`); (2) a version in status `importing` or `refused` is refused with 409 `E_NOT_ALLOWED_IN_STATE` and sub-code `not_pinnable`, which the 409 row of section 3.11 gains. Pins of versions in the other states are not changed by this block.
+@@ END
+# V-27-06-b | MEDIUM | names used and where they exist: `pinned_version_id` foreign key to any version, phase-27.md:110 (exists only; no family or status check); pin text phase-27.md:591; `PinVersion { version_id }` phase-27.md:389; `E_VALIDATION` 422 phase-27.md:599 and docs/API.md:985; the 409 row phase-27.md:600 | NEW: `not_pinnable` (no existing sub-code fits a version that is importing or refused; the other 409 sub-codes belong to other acts)
+
+@@ REP 27
+Pin or unpin the live version;
+@@ WITH
+Pin or unpin a version of the family (section 3.10);
+@@ END
+# V-27-06-c | MEDIUM | grep -c -F gave 1 | names used and where they exist: route row 11 phase-27.md:416; candidate pin in section 3.10 phase-27.md:591 ("a pinned candidate is not promoted until unpinned"); the promotion refusal `pinned` in section 3.7 step 1 phase-27.md:553 | NEW: none. Choice: sections 3.7 and 3.10 already allow a candidate pin, so the route row follows them
+
+@@ REP 27
+A row not visible, or a suspicion-tier row for a caller without `record_open` step-up, answers the masked 404 `E_NOT_FOUND`; the step-up check runs before the tier answer (phase 17 rule).
+@@ WITH
+A suspicion-tier row for a caller without `record_open` step-up answers 401 `E_STEPUP_REQUIRED` first (the step-up check runs before the tier answer, phase 17 section 3.10); any other row not visible to the caller answers the masked 404 `E_NOT_FOUND`.
+@@ END
+
+@@ REP 27
+| none | kill engage, pin |
+@@ WITH
+| none | kill engage, pin, route 16 for a suspicion-tier alert without step-up |
+@@ END
+# V-27-07-a | MEDIUM | grep -c -F gave 1 for each of the two REPs | names used and where they exist: phase 17 masking rule phase-17.md:1239-1240 (section 3.10 of phase 17, heading at phase-17.md:1216); section 6 check 8.l phase-27.md:844 (401 first); the 3.11 row phase-27.md:607 | NEW: none
+
+@@ REP 27
+`for_alert_live(conn, alert_id, alert_created_at, live_id)`
+@@ WITH
+`for_alert_live(conn, alert_id, alert_created_at)`: the latest `live` row of the alert, of any live version (section 3.4 "Single read", step 2)
+@@ END
+# V-27-07-b | MEDIUM | grep -c -F gave 1 | names used and where they exist: "Single read" step 2 phase-27.md:506 (any live version, the champion at scoring time); the DR-273 rule phase-27.md:930 (an alert keeps the score of the champion that scored it); the parameter appears only at phase-27.md:395 | NEW: none
+
+@@ REP 27
+Insert `admin.model_versions` with `status = importing`
+@@ WITH
+Insert `admin.model_versions` with `model_id` (the family of the path), `artifact_key` and `manifest_sha256` (from the request), `created_by` (the caller) and `status = importing`
+@@ END
+# V-27-08-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: NOT NULL columns `model_id` phase-27.md:61, `artifact_key` phase-27.md:68, `manifest_sha256` phase-27.md:71, `created_by` phase-27.md:86; request fields `artifact_key` and `manifest_sha256` in `ImportVersion` phase-27.md:386; the family lock of step 1 phase-27.md:469 | NEW: none
+
+@@ REP 27
+An infected card: refusal `manifest_invalid`.
+@@ WITH
+An infected or rejected card, or a card still not `clean` after the last attempt (the job is `dead`, phase 00), is refusal `manifest_invalid`; step 8 then sets `refused` and writes the audit, so the version does not stay in `importing`.
+@@ END
+# V-27-08-b | HIGH | grep -c -F gave 1 | names used and where they exist: `rejected` in `admin.av_status` phase-02.md:350; the dead job phase-00.md:545; step 8 phase-27.md:484; `model.version_refused` (SIEM true) phase-27.md:694; the edge `importing -> refused` phase-27.md:228; the artifact key `uq_model_artifact` phase-27.md:91. Choice: refuse rather than wait, because the plan has no other exit from `importing`; a retry route for an infrastructure failure would be a DECIDE. A refused artifact cannot be imported again, since `uq_model_artifact` keys on its sha256, which the lead may want stated
+
+@@ REP 27
+The inventory item is created in `registered` (phase 04 default).
+@@ WITH
+The version's inventory item, created at import (section 3.1), keeps its phase 04 default status `registered`.
+@@ END
+# V-27-08-d | MEDIUM | grep -c -F gave 1 | names used and where they exist: "created in the import transaction of section 3.3" phase-27.md:441; the item id is needed at the step 5 insert, phase-27.md:473; `inventory_item_id` NOT NULL phase-27.md:63 | NEW: none
+
+@@ REP 27
+Import, synchronous (route 4, akr-api
+@@ WITH
+Import, synchronous (route 6, akr-api
+@@ END
+# V-27-08-f | LOW | grep -c -F gave 1 | names used and where they exist: the import row is row 6, `POST /models/{id}/versions`, phase-27.md:411 | NEW: none
+
+@@ REP 27
+1. Lock order 1:
+@@ WITH
+1. Lock order 2:
+@@ END
+# V-27-08-g | LOW | grep -c -F gave 1 | names used and where they exist: the family lock is item 2 of section 3.16, phase-27.md:735; the rule that every path takes locks in that order, phase-27.md:733 | NEW: none
+
+@@ REP 27
+`InventoryService::update` on the inventory item to set
+@@ WITH
+`InventoryService::update` on the inventory item (`if_match` = the item's `version`, read in the same transaction) to set
+@@ END
+# V-27-09-a | LOW | grep -c -F gave 1 | names used and where they exist: `update(ctx, id, UpdateInventoryItem, if_match, assertion?)` phase-04.md:1338; the item's version as the optimistic lock, phase-04.md:1338 | NEW: none. The actor part is refuted (phase 04 section 7.6 fixes the context, phase-04.md:1689)
+
+@@ REP 27
+the body carries no score, band or reason code.
+@@ WITH
+the body carries no score, band or reason code. A suspicion-tier alert answers 401 `E_STEPUP_REQUIRED` first to a caller without `record_open` step-up (phase 17 section 3.10), and the masked 404 applies only after step-up.
+@@ END
+# V-27-10-a | MEDIUM | grep -c -F gave 1 | names used and where they exist: phase 17 rule phase-17.md:1239-1240; the same fix in section 3.4 step 1 (V-27-07-a, above); section 6 check 8.l phase-27.md:844 | NEW: none
+
+@@ REP 27
+Section 6 adds route 16
+@@ WITH
+Phase 17 section 6, check 9 adds route 16
+@@ END
+# V-27-10-b | LOW | grep -c -F gave 1 | names used and where they exist: the probe set of phase 17 section 6 check 9, phase-17.md:1243; section 4.5 phase-27.md:781 (the same statement) | NEW: none
+
+@@ REP 27
+'R11', 'retirement', NULL,          'Family kept with its versions
+@@ WITH
+'R11', 'age',        'created_at',  'Family kept with its versions
+@@ END
+
+@@ REP 27
+'R11', 'retirement', NULL,          'Versions with card
+@@ WITH
+'R11', 'age',        'created_at',  'Versions with card
+@@ END
+
+@@ REP 27
+the R11 `retirement` and R10 tables are never purged.
+@@ WITH
+the R11 family and version rows are `report_only` (their `age` clock on `created_at` is due after ten years, phase 23 class R11), and the R10 tables are never purged.
+@@ END
+# V-27-12-a | MEDIUM | grep -c -F gave 1 for each of the three REPs | names used and where they exist: R11 with clock `age` phase-23.md:601 (`report_only`, ten years); the R9 row with clock `retirement` phase-23.md:599; `retirement` never due in phase 23 phase-23.md:577; block 7.4 "model evidence is R11 through the retention rows of section 1.1" phase-27.md:877 | NEW: none. Choice: the class R11 stays, because block 7.4 fixes it, and the clock moves to `age`; the R9 alternative would contradict block 7.4
+
+# SUMMARY: fixes written 47 (REP 37, BLOCK 10); DECIDE 2; DROP 0; claims covered: V-27-01-a, V-27-01-c, V-27-01-d, V-27-01-e, V-27-02-a, V-27-02-b, V-27-02-c, V-27-02-d, V-27-03-a, V-27-03-b, V-27-03-c, V-27-03-e, V-27-03-f, V-27-03-g, V-27-04-a, V-27-04-b, V-27-04-c, V-27-04-d, V-27-05-a, V-27-05-b, V-27-05-c, V-27-05-d, V-27-06-a, V-27-06-b, V-27-06-c, V-27-07-a, V-27-07-b, V-27-08-a, V-27-08-b, V-27-08-d, V-27-08-f, V-27-08-g, V-27-09-a, V-27-10-a, V-27-10-b, V-27-12-a

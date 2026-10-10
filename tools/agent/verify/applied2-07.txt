@@ -1,0 +1,9 @@
+Replacements made in docs/plan/phase-07.md by the first re-check (DR-413). 1 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-07-1f]
+WHY: R-07-1 | CONFIRMED MEDIUM (raised HIGH) | the running operation totals are one short from phase 04 on: phase 04 has 32 operations with the evidence route of 7.2, so 86, 107, 121 and 130, not 85, 106, 120 and 129 (lead counted the route rows: 22, 32, 32, 21, 14, 9) | six numbers corrected in phases 04 to 07
+OLD: 9 new operations (129 with phases 01 and 03 to 06)
+NEW: 9 new operations (130 with phases 01 and 03 to 06)

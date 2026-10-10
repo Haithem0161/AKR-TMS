@@ -1,0 +1,34 @@
+Replacements made in docs/plan/phase-05.md by the first re-check (DR-413). 6 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-05-1]
+WHY: R-05-1 | CONFIRMED LOW | "Reused" line names `evidence.sealed`, an event no phase defines, and not `evidence.stored`, which the run report now emits | line corrected
+OLD: `evidence.staged`, `evidence.sealed` (phase 02).
+NEW: `evidence.staged` (source documents) and `evidence.stored` (the run report, through `put_generated`) (phase 02).
+
+=== F2 [R-05-2a]
+WHY: R-05-2 | CONFIRMED LOW | VD-02 is marked "partly" but sits in the "implemented here" list | moved to the partly-implemented list
+OLD: ; VD-02 (partly: this phase reads the inputs to each mapping, the bank's dictionary, column comments, value lists and candidate columns; the mapping itself is written by its author in the phase 10 workbench and published under `cr_mapping`), VD-05 (Db2
+NEW: ; VD-05 (Db2
+
+=== F3 [R-05-2b]
+WHY: R-05-2 | CONFIRMED LOW | VD-02 is marked "partly" but sits in the "implemented here" list | moved to the partly-implemented list
+OLD: VD-01 (ICS BANKS on Oracle as the first adapter pack), VD-06
+NEW: VD-01 (ICS BANKS on Oracle as the first adapter pack), VD-02 (this phase reads the inputs to each mapping, the bank's dictionary, column comments, value lists and candidate columns; the mapping itself is written by its author in the phase 10 workbench and published under `cr_mapping`), VD-06
+
+=== F4 [R-05-3]
+WHY: R-05-3 | CONFIRMED LOW (raised MEDIUM) | the retention seed note still calls `admin.source_pauses` "Coverage-gap evidence", against 7.12 | note reworded
+OLD: 'Coverage-gap evidence (C-15); as its source'
+NEW: 'Record of who paused a source, when and why (C-15); as its source'
+
+=== F5 [R-05-4]
+WHY: R-05-4 | CONFIRMED LOW | "no backfill planner (phase 11, DR-63)" points at a planner no phase builds (DR-380) | pointer corrected
+OLD: no mapping, no backfill planner (phase 11, DR-63):
+NEW: no mapping, no backfill planner (landing is phase 11, DR-63; no phase builds a backfill planner, DR-380):
+
+=== F6 [R-07-1d]
+WHY: R-07-1 | CONFIRMED MEDIUM (raised HIGH) | the running operation totals are one short from phase 04 on: phase 04 has 32 operations with the evidence route of 7.2, so 86, 107, 121 and 130, not 85, 106, 120 and 129 (lead counted the route rows: 22, 32, 32, 21, 14, 9) | six numbers corrected in phases 04 to 07
+OLD: 21 new operations (106 with phases 01, 03 and 04)
+NEW: 21 new operations (107 with phases 01, 03 and 04)

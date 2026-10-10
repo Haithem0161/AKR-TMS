@@ -1,0 +1,30 @@
+Replacements made in docs/plan/phase-09.md by the first re-check (DR-413). 5 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-09-1]
+WHY: R-09-1 | CONFIRMED LOW | the rename block says section 4's phase 00 and phase 04 bullets include the rename; they do not | sentence corrected
+OLD: Section 4's phase 00 and phase 04 bullets include this.
+NEW: Section 4's phase 00 and phase 04 bullets do not repeat the rename; this paragraph is its record.
+
+=== F2 [R-09-2a]
+WHY: R-09-2 | CONFIRMED LOW (raised MEDIUM) | the block says `unknown_queue` and `pool_archived` are raised by the authority matrix, which has no queue or pool field | the two codes leave the section 3.8 row
+OLD: and the codes `unknown_queue` and `pool_archived` of section 3.8 are raised by the authority matrix only.
+NEW: and the codes `unknown_queue` and `pool_archived` are raised by no check of this phase (the authority matrix has no queue or pool field either), so they leave the row of section 3.8.
+
+=== F3 [R-09-2b]
+WHY: R-09-2 | CONFIRMED LOW (raised MEDIUM) | the block says `unknown_queue` and `pool_archived` are raised by the authority matrix, which has no queue or pool field | the two codes leave the section 3.8 row
+OLD: `role_lacks_scope`, `pool_archived`, `unknown_queue`, `calendar_fixed` |
+NEW: `role_lacks_scope`, `calendar_fixed` |
+
+=== F4 [R-09-3]
+WHY: R-09-3 | CONFIRMED LOW (raised MEDIUM) | the Activation paragraph says a new pack version is used only by cases opened later, while the save-time scan always uses the active version | the exception is named
+OLD: nothing migrates (M-75). A rollback is a new change request;
+NEW: nothing migrates (M-75); the one exception is the save-time scan of forbidden terms (`PolicyPackService::scan`), which
+always reads the active version. A rollback is a new change request;
+
+=== F5 [R-09-4]
+WHY: R-09-4 | CONFIRMED LOW (raised MEDIUM) | the Keys paragraph calls the release schema closed over three table files, yet the default calendar and the reason-code file sit in the same folder | the calendar file's keys and the status of `reason-codes.v1.json` are stated
+OLD: `reference-release.v1.json` is closed and validates exactly these keys.
+NEW: `reference-release.v1.json` is closed and validates exactly these keys for the three table files. The fourth release file, the default calendar, carries `release_id`, the columns of its one `ref.calendars` row and its `ref.calendar_days` rows (section 1), and the schema has a branch for it. `reason-codes.v1.json` is not a release file of this schema: `akr-ctl ref seed` reads it (section 3.4, Seed).

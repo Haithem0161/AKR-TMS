@@ -1,0 +1,35 @@
+Replacements made in docs/plan/phase-03.md by the first re-check (DR-413). 5 entries.
+Each replaced the OLD text by the NEW text in place. The id in brackets is the lead's finding id; a finding
+of another phase can have a replacement in this file. WHY is the lead's verdict line for that finding:
+id, verdict and severity, what was wrong, and what the fix was meant to do.
+
+=== F1 [R-03-1]
+WHY: R-03-1 | CONFIRMED MEDIUM | block 7.15 adds three `dev.*` actions and `dev.cedar` but declares them neither in the schema nor in `Action::ALL`, so the inventory of section 3.1 step 3 fails in a `dev-routes` build | one sentence: declared under the feature in a schema fragment, with the `_dev_masked` entity
+OLD: file of 7.12 is built without the feature.
+NEW: file of 7.12 is built without the feature. With the feature on, the three actions are members of `Action::ALL`
+(`#[cfg(feature = "dev-routes")]`) and are declared in `policies/dev.cedarschema`, a schema fragment that
+`loader::load` appends together with `dev.cedar`; the fragment also declares the entity type of `_dev_masked` with
+its `tier` and `access_list` attributes. So the inventory of section 3.1 step 3 holds in both builds.
+
+=== F2 [R-03-2]
+WHY: R-03-2 | CONFIRMED LOW (raised MEDIUM) | 7.12 prints `roles` as a map, 7.16 as the `RoleActions` list | 7.12 prints the list
+OLD: printing `{bundle_hash, roles: {<role>: [<action>,
+...]}}` from the permits' `@role` annotations (phase 08 section 2).
+NEW: printing `{bundle_hash, roles: [{role, actions}]}`
+(the `RoleActions` list of 7.16) from the permits' `@role` annotations (phase 08 section 2).
+
+=== F3 [R-03-3]
+WHY: R-03-3 | CONFIRMED LOW (raised MEDIUM) | step 3 of `build` has no key for the `sod.json` rules that step 1 and phase 25 name | key `sod` (`LoadedBundle.sod`)
+OLD: 3. `{generated_at, bundle_version, bundle_sha256, roles, principals}`;
+NEW: 3. `{generated_at, bundle_version, bundle_sha256, roles, sod, principals}` (`sod` is the `sod.json` rules of the
+   loaded bundle, `LoadedBundle.sod`; `build` adds it, `roles` of 7.16 does not);
+
+=== F4 [R-03-4]
+WHY: R-03-4 | CONFIRMED MEDIUM | 7.17 lets a kind outside `MASKED_KINDS` be refused as masked, but the access event, the same-work rule and the latency floor are tied to "a masked kind" | the kinds named by `@deny("masked")` forbids count as masked kinds for those three rules
+OLD: The kind need not be in `MASKED_KINDS`.
+NEW: The kind need not be in `MASKED_KINDS`: `loader::load` collects the resource kinds that such forbids name, and for section 3.2 step 8 and section 3.6 steps 2 and 3 (the access event, the same work and the latency floor) those kinds count as masked kinds, so a miss and a refusal on them cannot be told apart by an event or by timing.
+
+=== F5 [R-03-5]
+WHY: R-03-5 | CONFIRMED LOW | 7.17 points to section 3.6 for the `deny` access event; it is section 3.2 step 8 | pointer
+OLD: and the access event is the `deny` of section 3.6.
+NEW: and the access event is the `deny` of section 3.2 step 8.
