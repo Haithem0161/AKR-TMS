@@ -1,0 +1,33 @@
+# Container logs of this compose project to the bank's log collector, as RFC 5424 syslog over TLS. The
+# binaries write JSON lines that have already passed the redaction layer; nothing is added here.
+service:
+  flush: 5
+  log_level: warn
+
+pipeline:
+  inputs:
+    - name: tail
+      path: /var/lib/docker/containers/*/*-json.log
+      parser: docker
+      tag: container.*
+      db: /tmp/tail.db
+      mem_buf_limit: 16MB
+      skip_long_lines: on
+
+  outputs:
+    - name: syslog
+      match: container.*
+      host: ${AKR_SIEM_SYSLOG_HOST}
+      port: ${AKR_SIEM_SYSLOG_PORT}
+      mode: tls
+      tls: on
+      tls.verify: on
+      syslog_format: rfc5424
+      syslog_appname_preset: akr-tms
+      syslog_message_key: log
+
+parsers:
+  - name: docker
+    format: json
+    time_key: time
+    time_format: "%Y-%m-%dT%H:%M:%S.%L%z"

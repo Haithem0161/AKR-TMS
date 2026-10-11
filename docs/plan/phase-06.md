@@ -635,7 +635,7 @@ run's id in `errors[]`); enqueue `gap_report_build {run_id}`; audit `gap_report.
 3. Run the section 3.3 grading inline (same code, `reason: "report"`), so the report never shows grades older than
    the newest profile.
 4. Build the document (`cbi-gap-report.v1.json`; ids, codes, labels and counts only; no customer value):
-   - `cover`: bank name (both languages, from the installation file `deploy/branding.json` of phase 08 section 3.10, which the akr-worker service mounts read-only; an unreadable file is `fail(internal)`), catalogue and register versions, sources (code, name, profile run id and
+   - `cover`: bank name (both languages, from the installation file `deploy/branding.json` of phase 08 section 3.10, fields `bank_name.ar` and `bank_name.en` (the shape phase 00 section 7.38 fixed), which the akr-worker service mounts read-only; an unreadable file is `fail(internal)`), catalogue and register versions, sources (code, name, profile run id and
      finished time), `data_as_of` per source (the business date per branch and the newest posting date, from phase 05
      profile rows), `generated_at`, `run_id`, open findings (`undeclared_blocked`, `declarations_expired`).
    - `summary`: items by grade and by term; scenarios by grade (excluded `pack_not_enabled` counted apart); the
@@ -847,7 +847,7 @@ the roles above, the only thing visible is the CBI's own public catalogue.
   - `pack_build` (payload `{kind, scope, lang?, requested_by}`; coalesce key kind + scope key + lang; concurrency 2;
     max attempts 3).
   - `coverage_sweep` (scheduled, `schedule.coverage_sweep`, daily 02:40 bank time; concurrency 1).
-- **Docker compose:** one change: akr-worker gains a read-only bind mount of the installation file `deploy/branding.json` at `/etc/akr/branding.json` (the cover of section 3.5 reads the bank name from it; the phase 00 volume list names it). Gotenberg (phase 02) renders the PDFs; no new service, no new network edge.
+- **Docker compose:** one change: akr-worker gains a read-only bind mount of the installation file `deploy/branding.json` at `/etc/akr/branding.json` (the cover of section 3.5 reads the bank name from it; the phase 00 volume list names it, and the source is `${AKR_BRANDING_FILE:-../branding.json}`, the same file the edge serves). Gotenberg (phase 02) renders the PDFs; no new service, no new network edge.
 - **AppState additions:** `api`: `catalogue: Arc<CatalogueQuery>`, `coverage: Arc<CoverageService>`
   (`ReadinessQuery`, `DeclarationService`, `GapReportQuery`), `packs: Arc<PackRequestService>`, `field_candidates:
   FieldCandidateFinder` on the discovery state; the evidence owner kind `gap_report_run`; step-up action classes

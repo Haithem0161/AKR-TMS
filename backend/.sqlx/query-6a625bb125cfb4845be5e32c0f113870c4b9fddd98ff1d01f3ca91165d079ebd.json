@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO admin.data_keys (id, family, period, wrapped) VALUES ($1, $2, $3, $4)\n             ON CONFLICT (family, period) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6a625bb125cfb4845be5e32c0f113870c4b9fddd98ff1d01f3ca91165d079ebd"
+}

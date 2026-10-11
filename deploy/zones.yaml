@@ -1,0 +1,112 @@
+# Who reaches whom (SP-04). This file is the single statement of the zone matrix.
+#
+#   networks   the zone networks. `internal: true` means no route out of the network.
+#   services   the networks each service is on and the ports it listens on for other services.
+#   edges      which service may open a connection to which, on which ports.
+#
+# Read by `akr-ctl net render` (the host rules that keep the CBS reachable from akr-ingestd only),
+# `akr-ctl net matrix` and `make zone-check` (a probe from every service's position), and by the chart
+# renderer of the cluster profile (one NetworkPolicy per edge).
+#
+# In the compose profile a network is the unit of separation: two services on one network reach each
+# other on every port they listen on. `net matrix` marks such a pair `zone` when no edge names it. The
+# cluster profile allows each edge alone.
+#
+# A service is added here in the same change that adds it to the compose file.
+
+version: 1
+
+networks:
+  z1_cbs: { internal: false, subnet: 10.247.71.0/28 }   # out to the CBS listeners only; host-enforced
+  z1_db: { internal: true }
+  z1_bao: { internal: true }
+  z2_app: { internal: true }
+  z2_store: { internal: true }
+  z3_edge: { internal: false }
+  z3_ory: { internal: true }
+  z4_gateway: { internal: false }
+  z4_db: { internal: true }
+  z4_cache: { internal: true }
+  z5_mgmt: { internal: true }
+
+services:
+  postgres: { networks: [z1_db, z2_app, z3_ory, z4_db], ports: [5432] }
+  postgres-standby: { networks: [z2_app], ports: [5432] }
+  pgbackrest: { networks: [z2_app] }
+  restic: { networks: [z2_app] }
+  openbao: { networks: [z1_bao, z2_app], ports: [8200] }
+  objectstore: { networks: [z2_store], ports: [9000] }
+  s3guard: { networks: [z2_store, z2_app, z3_edge, z5_mgmt], ports: [9000, 9101] }
+  valkey: { networks: [z2_app, z4_cache], ports: [6379] }
+  kratos: { networks: [z3_ory], ports: [4433, 4434] }
+  hydra: { networks: [z3_ory, z3_edge], ports: [4444, 4445] }
+  gotenberg: { networks: [z2_app], ports: [3000] }
+  clamd: { networks: [z2_app], ports: [3310] }
+  caddy: { networks: [z3_edge], ports: [443] }
+  akr-api: { networks: [z2_app, z3_edge, z3_ory, z5_mgmt], ports: [8080, 9101] }
+  akr-worker: { networks: [z2_app, z5_mgmt], ports: [8080, 9101] }
+  akr-ingestd:
+    networks: [z1_cbs, z1_db, z1_bao, z5_mgmt]
+    ports: [8080, 9101]
+    addresses: { z1_cbs: 10.247.71.2 }
+  akr-assess: { networks: [z4_gateway, z4_db, z4_cache, z1_bao, z5_mgmt], ports: [8080, 9101] }
+  otel-collector: { networks: [z5_mgmt], ports: [4318] }
+  jaeger: { networks: [z5_mgmt], ports: [4318, 16686] }
+  prometheus: { networks: [z5_mgmt], ports: [9090] }
+  alertmanager: { networks: [z5_mgmt], ports: [9093] }
+  log-forwarder: { networks: [z5_mgmt] }
+
+edges:
+  - { from: akr-api, to: postgres, ports: [5432] }
+  - { from: akr-api, to: valkey, ports: [6379] }
+  - { from: akr-api, to: openbao, ports: [8200] }
+  - { from: akr-api, to: s3guard, ports: [9000] }
+  - { from: akr-api, to: otel-collector, ports: [4318] }
+
+  - { from: akr-worker, to: postgres, ports: [5432] }
+  - { from: akr-worker, to: valkey, ports: [6379] }
+  - { from: akr-worker, to: openbao, ports: [8200] }
+  - { from: akr-worker, to: s3guard, ports: [9000] }
+  - { from: akr-worker, to: otel-collector, ports: [4318] }
+
+  # DR-25: akr-ingestd reaches OpenBao for KV reads only.
+  - { from: akr-ingestd, to: postgres, ports: [5432] }
+  - { from: akr-ingestd, to: openbao, ports: [8200] }
+  - { from: akr-ingestd, to: otel-collector, ports: [4318] }
+
+  - { from: akr-assess, to: postgres, ports: [5432] }
+  - { from: akr-assess, to: valkey, ports: [6379] }
+  - { from: akr-assess, to: openbao, ports: [8200] }
+  - { from: akr-assess, to: otel-collector, ports: [4318] }
+
+  - { from: s3guard, to: objectstore, ports: [9000] }
+  - { from: s3guard, to: otel-collector, ports: [4318] }
+  - { from: caddy, to: akr-api, ports: [8080] }
+  - { from: caddy, to: s3guard, ports: [9000] }
+
+  - { from: kratos, to: postgres, ports: [5432] }
+  - { from: hydra, to: postgres, ports: [5432] }
+  - { from: postgres-standby, to: postgres, ports: [5432] }
+  - { from: pgbackrest, to: postgres, ports: [5432] }
+  - { from: restic, to: openbao, ports: [8200] }
+
+  - { from: prometheus, to: akr-api, ports: [9101] }
+  - { from: prometheus, to: akr-worker, ports: [9101] }
+  - { from: prometheus, to: akr-ingestd, ports: [9101] }
+  - { from: prometheus, to: akr-assess, ports: [9101] }
+  - { from: prometheus, to: s3guard, ports: [9101] }
+  - { from: prometheus, to: alertmanager, ports: [9093] }
+  - { from: otel-collector, to: jaeger, ports: [4318] }
+
+# Addresses outside the installation, declared at install. Empty until then: with no CBS listener
+# declared, nothing reaches the CBS.
+cbs:
+  listeners: []          # "address:port" of each CBS database listener, for example "10.20.0.15:1521"
+cluster:
+  apiserver: null        # the cluster profile: the address of the Kubernetes API server
+gateway:
+  cidrs: []              # the payment hub's networks, for the decision gateway
+backup:
+  repository: null       # "host:port" of the pgBackRest repository on the backup server
+egress:
+  proxy: null            # "host:port" of the bank's proxy for the worker's outbound fetches

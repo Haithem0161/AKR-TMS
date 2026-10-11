@@ -1,0 +1,50 @@
+[package]
+name = "akr-ctl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "akr_ctl"
+path = "src/lib.rs"
+
+[[bin]]
+name = "akr-ctl"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+akr-audit.workspace = true
+akr-common.workspace = true
+akr-db.workspace = true
+akr-domain.workspace = true
+akr-objectstore.workspace = true
+akr-telemetry.workspace = true
+base64.workspace = true
+chrono.workspace = true
+clap.workspace = true
+ed25519-dalek.workspace = true
+getrandom.workspace = true
+hex.workspace = true
+hmac.workspace = true
+reqwest.workspace = true
+rustix.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx = { workspace = true, features = ["postgres"] }
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+uuid.workspace = true
+yaml-rust2.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+sqlx = { workspace = true, features = ["runtime-tokio", "postgres", "macros", "migrate"] }

@@ -1,0 +1,43 @@
+[package]
+name = "akr-s3guard"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "akr_s3guard"
+path = "src/lib.rs"
+
+[[bin]]
+name = "akr-s3guard"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+akr-common = { workspace = true }
+akr-objectstore = { workspace = true }
+akr-telemetry = { workspace = true }
+async-trait = { workspace = true }
+axum = { workspace = true }
+futures-util = { workspace = true }
+http = { workspace = true }
+metrics = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+bytes = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+zeroize = { workspace = true }

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) FILTER (WHERE attempts < $1) AS \"pending!\",\n                      count(*) FILTER (WHERE attempts >= $1) AS \"stuck!\"\n               FROM admin.outbox\n               WHERE dispatched_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pending!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "stuck!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "72757431f3a6ce67912b20091d29f98f79ac135c0e093dad5413bd171584ba7a"
+}

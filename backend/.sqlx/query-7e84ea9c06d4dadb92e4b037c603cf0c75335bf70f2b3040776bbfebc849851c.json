@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM admin.jobs\n             WHERE id IN (\n                 SELECT id FROM admin.jobs\n                 WHERE status IN ('done', 'dead') AND finished_at < now() - $1::bigint * interval '1 day'\n                 ORDER BY finished_at\n                 LIMIT $2\n                 FOR UPDATE SKIP LOCKED)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7e84ea9c06d4dadb92e4b037c603cf0c75335bf70f2b3040776bbfebc849851c"
+}

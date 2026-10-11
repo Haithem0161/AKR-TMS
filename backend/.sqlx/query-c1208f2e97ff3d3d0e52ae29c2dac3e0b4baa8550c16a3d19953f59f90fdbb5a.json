@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE admin.outbox SET dispatched_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c1208f2e97ff3d3d0e52ae29c2dac3e0b4baa8550c16a3d19953f59f90fdbb5a"
+}

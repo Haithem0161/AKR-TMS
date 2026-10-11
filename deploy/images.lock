@@ -1,0 +1,41 @@
+# Every image the product pulls, pinned by digest: one line per image (name, digest, source).
+#
+#   name     the repository as a compose file or a Dockerfile names it
+#   digest   the content digest of the multi-platform index, or `build` for an image the release
+#            pipeline builds and signs itself (its digest is in the bundle manifest)
+#   source   the tag the digest was resolved from, or the build definition
+#
+# A reference in deploy/ that is not in this file fails the build (tools/ci/check_images_lock.py).
+
+# Services
+valkey/valkey                 sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11  docker.io/valkey/valkey:9.1.2-alpine
+openbao/openbao               sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf  docker.io/openbao/openbao:2.7.1
+oryd/kratos                   sha256:481bfc3022e5427ffb94570eef84480b99c9f8158388378c57df8c1a4a104b3d  docker.io/oryd/kratos:v26.2.0-distroless
+oryd/hydra                    sha256:ad53a123ddf869fc23ea74f3d76b47e2966dc52f559e93ab31f81440f4d60c5e  docker.io/oryd/hydra:v26.2.0-distroless
+gotenberg/gotenberg           sha256:f29984bd1e226bf1b93ba90af06000afa8b315853e99d27b9aaa41b93f15c769  docker.io/gotenberg/gotenberg:8.37.0
+clamav/clamav                 sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0  docker.io/clamav/clamav:1.5.4
+caddy                         sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f  docker.io/library/caddy:2.11.7-alpine
+restic/restic                 sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510  docker.io/restic/restic:0.19.1
+otel/opentelemetry-collector  sha256:310a800ad69ee430e7c541796852a242c9c7db97aaad4daa5ccf843c525fbdb2  docker.io/otel/opentelemetry-collector:0.162.0
+jaegertracing/jaeger          sha256:836b967b5abcf1f7758066aa6b348619267a2f1459f72d472840570f9bd88a17  docker.io/jaegertracing/jaeger:2.22.0
+prom/prometheus               sha256:b2a413d5a03ea6a76782a508d1c7947440bba3b973931a25676e278431891b01  docker.io/prom/prometheus:v3.15.0-distroless
+prom/alertmanager             sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a  docker.io/prom/alertmanager:v0.34.1
+fluent/fluent-bit             sha256:c5542543523c9678398dd78d927c05e8425ec15b038f226b67b3b019b1a70845  docker.io/fluent/fluent-bit:5.1.3
+
+# Bases of the images the pipeline builds
+postgres                      sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3  docker.io/library/postgres:17
+rust                          sha256:2775a09d208ff0d7c1f50490c45b62db929e87ba1dcbc3f2132ac71a704bcdd3  docker.io/library/rust:1.97.1-slim-bookworm
+gcr.io/distroless/cc-debian12 sha256:9dac0a79194e45a7da0158a9c6da57b217585af0786db3845d1f0ec1a0dd182f  gcr.io/distroless/cc-debian12:nonroot
+
+# Built and signed by the release pipeline
+akr/postgres                  build  deploy/images/postgres/Dockerfile
+akr/akr-api                   build  deploy/images/akr/Dockerfile#akr-api
+akr/akr-worker                build  deploy/images/akr/Dockerfile#akr-worker
+akr/akr-ingestd               build  deploy/images/akr/Dockerfile#akr-ingestd
+akr/akr-assess                build  deploy/images/akr/Dockerfile#akr-assess
+akr/akr-s3guard               build  deploy/images/akr/Dockerfile#akr-s3guard
+akr/akr-ctl                   build  deploy/images/akr/Dockerfile#akr-ctl
+akr/objectstore               build  the Silo source at tag RELEASE.2026-09-16T00-00-00Z, compared with Silo's checksums and provenance
+
+# Development only, never in a bundle
+minio/minio                   sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e  docker.io/minio/minio:RELEASE.2025-04-22T22-12-26Z

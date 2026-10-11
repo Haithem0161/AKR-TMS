@@ -1,0 +1,5 @@
+# The image is built from the pinned toolchain image, so the toolchain file would only make rustup fetch
+# components the build does not use.
+target/
+rust-toolchain.toml
+deny.toml

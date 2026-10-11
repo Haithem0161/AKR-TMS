@@ -1,0 +1,24 @@
+# Pages to the operator. Each of these is a loss that nobody sees until someone opens the cockpit, so it
+# does not wait for that.
+groups:
+  - name: akr-platform
+    rules:
+      # A row at outbox.max_attempts is lost to its consumers until someone acts.
+      - alert: AkrOutboxStuck
+        expr: akr_outbox_stuck > 0
+        for: 5m
+        labels:
+          severity: P2
+          route: operator
+        annotations:
+          summary: "Outbox rows have stopped at the attempt limit"
+          description: "{{ $value }} outbox rows reached outbox.max_attempts and are no longer delivered."
+
+      - alert: AkrJobsDead
+        expr: increase(akr_jobs_dead_total[15m]) > 0
+        labels:
+          severity: P2
+          route: operator
+        annotations:
+          summary: "Jobs have died"
+          description: "{{ $value }} jobs of kind {{ $labels.kind }} reached max_attempts in the last 15 minutes."

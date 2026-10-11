@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, family, period, wrapped FROM admin.data_keys WHERE family = $1 AND period = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "family",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "period",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "wrapped",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6e019a978060ab184b02d9db8ed7c32cc36d4486be53e491a031080b53c57b87"
+}

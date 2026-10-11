@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT n.nspname::text AS \"schema_name!\", c.relname::text AS \"table_name!\"\n               FROM pg_catalog.pg_class c\n               JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace\n               WHERE n.nspname = ANY($1::text[])\n                 AND c.relkind IN ('r', 'p')\n                 AND NOT c.relispartition\n                 AND c.relname <> $2::text\n                 AND NOT EXISTS (\n                     SELECT 1 FROM admin.retention_assignment ra\n                     WHERE ra.schema_name = n.nspname AND ra.table_name = c.relname)\n               ORDER BY 1, 2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "schema_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "table_name!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "801ab64ee36308e7233a34534ce3d45012adfe75075f392d30fd2ee622b8e43a"
+}

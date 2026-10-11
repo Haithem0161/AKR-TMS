@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE admin.outbox\n             SET attempts = attempts + 1, last_error = $2, available_at = now() + make_interval(secs => $3)\n             WHERE id = $1 AND dispatched_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "629e487e389ea0bdffa20d16689bea5f35165905e4546b1be897d5869784089b"
+}

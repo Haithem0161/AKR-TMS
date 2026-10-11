@@ -6,3 +6,14 @@ from-banks-pc.zip
 # Generated
 __pycache__/
 *.pyc
+
+# Build output
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/.tanstack/
+
+# Development certificates, secrets and local state: generated per machine, never committed
+deploy/dev/certs/
+deploy/dev/secrets/
+.env

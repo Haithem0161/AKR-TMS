@@ -1,0 +1,11 @@
+# Development stack: the profile S bundle (deploy/compose/compose.yaml, the same images) plus the dev
+# overlay that publishes the stores on loopback. Project name `akr-tms`, so nothing here touches another
+# project's containers.
+name: akr-tms
+
+include:
+  - path:
+      - deploy/compose/compose.yaml
+      - deploy/compose/compose.dev.yaml
+    project_directory: deploy/compose
+    env_file: deploy/compose/dev.env

@@ -1347,6 +1347,21 @@ sets or reads, and they hold nothing else: `StagedRow` the `admin.evidence_objec
 the columns `open` reads in its steps 1 to 4; `NewPackRow` the `admin.packs` columns that step 3 of
 `PackService::publish` sets.
 
+Build pass of phase 00 (2026-10-11); DR-425.
+
+### 7.20 The audit port is in akr-domain (build gap of phase 00, HIGH; DR-425)
+Section 2 of this phase defines `AuditSink`, `AuditEvent`, `EventKind`, `Actor`, `RequestCtx`, `Canon`, `AuditReceipt`
+and `AuditError` in the `audit` crate. As built in phase 00 they are defined in `akr_domain::audit` (phase 00 section
+7.32), because `common` and `jobs` emit events and sit below `db`, which this phase's `audit` crate depends on.
+- The `audit` crate re-exports the port (`pub use akr_domain::audit::*`), so the paths this phase and later phases
+  write (`audit::AuditSink`, `audit::kinds::X`) are unchanged.
+- This phase adds to the `audit` crate only: `PgAuditSink`, the canonical encoder (the bytes of a `Canon` and of an
+  entry), the chain, the anchors, the verifier, and `CATALOGUE` (the list of every kind, built from
+  `akr_domain::audit::kinds`). `Canon` itself stays in `akr-domain`.
+- A new kind is a static in `akr_domain::audit::kinds` plus its line in `CATALOGUE`; the test that every kind is in
+  the catalogue runs in `audit`.
+- `common` and `jobs` must not depend on `akr-audit`.
+
 ## What This Phase Does NOT Touch
 
 - No business routes: the audit viewer, chain status and verify-run routes and screens (API.md 3.4, G6) are phase 24;

@@ -1,0 +1,4 @@
+# No dependency runs an install script. esbuild's only checks its own binary, which the platform
+# package already carries.
+ignoredBuiltDependencies:
+  - esbuild

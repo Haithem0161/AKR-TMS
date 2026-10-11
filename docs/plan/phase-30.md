@@ -34,7 +34,7 @@ ALTER TABLE admin.releases DROP CONSTRAINT IF EXISTS releases_refusal_code_check
 ALTER TABLE admin.releases ADD CONSTRAINT releases_refusal_code_check
     CHECK (refusal_code IS NULL OR refusal_code IN (
         'bundle_signature_invalid', 'image_signature_invalid', 'manifest_digest_mismatch',
-        'fingerprint_mismatch', 'sbom_missing', 'rollback_plan_missing', 'notes_missing',
+        'fingerprint_mismatch', 'sbom_missing', 'rollback_plan_missing', 'notes_missing', 'notices_missing',
         'version_not_newer', 'policy_bundle_hash_mismatch', 'help_article_invalid', 'chart_signature_invalid'));
 
 INSERT INTO admin.settings (key, value, value_type, floor, governed, label) VALUES
@@ -527,7 +527,7 @@ A3 refreshes its tiles on the phase 03 cadence; it reads `GET /admin/ops` only. 
 2. **Chart lint and schema.** `helm lint deploy/chart/akr` reports no error; `kubeconform -strict -kubernetes-version <pinned>` on `helm template` output reports no invalid object.
 3. **Admission.** Three cases in namespace `akr`: (a) an image by digest with a valid vendor signature (the bundle's `akr-api`) is admitted; (b) a busybox image by digest with no signature is refused by the Kyverno policy with the policy name in the message; (c) the same signed image referenced by tag is refused (digest required).
 4. **Cluster zone check.** `akr-ctl net check --cluster` exits 0 and its table equals the matrix of `deploy/zones.yaml` in every row; the known-bad probe (no membership labels) reaches nothing. Then the probe matrix is edited in a scratch copy with one edge removed and the check exits 2 on the row of that edge.
-5. **Chart signature.** `akr-ctl bundle verify` on a bundle whose `chart/akr` file was changed by one byte refuses with `chart_signature_invalid`; the import row is `refused` with that code; the check constraint of section 1 accepts the value and rejects `chart_bad_value` (a direct `INSERT` through `akr_migrate` in a scratch database).
+5. **Chart signature.** `akr-ctl bundle verify` on a bundle whose `chart/akr` file was changed by one byte, and whose manifest was then written and signed again over the changed file (`bundle::build::seal`, as the phase 00 test does), refuses with `chart_signature_invalid`; without the new manifest the digest check runs first and the refusal is `manifest_digest_mismatch` (phase 00 section 7.37); the import row is `refused` with that code; the check constraint of section 1 accepts the value and rejects `chart_bad_value` (a direct `INSERT` through `akr_migrate` in a scratch database).
 6. **Migration `0095`.** Applies cleanly twice; `SELECT key FROM admin.settings WHERE key IN ('ops.last_failover_drill_at','ops.failover_drill_max_age_days','ops.failover_max_s','ha.standby_reads','ha.standby_max_lag_s')` returns five rows; `\d admin.releases` shows `releases_refusal_code_check` once. The SQL of section 1 was checked against a throwaway `docker run --rm postgres:17` with a stub `admin.releases` and `admin.settings` (no production database).
 7. **PostgreSQL proof of concept.** Criteria 1 to 10 of section 3.4 for each candidate; the report is attached to the bank's acceptance record. The chosen tool is named in DR-320 by the PoC report, not by this document.
 8. **Failover drill.** Cases C1 to C6 of section 3.9 with their pass criteria; `akr-ctl ops record-failover-drill --result passed --measured-failover-s <n> --cases-passed 6 --cases-total 6 --evidence drill.json` sets `ops.last_failover_drill_at`; audit `failover_drill.recorded` exists; the age tile of section 3.13 reads `ok`.

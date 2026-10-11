@@ -1,0 +1,536 @@
+# AKR-TMS profile S: one server, one compose project. Zone networks are the single place that says which
+# container can reach which (deploy/zones.yaml is the statement; `make zone-check` proves the two agree).
+#
+# Paths are relative to this file. AKR_TLS_DIR and AKR_SECRETS_DIR come from the install's .env; the
+# development values are in dev.env.
+#
+# Never remove this project's containers or volumes by hand: `docker compose stop` and `down` only.
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+
+# The AKR binaries: no core dump and no swap (a secret in memory stays in memory).
+x-akr: &akr
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  ulimits: { core: 0 }
+  mem_limit: ${AKR_BINARY_MEMORY:-2g}
+  memswap_limit: ${AKR_BINARY_MEMORY:-2g}
+  tmpfs: [/tmp]
+
+x-akr-build: &akr-build
+  context: ../../backend
+  dockerfile: ../deploy/images/akr/Dockerfile
+
+# A binary signs in to OpenBao with its own AppRole and reads everything else from there.
+x-akr-env: &akr-env
+  AKR_ENV: ${AKR_ENV:-production}
+  BAO_ADDR: https://openbao:8200
+  BAO_CACERT: /run/akr/tls/ca.crt
+  BAO_ROLE_ID_FILE: /run/akr/approle/role_id
+  BAO_SECRET_ID_FILE: /run/akr/approle/secret_id
+  OTLP_ENDPOINT: http://otel-collector:4318
+
+x-akr-health: &akr-health
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 10s
+
+networks:
+  # Egress to the CBS listeners only, host-enforced (akr-ctl net render). The subnet and the address of
+  # akr-ingestd on it are the ones deploy/zones.yaml states.
+  z1_cbs:
+    ipam: { config: [{ subnet: 10.247.71.0/28 }] }
+  z1_db: { internal: true }
+  z1_bao: { internal: true }
+  z2_app: { internal: true }
+  z2_store: { internal: true }
+  z3_edge: {}
+  z3_ory: { internal: true }
+  z4_gateway: {}
+  z4_db: { internal: true }
+  z4_cache: { internal: true }
+  z5_mgmt: { internal: true }
+
+volumes:
+  pgdata: {}
+  pgsocket: {}
+  pgstandby: {}
+  baodata: {}
+  storedata: {}
+  # The pgBackRest and restic repositories. An install points this volume at the backup server's share
+  # (driver_opts in the install's override file); the copies in it are encrypted before they are written.
+  backuprepo: {}
+  backupmarker: {}
+  clamdb: {}
+  promdata: {}
+  alertdata: {}
+
+services:
+  postgres:
+    image: akr/postgres:17
+    build: { context: ../images/postgres }
+    <<: *hardening
+    user: postgres
+    networks: [z1_db, z2_app, z3_ory, z4_db]
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/akr/secrets/pg_superuser
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale-provider=builtin --builtin-locale=C.UTF-8"
+    command:
+      - postgres
+      - -c
+      - hba_file=/etc/postgresql/akr/pg_hba.conf
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/tls/server.crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/tls/server.key
+      - -c
+      - ssl_min_protocol_version=TLSv1.3
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=${AKR_PG_ARCHIVE_MODE:-on}
+      - -c
+      - archive_command=pgbackrest --stanza=akr archive-push %p
+      - -c
+      - archive_timeout=60
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgsocket:/var/run/postgresql
+      - backuprepo:/var/lib/pgbackrest
+      - ./config/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - ${AKR_TLS_DIR}:/run/akr/tls:ro
+      - ${AKR_SECRETS_DIR}/pg_superuser:/run/akr/secrets/pg_superuser:ro
+    tmpfs:
+      - /var/lib/postgresql/tls:uid=999,gid=999,mode=0700
+      - /tmp
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
+    <<: *hardening
+    user: valkey
+    networks: [z2_app, z4_cache]
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory-policy", "allkeys-lru"]
+    tmpfs: [/data, /tmp]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  openbao:
+    image: openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf
+    <<: *hardening
+    networks: [z1_bao, z2_app]
+    environment:
+      SKIP_SETCAP: "true"
+      SKIP_CHOWN: "true"
+      BAO_ADDR: https://127.0.0.1:8200
+      BAO_CACERT: /run/akr/tls/ca.crt
+    command: ["server", "-config=/openbao/config/openbao.hcl"]
+    volumes:
+      - baodata:/openbao/file
+      - ./config/openbao/openbao.hcl:/openbao/config/openbao.hcl:ro
+      - ${AKR_TLS_DIR}:/run/akr/tls:ro
+    tmpfs: [/tmp]
+    healthcheck:
+      # `bao status` exits 2 while sealed and 1 when the server cannot be reached.
+      test: ["CMD-SHELL", "bao status >/dev/null 2>&1; [ $$? -ne 1 ]"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # The object store: the MinIO code line as the AKR Silo build, compiled and signed by the release
+  # pipeline (deploy/images.lock). Only the S3 guard reaches it.
+  objectstore:
+    image: akr/objectstore:RELEASE.2026-09-16T00-00-00Z
+    <<: *hardening
+    user: "10001:10001"
+    networks: [z2_store]
+    environment:
+      MINIO_BROWSER: "off"
+      MINIO_UPDATE: "off"
+      MINIO_ROOT_USER_FILE: /run/akr/secrets/store_root_user
+      MINIO_ROOT_PASSWORD_FILE: /run/akr/secrets/store_root_password
+    command: ["server", "/data", "--address", ":9000", "--certs-dir", "/tmp/certs"]
+    volumes:
+      - storedata:/data
+      - ${AKR_SECRETS_DIR}/store_root_user:/run/akr/secrets/store_root_user:ro
+      - ${AKR_SECRETS_DIR}/store_root_password:/run/akr/secrets/store_root_password:ro
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # The only way to the object store. It refuses the store's own extensions and every management call.
+  s3guard:
+    image: akr/akr-s3guard:${AKR_RELEASE:-dev}
+    build: { <<: *akr-build, target: akr-s3guard }
+    <<: *akr
+    networks: [z2_store, z2_app, z3_edge, z5_mgmt]
+    environment:
+      AKR_ENV: ${AKR_ENV:-production}
+      AKR_S3_UPSTREAM: http://objectstore:9000
+      AKR_S3GUARD_INSTALLER_CIDRS: ${AKR_S3GUARD_INSTALLER_CIDRS:-}
+      OTLP_ENDPOINT: http://otel-collector:4318
+    depends_on:
+      objectstore: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/akr-s3guard", "healthcheck"]
+      <<: *akr-health
+
+  akr-api:
+    image: akr/akr-api:${AKR_RELEASE:-dev}
+    build: { <<: *akr-build, target: akr-api }
+    <<: *akr
+    networks: [z2_app, z3_edge, z3_ory, z5_mgmt]
+    environment:
+      <<: *akr-env
+      VALKEY_URL: redis://valkey:6379
+      S3_ENDPOINT: http://s3guard:9000
+    volumes:
+      - ${AKR_TLS_DIR}/ca.crt:/run/akr/tls/ca.crt:ro
+      - ${AKR_SECRETS_DIR}/bao_akr-api_role_id:/run/akr/approle/role_id:ro
+      - ${AKR_SECRETS_DIR}/bao_akr-api_secret_id:/run/akr/approle/secret_id:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+      openbao: { condition: service_healthy }
+      s3guard: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/akr-api", "healthcheck"]
+      <<: *akr-health
+
+  akr-worker:
+    image: akr/akr-worker:${AKR_RELEASE:-dev}
+    build: { <<: *akr-build, target: akr-worker }
+    <<: *akr
+    networks: [z2_app, z5_mgmt]
+    environment:
+      <<: *akr-env
+      VALKEY_URL: redis://valkey:6379
+      S3_ENDPOINT: http://s3guard:9000
+    volumes:
+      - ${AKR_TLS_DIR}/ca.crt:/run/akr/tls/ca.crt:ro
+      - ${AKR_SECRETS_DIR}/bao_akr-worker_role_id:/run/akr/approle/role_id:ro
+      - ${AKR_SECRETS_DIR}/bao_akr-worker_secret_id:/run/akr/approle/secret_id:ro
+      - backupmarker:/var/lib/akr/backup:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+      openbao: { condition: service_healthy }
+      s3guard: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/akr-worker", "healthcheck"]
+      <<: *akr-health
+
+  # The only container on z1_cbs, at the address the host rules name.
+  akr-ingestd:
+    image: akr/akr-ingestd:${AKR_RELEASE:-dev}
+    build: { <<: *akr-build, target: akr-ingestd }
+    <<: *akr
+    networks:
+      z1_cbs: { ipv4_address: 10.247.71.2 }
+      z1_db: {}
+      z1_bao: {}
+      z5_mgmt: {}
+    environment:
+      <<: *akr-env
+    volumes:
+      - ${AKR_TLS_DIR}/ca.crt:/run/akr/tls/ca.crt:ro
+      - ${AKR_SECRETS_DIR}/bao_akr-ingestd_role_id:/run/akr/approle/role_id:ro
+      - ${AKR_SECRETS_DIR}/bao_akr-ingestd_secret_id:/run/akr/approle/secret_id:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      openbao: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/akr-ingestd", "healthcheck"]
+      <<: *akr-health
+
+  # The decision gateway of phase 29. Not started unless the profile is named.
+  akr-assess:
+    image: akr/akr-assess:${AKR_RELEASE:-dev}
+    build: { <<: *akr-build, target: akr-assess }
+    <<: *akr
+    profiles: [phase2]
+    networks: [z4_gateway, z4_db, z4_cache, z1_bao, z5_mgmt]
+    environment:
+      <<: *akr-env
+      VALKEY_URL: redis://valkey:6379
+    volumes:
+      - ${AKR_TLS_DIR}/ca.crt:/run/akr/tls/ca.crt:ro
+      - ${AKR_SECRETS_DIR}/bao_akr-assess_role_id:/run/akr/approle/role_id:ro
+      - ${AKR_SECRETS_DIR}/bao_akr-assess_secret_id:/run/akr/approle/secret_id:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+      openbao: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/akr-assess", "healthcheck"]
+      <<: *akr-health
+
+  # The edge: TLS from the bank's CA, the API, the static frontend, and presigned GETs through the guard.
+  caddy:
+    image: caddy@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    <<: *hardening
+    user: "65532:65532"
+    networks: [z3_edge]
+    # The image's binary carries the file capability cap_net_bind_service, and the kernel refuses to run
+    # such a file when the capability is outside the bounding set. The process still gains nothing:
+    # no-new-privileges discards the file capability at exec.
+    cap_add: [NET_BIND_SERVICE]
+    # The edge listens on 443 as a user that is not root.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    environment:
+      AKR_PUBLIC_HOST: ${AKR_PUBLIC_HOST:-localhost}
+      XDG_DATA_HOME: /tmp/caddy/data
+      XDG_CONFIG_HOME: /tmp/caddy/config
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    volumes:
+      - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${AKR_TLS_DIR}/edge.crt:/run/akr/tls/edge.crt:ro
+      - ${AKR_TLS_DIR}/edge.key:/run/akr/tls/edge.key:ro
+      - ${AKR_WWW_DIR:-./www}:/srv/www:ro
+      - ${AKR_BRANDING_FILE:-../branding.json}:/srv/branding/branding.json:ro
+    tmpfs: [/tmp]
+    depends_on:
+      akr-api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--no-check-certificate", "-O", "/dev/null", "https://127.0.0.1/edge-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Kratos and Hydra start from phase 01, which adds their databases, their configuration and their
+  # secrets; until then the profile keeps them out of `up`.
+  kratos-migrate:
+    image: oryd/kratos@sha256:481bfc3022e5427ffb94570eef84480b99c9f8158388378c57df8c1a4a104b3d
+    <<: *hardening
+    profiles: [identity]
+    restart: "no"
+    networks: [z3_ory]
+    command: ["migrate", "sql", "--read-from-env", "--yes", "--config", "/etc/akr/kratos/kratos.yml"]
+    env_file: [{ path: "${AKR_SECRETS_DIR}/kratos.env", required: false }]
+    volumes:
+      - ./kratos:/etc/akr/kratos:ro
+      - ${AKR_TLS_DIR}/ca.crt:/run/akr/tls/ca.crt:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  kratos:
+    image: oryd/kratos@sha256:481bfc3022e5427ffb94570eef84480b99c9f8158388378c57df8c1a4a104b3d
+    <<: *hardening
+    profiles: [identity]
+    networks: [z3_ory]
+    command: ["serve", "--config", "/etc/akr/kratos/kratos.yml"]
+    env_file: [{ path: "${AKR_SECRETS_DIR}/kratos.env", required: false }]
+    volumes:
+      - ./kratos:/etc/akr/kratos:ro
+      - ${AKR_TLS_DIR}/ca.crt:/run/akr/tls/ca.crt:ro
+    tmpfs: [/tmp]
+    depends_on:
+      kratos-migrate: { condition: service_completed_successfully }
+
+  hydra-migrate:
+    image: oryd/hydra@sha256:ad53a123ddf869fc23ea74f3d76b47e2966dc52f559e93ab31f81440f4d60c5e
+    <<: *hardening
+    profiles: [identity]
+    restart: "no"
+    networks: [z3_ory]
+    command: ["migrate", "sql", "--read-from-env", "--yes", "--config", "/etc/akr/hydra/hydra.yml"]
+    env_file: [{ path: "${AKR_SECRETS_DIR}/hydra.env", required: false }]
+    volumes:
+      - ./hydra:/etc/akr/hydra:ro
+      - ${AKR_TLS_DIR}/ca.crt:/run/akr/tls/ca.crt:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  hydra:
+    image: oryd/hydra@sha256:ad53a123ddf869fc23ea74f3d76b47e2966dc52f559e93ab31f81440f4d60c5e
+    <<: *hardening
+    profiles: [identity]
+    networks: [z3_ory, z3_edge]
+    command: ["serve", "all", "--config", "/etc/akr/hydra/hydra.yml"]
+    env_file: [{ path: "${AKR_SECRETS_DIR}/hydra.env", required: false }]
+    volumes:
+      - ./hydra:/etc/akr/hydra:ro
+      - ${AKR_TLS_DIR}/ca.crt:/run/akr/tls/ca.crt:ro
+    tmpfs: [/tmp]
+    depends_on:
+      hydra-migrate: { condition: service_completed_successfully }
+
+  # Documents to PDF, from phase 02. Chromium runs no script and fetches nothing but the files it is given.
+  gotenberg:
+    image: gotenberg/gotenberg@sha256:f29984bd1e226bf1b93ba90af06000afa8b315853e99d27b9aaa41b93f15c769
+    <<: *hardening
+    networks: [z2_app]
+    command:
+      - gotenberg
+      - --chromium-disable-javascript=true
+      - --chromium-allow-list=^file:///tmp/.*
+      - --api-timeout=120s
+    tmpfs: ["/tmp:exec", /home/gotenberg]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Malware scanning of uploads, from phase 02. Signatures come from the bank's mirror or the bundle
+  # into the clamdb volume; the container itself has no way out.
+  clamd:
+    image: clamav/clamav@sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0
+    <<: *hardening
+    user: "100:101"
+    networks: [z2_app]
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "true"
+      CLAMAV_NO_MILTERD: "true"
+    volumes:
+      - clamdb:/var/lib/clamav
+    tmpfs: [/tmp, /run/clamav, /var/log/clamav, /run/lock]
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # Backups start when the install has pointed the backuprepo volume at the backup server.
+  pgbackrest:
+    image: akr/postgres:17
+    <<: *hardening
+    profiles: [backup]
+    user: postgres
+    networks: [z2_app]
+    entrypoint: ["/bin/sh", "/etc/akr/backup/pgbackrest-schedule.sh"]
+    environment:
+      AKR_BACKUP_PASSPHRASE_FILE: /run/akr/secrets/backup_passphrase
+    volumes:
+      - pgdata:/var/lib/postgresql/data:ro
+      - pgsocket:/var/run/postgresql
+      - backuprepo:/var/lib/pgbackrest
+      - backupmarker:/var/lib/akr/backup
+      - ./config/pgbackrest:/etc/akr/backup:ro
+      - ./config/pgbackrest/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - ${AKR_SECRETS_DIR}/backup_passphrase:/run/akr/secrets/backup_passphrase:ro
+    tmpfs: [/tmp, /var/log/pgbackrest, /var/spool/pgbackrest]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  restic:
+    image: restic/restic@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510
+    <<: *hardening
+    profiles: [backup]
+    user: "10001:10001"
+    networks: [z2_app]
+    entrypoint: ["/bin/sh", "/etc/akr/backup/restic-schedule.sh"]
+    environment:
+      RESTIC_REPOSITORY: /var/lib/backup-repo/restic
+      RESTIC_PASSWORD_FILE: /run/akr/secrets/backup_passphrase
+      RESTIC_CACHE_DIR: /tmp/restic-cache
+    volumes:
+      - storedata:/data/store:ro
+      - backuprepo:/var/lib/backup-repo
+      - ./config/restic:/etc/akr/backup:ro
+      - ${AKR_SECRETS_DIR}/backup_passphrase:/run/akr/secrets/backup_passphrase:ro
+    tmpfs: [/tmp]
+
+  # A streaming replica on the same server in development; on its own server in production.
+  postgres-standby:
+    image: akr/postgres:17
+    <<: *hardening
+    profiles: [standby]
+    user: postgres
+    networks: [z2_app]
+    entrypoint: ["/bin/sh", "/etc/akr/standby/standby.sh"]
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      AKR_PRIMARY_HOST: postgres
+      AKR_REPLICATION_PASSWORD_FILE: /run/akr/secrets/db_akr_replication
+    volumes:
+      - pgstandby:/var/lib/postgresql/data
+      - ./config/postgres:/etc/akr/standby:ro
+      - ${AKR_TLS_DIR}:/run/akr/tls:ro
+      - ${AKR_SECRETS_DIR}/db_akr_replication:/run/akr/secrets/db_akr_replication:ro
+    tmpfs:
+      - /var/run/postgresql:uid=999,gid=999
+      - /var/lib/postgresql/tls:uid=999,gid=999,mode=0700
+      - /tmp
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  otel-collector:
+    image: otel/opentelemetry-collector@sha256:310a800ad69ee430e7c541796852a242c9c7db97aaad4daa5ccf843c525fbdb2
+    <<: *hardening
+    networks: [z5_mgmt]
+    command: ["--config=/etc/otel/collector.yaml"]
+    volumes:
+      - ../observability/otel-collector.yaml:/etc/otel/collector.yaml:ro
+
+  jaeger:
+    image: jaegertracing/jaeger@sha256:836b967b5abcf1f7758066aa6b348619267a2f1459f72d472840570f9bd88a17
+    <<: *hardening
+    networks: [z5_mgmt]
+    tmpfs: [/tmp]
+
+  prometheus:
+    image: prom/prometheus@sha256:b2a413d5a03ea6a76782a508d1c7947440bba3b973931a25676e278431891b01
+    <<: *hardening
+    networks: [z5_mgmt]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${AKR_METRICS_RETENTION:-30d}
+    volumes:
+      - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/rules:/etc/prometheus/rules:ro
+      - promdata:/prometheus
+
+  alertmanager:
+    image: prom/alertmanager@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
+    <<: *hardening
+    networks: [z5_mgmt]
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ../observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertdata:/alertmanager
+
+  # Container logs (JSON lines, already redacted by the binaries) to the bank's log collector. It starts
+  # when the install declares the collector.
+  log-forwarder:
+    image: fluent/fluent-bit@sha256:c5542543523c9678398dd78d927c05e8425ec15b038f226b67b3b019b1a70845
+    <<: *hardening
+    profiles: [siem]
+    user: "0:0"
+    networks: [z5_mgmt]
+    command: ["/fluent-bit/bin/fluent-bit", "-c", "/etc/akr/fluent-bit.yaml"]
+    environment:
+      AKR_COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-akr-tms}
+      AKR_SIEM_SYSLOG_HOST: ${AKR_SIEM_SYSLOG_HOST:-}
+      AKR_SIEM_SYSLOG_PORT: ${AKR_SIEM_SYSLOG_PORT:-6514}
+    volumes:
+      - ../observability/fluent-bit.yaml:/etc/akr/fluent-bit.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    tmpfs: [/tmp]

@@ -1,0 +1,27 @@
+[package]
+name = "akr-db"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+akr-common.workspace = true
+akr-crypto.workspace = true
+akr-domain.workspace = true
+akr-jobs.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+# The one crate that opens connections and holds SQL text. TLS is rustls over aws-lc-rs, the provider the
+# HTTP client already brings, so the binaries link one TLS stack.
+sqlx = { workspace = true, features = ["runtime-tokio", "tls-rustls-aws-lc-rs", "postgres", "uuid", "chrono", "json", "derive", "macros", "migrate"] }
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+

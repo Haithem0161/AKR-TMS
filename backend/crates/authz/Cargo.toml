@@ -1,0 +1,20 @@
+[package]
+name = "akr-authz"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+akr-common.workspace = true
+akr-domain.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

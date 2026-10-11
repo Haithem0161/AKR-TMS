@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"due!\" FROM admin.timers\n               WHERE fired_at IS NULL AND cancelled_at IS NULL AND fire_at <= now()",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "due!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "49900bc07020ac48345370653748841951fb1e620de0ae9223df8f1af066fb07"
+}

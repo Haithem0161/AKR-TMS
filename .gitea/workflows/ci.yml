@@ -1,0 +1,69 @@
+# Every push and every pull request. The jobs run on the vendor's build runner (label `akr-build`), which
+# carries Docker with compose, rustup, cargo-deny, cargo-audit, sqlx-cli, Node 22 with pnpm, and Python
+# 3.11 or later. The toolchain version comes from backend/rust-toolchain.toml.
+#
+# Each job starts its own stack and removes it at the end: a runner is used by one job at a time.
+name: ci
+
+on:
+  push:
+    branches: [main, "release/**"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: never
+  SQLX_OFFLINE: "true"
+
+jobs:
+  lint:
+    runs-on: akr-build
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # The workspace lints (SP-70) make clippy fail on unwrap, expect, panics and lossy casts; the
+      # release profile keeps overflow checks on.
+      - run: make lint
+      - run: tools/ci/check_driver_isolation.sh
+      - run: grep -q '^overflow-checks = true' backend/Cargo.toml
+
+  supply-chain:
+    runs-on: akr-build
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: make deny
+      - run: cargo audit --file backend/Cargo.lock --deny warnings
+      - run: python3 tools/ci/check_waivers.py
+      - run: python3 tools/ci/check_images_lock.py
+
+  test:
+    runs-on: akr-build
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # PostgreSQL 17 (builtin C.UTF-8), Valkey, the pinned OpenBao, the object store and the guard,
+      # as one throwaway compose project.
+      - run: make up
+      - run: make bao-dev
+      - run: make db
+      - run: make migrate
+      # A second run applies nothing.
+      - run: make migrate
+      - run: make check
+      - run: make store-dev
+      - run: make prepare-check
+      # Includes the schema checks, the redaction golden test and the OpenBao parity suite.
+      - run: make test-all
+      - run: make store-conformance
+      - run: make zone-check
+      - if: always()
+        run: make down
+
+  frontend:
+    runs-on: akr-build
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: pnpm --dir frontend install --frozen-lockfile
+      # Drift: the committed client must equal a fresh generation.
+      - run: make generate-api
+      - run: git diff --exit-code -- frontend/openapi.json frontend/src/api
+      - run: tools/ci/check_frontend_licences.sh
+      - run: pnpm --dir frontend run typecheck
+      - run: pnpm --dir frontend run build

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM admin.timers\n             WHERE id IN (\n                 SELECT id FROM admin.timers\n                 WHERE fired_at < now() - $1::bigint * interval '1 day'\n                    OR cancelled_at < now() - $1::bigint * interval '1 day'\n                 LIMIT $2\n                 FOR UPDATE SKIP LOCKED)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e7996545efd6b98758906fc397aea8203dd3536f029501ba0f67fc48c56e572b"
+}

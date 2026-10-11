@@ -1,0 +1,59 @@
+[package]
+name = "akr-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "akr_api"
+path = "src/lib.rs"
+
+[[bin]]
+name = "akr-api"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[features]
+# Lets a test stop a request between the handler and the commit. The crate enables it for its own tests
+# only (the dev-dependency below); a release build never carries it.
+fault-injection = []
+
+[dependencies]
+akr-audit.workspace = true
+akr-authz.workspace = true
+akr-common.workspace = true
+akr-crypto.workspace = true
+akr-db.workspace = true
+akr-domain.workspace = true
+akr-jobs.workspace = true
+akr-objectstore.workspace = true
+akr-telemetry.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+bytes.workspace = true
+fred = { workspace = true, features = ["subscriber-client"] }
+http.workspace = true
+http-body-util.workspace = true
+metrics.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx = { workspace = true, features = ["postgres"] }
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+utoipa-swagger-ui.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+akr-api = { path = ".", features = ["fault-injection"] }
+sqlx = { workspace = true, features = ["runtime-tokio", "postgres", "macros", "migrate"] }
+tower.workspace = true

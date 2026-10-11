@@ -92,6 +92,12 @@ is null and cancelled_at is null`. Retention follows the owner.
 
 TTL 7 days (assessment API: per bank setting). Same key, different hash -> 422 `E_IDEMPOTENCY_REUSE`. Shape from DBS migrations 0003 and 0024 (docs/plan/research.md DR-21). R12.
 
+### data_keys
+| id uuid pk | family text | period text (YYYY-MM) | wrapped text (transit ciphertext of the key) | created_at | unique (family, period) |
+
+One data key per key family and month, wrapped by the OpenBao KEK `akr-kek`; a sealed value names its row by id. Rows
+are inserted, never changed or deleted by a service (docs/plan/research.md DR-424). R9.
+
 ### settings / feature_flags
 | key text pk | value jsonb | value_type text | floor jsonb null ({min}, {max}, basis) | governed bool | label jsonb | updated_by fk null | updated_at | version |  (settings; `floor` holds the regulatory limit)
 | key text pk | enabled bool | scope jsonb (branches, roles) | label jsonb | updated_by | updated_at | version |  (feature_flags)

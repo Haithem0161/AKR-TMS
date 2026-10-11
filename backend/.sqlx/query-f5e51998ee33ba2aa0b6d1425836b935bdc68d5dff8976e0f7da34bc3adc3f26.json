@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT request_hash, response_status, response_content_type, response_body\n             FROM admin.idempotency_keys\n             WHERE principal_id = $1 AND key = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
+        "name": "response_status",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "response_content_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "response_body",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "f5e51998ee33ba2aa0b6d1425836b935bdc68d5dff8976e0f7da34bc3adc3f26"
+}

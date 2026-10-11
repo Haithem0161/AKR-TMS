@@ -1,0 +1,74 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT schema_name, table_name, column_name,\n                      classification AS \"classification: Classification\", encrypted, keyed_hash, note\n               FROM admin.column_classification\n               WHERE schema_name = $1 AND table_name = $2\n               ORDER BY column_name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "schema_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "table_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "column_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "classification: Classification",
+        "type_info": {
+          "Custom": {
+            "name": "data_classification",
+            "kind": {
+              "Enum": [
+                "public",
+                "internal",
+                "personal",
+                "financial",
+                "detection-logic",
+                "secret-str",
+                "card"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "encrypted",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "keyed_hash",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "note",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "72174ee410b64135ca23c42f7f7b9d84dbff2a5f7cd3b533a4b33c76df654e29"
+}

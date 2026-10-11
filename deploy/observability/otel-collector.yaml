@@ -1,0 +1,24 @@
+# Traces from the binaries (OTLP over HTTP) to Jaeger. Metrics are scraped by Prometheus from each
+# binary's management listener, so nothing but traces passes here.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+  batch: {}
+
+exporters:
+  otlphttp/jaeger:
+    endpoint: http://jaeger:4318
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/jaeger]

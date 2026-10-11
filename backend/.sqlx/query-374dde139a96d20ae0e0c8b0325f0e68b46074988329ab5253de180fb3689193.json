@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE admin.timers SET cancelled_at = now()\n             WHERE owner_kind = $1 AND owner_id = $2 AND kind = $3\n               AND fired_at IS NULL AND cancelled_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "374dde139a96d20ae0e0c8b0325f0e68b46074988329ab5253de180fb3689193"
+}

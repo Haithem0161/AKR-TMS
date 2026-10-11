@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT key, value, value_type AS \"value_type: SettingValueType\",\n                      floor AS \"floor: Json<SettingFloor>\", governed, label AS \"label: Json<I18nText>\",\n                      updated_by, updated_at, version\n               FROM admin.settings\n               ORDER BY key",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "value",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 2,
+        "name": "value_type: SettingValueType",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "floor: Json<SettingFloor>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 4,
+        "name": "governed",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "label: Json<I18nText>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "version",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "96b1678838c2956f6dcc70ef6158bf2ec34c865ad9411ec1e22be6243b126cca"
+}

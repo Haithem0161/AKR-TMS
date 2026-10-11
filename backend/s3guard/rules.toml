@@ -1,0 +1,62 @@
+# The request shapes akr-s3guard refuses, and the published advisory each one neutralises (TS-22).
+#
+# This file is versioned with the store build: when the pinned build changes, every advisory fixed in it is
+# checked against this table and the security regression suite runs with and without the guard. A rule
+# stays after its advisory is fixed upstream, because the product never sends the request it refuses.
+#
+# The ids are the values of the `rule` label on akr_s3guard_rejected_total and of the x-akr-s3guard-rule
+# header on a refused request. The guard refuses to start when this file and its code name different rules.
+
+store = "Silo RELEASE.2026-09-16T00-00-00Z"
+
+[[rule]]
+id = "s3_select"
+rejects = "the `select` and `select-type` query parameters (S3 Select)"
+advisories = ["CVE-2026-39414"]
+
+[[rule]]
+id = "snowball_auto_extract"
+rejects = "the X-Amz-Meta-Snowball-Auto-Extract header, and any header naming snowball"
+advisories = ["CVE-2026-40344"]
+
+[[rule]]
+id = "unsigned_payload_trailer"
+rejects = "x-amz-content-sha256: STREAMING-UNSIGNED-PAYLOAD-TRAILER"
+advisories = ["CVE-2026-40344", "CVE-2026-41145"]
+
+[[rule]]
+id = "query_credentials_on_write"
+rejects = "credentials or a signature in the query of any method other than GET and HEAD (no presigned writes)"
+advisories = ["CVE-2026-41145", "SN-2026-011", "SN-2026-012"]
+
+[[rule]]
+id = "store_internal_header"
+rejects = "any client header beginning X-Minio-, and X-Amz-Bucket-Replication-Status"
+advisories = ["CVE-2026-34204", "SN-2026-008"]
+
+[[rule]]
+id = "unsigned_amz_header"
+rejects = "an x-amz-* header that the request's SignedHeaders list does not name"
+advisories = ["SN-2026-011"]
+
+[[rule]]
+id = "admin_path"
+rejects = "admin, console, internode, health and metrics paths under /minio, and STS (POST / or an Action parameter)"
+advisories = ["CVE-2026-33322", "CVE-2026-33419", "CVE-2026-42600"]
+
+# The allow-list. These three name no advisory: they are what keeps a future flaw out of reach.
+
+[[rule]]
+id = "operation_not_allowed"
+rejects = "every S3 operation the product does not use, and every request the guard and the store could read differently"
+advisories = []
+
+[[rule]]
+id = "delete_outside_quarantine"
+rejects = "DELETE of an object in any bucket other than akr-quarantine"
+advisories = []
+
+[[rule]]
+id = "bucket_write_outside_installer"
+rejects = "bucket creation and object-lock configuration from outside the installer's network"
+advisories = []

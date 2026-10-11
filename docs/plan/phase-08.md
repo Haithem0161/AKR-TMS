@@ -515,7 +515,8 @@ The answer for a person outside an object's access list: nothing.
 check limits (through the profile and run responses), the declaration review bound (phase 06); `me.preferences`.
 Install-time: the bank's name in Arabic and English, which X1 needs before sign-in, comes from `/branding.json`, a
 static file Caddy serves from the installation's `deploy/branding.json` (written at installation, no API, no
-secret); the bank's logo arrives with the `brand.bank_logo` setting in P1 (DESIGN-SYSTEM 12), and until then the
+secret; phase 00 section 7.38 built the route and fixed the shape: `{ "bank_name": { "ar": "...", "en": "..." } }`,
+with `AKR_BRANDING_FILE` naming the file that is mounted); the bank's logo arrives with the `brand.bank_logo` setting in P1 (DESIGN-SYSTEM 12), and until then the
 header shows the name only.
 
 ## 4. Infrastructure Updates

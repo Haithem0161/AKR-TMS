@@ -1,0 +1,90 @@
+# Release branches only, after `ci` has passed on the same commit. Protected branches and a second
+# approver are set on the repository; nothing here can be started from a fork.
+#
+# Beside what `ci` needs, the runner carries cargo-auditable, cargo-cyclonedx, Syft, Trivy, cosign and
+# Go (for the Silo build). The signing key never leaves the vendor's KMS: cosign is given a key
+# reference, and the KMS asks two people before it signs (SP-73).
+name: release
+
+on:
+  push:
+    branches: ["release/**"]
+
+env:
+  CARGO_TERM_COLOR: never
+  SQLX_OFFLINE: "true"
+  AKR_RELEASE: ${{ github.ref_name }}
+  HARBOR: ${{ vars.VENDOR_HARBOR }}
+  COSIGN_KEY: ${{ vars.VENDOR_KMS_KEY }}
+
+jobs:
+  images:
+    runs-on: akr-build
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: python3 tools/ci/check_images_lock.py
+      # The Dockerfile builds every binary with cargo-auditable on the pinned toolchain image and
+      # copies each onto the pinned distroless base, as a user that is not root.
+      - run: docker compose --profile phase2 build
+      - run: mkdir -p out/sbom
+      # One bill of materials per binary, one for the frontend packages, one per image (CycloneDX),
+      # each component with its maintainer and country where the registry states them (VO-07, TS-37).
+      - run: cd backend && cargo cyclonedx --format json --all --override-filename bom
+      - run: |
+          for manifest in backend/*/bom.json backend/crates/*/bom.json; do
+              cp "$manifest" "out/sbom/$(basename "$(dirname "$manifest")").cdx.json"
+          done
+      - run: syft scan dir:frontend --output cyclonedx-json=out/sbom/frontend.cdx.json
+      # A HIGH or CRITICAL finding fails the build unless the waiver register carries it.
+      - run: python3 tools/ci/check_waivers.py
+      - run: python3 tools/ci/waiver_exports.py trivyignore out/trivyignore.yaml
+      - run: |
+          for image in $(docker compose --profile phase2 config --images | sort -u); do
+              name="$(echo "$image" | tr '/:@' '___')"
+              syft scan "$image" --output "cyclonedx-json=out/sbom/image-$name.cdx.json"
+              trivy image --exit-code 1 --severity HIGH,CRITICAL --ignorefile out/trivyignore.yaml "$image"
+          done
+      - run: |
+          for image in $(docker compose --profile phase2 config --images | grep '^akr/' | sort -u); do
+              docker tag "$image" "$HARBOR/$image"
+              docker push "$HARBOR/$image"
+              cosign sign --yes --key "$COSIGN_KEY" "$HARBOR/$image"
+          done
+
+  object-store:
+    runs-on: akr-build
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # The Silo tag is built from source and compared with Silo's published checksums and provenance
+      # before anything runs against it.
+      - run: deploy/images/objectstore/build.sh
+      - run: make up
+      - run: make store-dev
+      # The WORM conformance suite and the security regression suite, through the guard and without it
+      # (TS-22).
+      - run: make store-conformance
+      - run: make store-conformance-direct
+      - run: cd backend && cargo test --locked -p akr-objectstore -p akr-s3guard -- --include-ignored
+      - if: always()
+        run: make down
+
+  bundle:
+    needs: [images, object-store]
+    runs-on: akr-build
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # The staged tree: migrations, the compose bundle, docs, SBOMs with the VEX statement and their
+      # diff against the previous release, notices, test evidence, release notes and the rollback plan.
+      - run: tools/ci/stage_bundle.sh out/stage out/images
+      - run: |
+          cargo run --locked --release --manifest-path backend/Cargo.toml -p akr-ctl -- bundle build \
+              --source out/stage --images-layout out/images --out "out/akr-tms-$AKR_RELEASE" \
+              --release "$AKR_RELEASE"
+      # The manifest and every image are signed by the vendor key (TS-30, SP-66, SP-74).
+      - run: cosign sign-blob --yes --key "$COSIGN_KEY" --output-signature "out/akr-tms-$AKR_RELEASE/manifest.json.sig" "out/akr-tms-$AKR_RELEASE/manifest.json"
+      - run: |
+          cargo run --locked --release --manifest-path backend/Cargo.toml -p akr-ctl -- bundle verify \
+              "out/akr-tms-$AKR_RELEASE" --pubkey "$VENDOR_PUBKEY" --fingerprint "$VENDOR_FINGERPRINT"
+        env:
+          VENDOR_PUBKEY: ${{ vars.VENDOR_PUBKEY_FILE }}
+          VENDOR_FINGERPRINT: ${{ vars.VENDOR_KEY_FINGERPRINT }}

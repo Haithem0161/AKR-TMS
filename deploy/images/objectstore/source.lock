@@ -1,0 +1,11 @@
+# The source of the AKR object store image: the Silo build of the MinIO code line (DR-02), compiled by
+# the release pipeline and never pulled as a binary.
+#
+# build.sh refuses to run while a value below is empty. They are set, and reviewed by two people, when
+# the Silo release is pinned (RQ-03); the second source named in ARCHITECTURE.md D5 is pinned the same
+# way before it is ever used.
+SILO_TAG=RELEASE.2026-09-16T00-00-00Z
+SILO_REPOSITORY=
+SILO_COMMIT=
+SILO_SOURCE_SHA256=
+GO_IMAGE=

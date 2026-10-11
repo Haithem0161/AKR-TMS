@@ -108,7 +108,7 @@ parallel run of ROADMAP.md (P1 exit) is operational and has no phase file.
 
 | Phase | New tables |
 |-|-|
-| 00 | `jobs`, `outbox`, `timers`, `idempotency_keys`, `settings`, `feature_flags`, `column_classification`, `retention_assignment` |
+| 00 | `jobs`, `outbox`, `timers`, `idempotency_keys`, `data_keys`, `settings`, `feature_flags`, `column_classification`, `retention_assignment` |
 | 01 | `users`, `role_grants` (bootstrap rows only until 04), `delegations`, `pools`, `stepup_assertions`, `api_tokens`, `password_history` |
 | 02 | `audit_log` (partitioned), `access_event` (partitioned), `audit_anchors`, `evidence_objects`, `packs` |
 | 03 | `policy_bundles`, `branches`, `purpose_codes`, `credential_resets` (and `users.enabled_at`) |

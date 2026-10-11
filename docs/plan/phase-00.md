@@ -200,6 +200,18 @@ CREATE TABLE IF NOT EXISTS admin.idempotency_keys (
 );
 CREATE INDEX IF NOT EXISTS idx_idem_created ON admin.idempotency_keys (created_at);
 
+-- The registry of data keys (DR-424): one row per key family and month. `wrapped` is the 256-bit key as OpenBao
+-- transit ciphertext under akr-kek; the key itself exists only in process memory. Every sealed value names its
+-- row by id, so a row is never changed or deleted while a value sealed under it exists.
+CREATE TABLE IF NOT EXISTS admin.data_keys (
+    id          UUID PRIMARY KEY,      -- UUIDv7, app-side; carried by every value sealed under the key
+    family      TEXT NOT NULL CHECK (family ~ '^[a-z][a-z0-9-]*$'),
+    period      TEXT NOT NULL CHECK (period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),   -- the UTC month the key seals in
+    wrapped     TEXT NOT NULL CHECK (wrapped ~ '^vault:v[0-9]+:'),             -- transit ciphertext, never the key
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (family, period)
+);
+
 CREATE TABLE IF NOT EXISTS admin.settings (
     key         TEXT PRIMARY KEY CHECK (key ~ '^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$'),
     value       JSONB NOT NULL,
@@ -227,6 +239,7 @@ CREATE TABLE IF NOT EXISTS admin.feature_flags (
 -- The idempotency ledger holds copies of mutation responses: application role only, never akr_readonly
 -- (DBS migration 0019 lesson). Settings and flags are read by every service role.
 GRANT SELECT, INSERT, UPDATE, DELETE ON admin.idempotency_keys TO akr_app;
+GRANT SELECT, INSERT ON admin.data_keys TO akr_app;   -- wrapped keys only; no UPDATE, no DELETE
 GRANT SELECT, UPDATE ON admin.settings, admin.feature_flags TO akr_app;   -- rows are seeded by migrations only
 GRANT SELECT ON admin.settings, admin.feature_flags TO akr_ingest;
 
@@ -314,11 +327,15 @@ CREATE TABLE IF NOT EXISTS admin.retention_assignment (
 );
 
 GRANT SELECT ON admin.column_classification, admin.retention_assignment TO akr_app, akr_ingest, akr_readonly;
+-- Every binary loads the classification register at start, to keep classified values out of its logs.
+GRANT SELECT ON admin.column_classification TO akr_assess;
 
--- The one non-internal column of this phase first, then the rest as internal.
+-- The two non-internal columns of this phase first, then the rest as internal.
 INSERT INTO admin.column_classification (schema_name, table_name, column_name, classification, encrypted, note)
 VALUES ('admin', 'idempotency_keys', 'response_body', 'secret-str', TRUE,
-        'Copy of a mutation response; may carry suspicion-tier content')
+        'Copy of a mutation response; may carry suspicion-tier content'),
+       ('admin', 'data_keys', 'wrapped', 'secret-str', FALSE,
+        'A data key wrapped by the OpenBao KEK (transit ciphertext); never serialised')
 ON CONFLICT (schema_name, table_name, column_name) DO NOTHING;
 
 INSERT INTO admin.column_classification (schema_name, table_name, column_name, classification)
@@ -332,6 +349,7 @@ FROM (VALUES
                                   'created_at','fired_at','cancelled_at']),
   ('idempotency_keys',      ARRAY['principal_id','key','endpoint','request_hash','response_status',
                                   'response_content_type','created_at','completed_at']),
+  ('data_keys',             ARRAY['id','family','period','created_at']),
   ('settings',              ARRAY['key','value','value_type','floor','governed','label','updated_by','updated_at',
                                   'version']),
   ('feature_flags',         ARRAY['key','enabled','scope','label','updated_by','updated_at','version']),
@@ -346,6 +364,7 @@ INSERT INTO admin.retention_assignment (schema_name, table_name, retention_class
  ('admin', 'outbox',                'R12', 'age',        'dispatched_at','Only dispatched rows; an undispatched row is evidence that someone was not told'),
  ('admin', 'timers',                'R12', 'age',        'fired_at',     'Only fired or cancelled rows (cancelled_at for cancelled); timers.terminal_retention_days'),
  ('admin', 'idempotency_keys',      'R12', 'age',        'created_at',   'idempotency.ttl_days'),
+ ('admin', 'data_keys',             'R9',  'retirement', NULL,           'Kept while any value sealed under the key exists'),
  ('admin', 'settings',              'R9',  'retirement', NULL,           'Current values; change history is in the audit trail (R10)'),
  ('admin', 'feature_flags',         'R9',  'retirement', NULL,           'As settings'),
  ('admin', 'column_classification', 'R9',  'retirement', NULL,           NULL),
@@ -650,8 +669,9 @@ as code in `deploy/observability/` next to these metrics.
 |-|-|-|
 | `setting.updated` | `SettingsService::apply` (before, after, source) | setting key |
 | `flag.updated` | `FlagsService::update` (before, after) | flag key |
-| `restore_drill.recorded` | `akr-ctl ops record-restore-drill` | setting `ops.last_restore_drill_at` |
+| `restore_drill.recorded` | `akr-ctl ops record-restore-drill` (result, evidence_sha256, os_user, os_session) | setting `ops.last_restore_drill_at` |
 | `job.dead` | a job reaching `dead` (kind, attempts; no payload) | job id |
+| `ctl.command_run` | every `akr-ctl` command that changes the installation: `db provision`, `db migrate`, `store ...`, `bundle import`, `ops ...` (command, outcome, os_user, os_session) | `installation` |
 
 They go to the `TracingSink` stub in this phase; phase 02 swaps in the PostgreSQL writer and from then they persist.
 No HTTP mutation exists in this phase except the dev-only echo, which writes nothing.
@@ -695,7 +715,7 @@ Environment variables only for bootstrap (`AKR_ENV`, binds, OpenBao address and 
 | `restic` | restic (pinned) | `z2_app` | every 15 min: store drive directories (consistent snapshot) and OpenBao snapshots; repository passphrase held off the server |
 | `openbao` | OpenBao (pinned) | `z1_bao`, `z2_app` | raft storage; TLS listener; Shamir 3-of-5 in production; `make bao-dev` initialises 1-of-1 for development only |
 | `objectstore` | AKR Silo build (pinned tag, built and signed by our pipeline) | `z2_store` (internal) | `MINIO_BROWSER=off`; non-root; read-only root fs; no egress; reachable only from the guard |
-| `s3guard` | `akr-s3guard` | `z2_store`, `z2_app`, `z3_edge` | `z3_edge` only for presigned GET through the edge |
+| `s3guard` | `akr-s3guard` | `z2_store`, `z2_app`, `z3_edge`, `z5_mgmt` | `z3_edge` only for presigned GET through the edge; `z5_mgmt` for its metrics on 9101 and its traces (7.35) |
 | `valkey` | Valkey 9 (pinned) | `z2_app`, `z4_cache` | cache, rate limits, SSE fan-out; no persistence required |
 | `kratos`, `kratos-migrate` | Ory Kratos (pinned) | `z3_ory` (only the BFF in `akr-api` and `akr-ctl` reach it; phase 01 section 4) | containers up and healthy; flows and config in phase 01 |
 | `hydra`, `hydra-migrate` | Ory Hydra (pinned) | `z3_ory`, `z3_edge` | as Kratos |
@@ -783,8 +803,8 @@ drift check in CI. No tokens, shell or screens (phase 08). Backend and platform 
    - idempotency: a replay returns a byte-identical body with `x-idempotent-replay: true`; the same key with a
      different body -> 422 `E_IDEMPOTENCY_REUSE`; the same key from a different principal runs independently; 12
      concurrent identical requests -> exactly one execution and one ledger row, the others 409 or a replay; a handler
-     error leaves no row; an abandoned in-flight row older than the lease is taken over; the stored body is
-     ciphertext (it does not contain the plaintext bytes);
+     error leaves no row; a request that dies after the handler and before the commit leaves no row, and a retry runs
+     the handler once (7.17); the stored body is ciphertext (it does not contain the plaintext bytes);
    - jobs: enqueue inside a rolled-back transaction leaves no row; a handler error backs off and reaches `dead`
      after `max_attempts`; a killed worker's job is reclaimed after the lease and completes once; two enqueues with
      one coalesce key while queued -> one row; the scheduler run by two worker instances enqueues one job per slot;
@@ -1106,6 +1126,455 @@ From phase 25 on, `akr-ctl bundle build` (section 4, item 7) also writes `help/*
 
 ### 7.29 The failover drill key: CLI exemption and null seed (V-30-06-a, V-30-06-b, MEDIUM; DR-328; DR-413)
 From phase 30 on, the CLI-only exemption of section 3 covers two governed keys: `ops.last_restore_drill_at`, written by `akr-ctl ops record-restore-drill`, and `ops.last_failover_drill_at`, written by `akr-ctl ops record-failover-drill` (phase 30 section 3.9). Both writes go through `SettingsService::apply` with `ChangeSource::Direct`, and no other governed key is covered. The settings registry marks `ops.last_failover_drill_at` nullable until the first passed drill, as it marks `ops.last_restore_drill_at`, so the null seed of migration `0095` is allowed.
+
+Build pass (2026-10-11): gaps met while building this phase, fixed here in the same change (planning rule); DR-424.
+
+### 7.30 The data key registry (build gap, HIGH; DR-424)
+Section 3 says a data key is made once per family and month and unwrapped once, and that `Sealed` names its key by id,
+but no place held the wrapped keys. They are rows of `admin.data_keys` (section 1, migrations 0003 and 0004): id,
+family, period (`YYYY-MM`, UTC), `wrapped` (the transit ciphertext `vault:v<n>:...`), created_at; unique on (family,
+period); `akr_app` has SELECT and INSERT only; class R9, clock `retirement`. This follows the plan's own pattern for
+wrapped material (`evidence_objects.wrapped_dek` of phase 02, `signing_keys.wrapped_seed` of phase 29): the wrapped key
+travels with the data it protects, in the same backup, and no service writes to OpenBao.
+- The port is `akr_crypto::DataKeyStore { find(id); find_period(family, period); insert_if_absent(row) -> the row that
+  is there }`; the adapter is `db::PgDataKeyStore` (`INSERT ... ON CONFLICT (family, period) DO NOTHING`, then read).
+- A binary that may only unwrap (`akr-api`: transit decrypt) cannot make a key. `akr-worker` therefore calls
+  `OpenBaoCrypto::ensure_keys(now)` at start and in `maintenance_sweep`: every family gets its key for the current
+  month and the next one. A missing key on a decrypt-only binary is `CryptoError::Unavailable` (503).
+- A phase that gives another role a family (`akr_ingest` and `raw` in phase 11, `akr_assess` in phase 29) grants that
+  role SELECT, and INSERT when its AppRole may wrap, on `admin.data_keys` in its own migration.
+- Rewrapping after a KEK rotation (`transit/rewrap`, then UPDATE of `wrapped`) is a ceremony step run as
+  `akr_migrate`; no service role has UPDATE or DELETE.
+
+### 7.31 Crypto port shapes as built (build gap, MEDIUM; DR-424)
+- `Family` is an enum (`personal`, `financial`, `secret-str`, `card`, `idempotency`, `evidence`) with a one-byte wire
+  code each (1 to 6). A phase that adds a family adds a variant and the next code; a code is never reused.
+- Stored form of `Sealed` (a `BYTEA` column): `0x01 | family code | data key id (16 bytes) | KEK version (u32,
+  big-endian) | nonce (12 bytes) | ciphertext and tag`. The 22 bytes before the nonce are authenticated together with
+  the caller's AAD, so a value cannot be re-labelled to another family, key or version. `Sealed` has no `Serialize`.
+- `Purpose { name, source }` is defined in `akr-crypto` and re-exported as `common::crypto::Purpose` (7.15); `source`
+  is the KV entry the purpose derives from (`keys/auth-hmac` for the three purposes of phase 01, `keys/match-key` for
+  the match purposes). The key of a purpose is `HKDF-SHA-256(entry key, info = purpose name)`; the hash is HMAC-SHA-256
+  under it. `Purpose::ALL` lists every declared purpose (none in this phase) and carries the uniqueness test. A KV item
+  under `keys/` is `{"key": "<base64, at least 32 bytes>"}`. A binary loads the keys of the purposes it uses at start
+  (`HashKeys::load`), before its token loses KV.
+- `Signature { key_version, bytes: [u8; 64] }`; `to_transit()` and `from_transit()` give and read `vault:v<n>:<base64>`.
+  The key names of 7.6 are the constants of `akr_crypto::signing_key`.
+- The trait takes `family: Family` and `purpose: &Purpose`; every method is `async` and returns `Result<_,
+  CryptoError>` (7.22) with the variants `Unavailable(String)`, `Rejected` and `UnknownKey(String)`.
+- `InMemoryCrypto` derives every key from one seed, so the dev `akr-api` and `akr-worker` read each other's values and
+  a restart loses nothing; `Config::validate` refuses it in production.
+
+### 7.32 The audit port and the keyset types live in akr-domain; common as built (build gap, HIGH; DR-425)
+Section 2 puts `AuditSink` in the `audit` crate. From phase 02 that crate depends on `db` (the PostgreSQL writer),
+`db` depends on `common` and `jobs`, and both of those emit events: `SettingsService::apply` and `FlagsService::update`
+(`common`), and `job.dead` (the harness in `jobs`). That is a crate cycle. The fix is the one the DBS made (DBS
+decision 38): a port that low crates need lives in `akr-domain`.
+- **Audit port.** `akr_domain::audit` holds `AuditSink { emit(tx, AuditEvent) -> AuditReceipt; emit_standalone(
+  AuditEvent) -> AuditReceipt }`, `AuditEvent` (built with `AuditEvent::new(&kinds::X, actor, request)` and
+  `.resource_id`, `.resource_key`, `.case`, `.decision`, `.detail(name, value)?`; `detail` refuses a name the kind does
+  not list), `EventKind { name, resource_type, stream, severity, siem, detail_keys }`, `Stream`, `Severity`, `Actor {
+  User { id, on_behalf_of }, System, Anonymous }`, `RequestCtx { ip, session_id, token_id, job_id, correlation_id, ua }`,
+  `ResourceRef`, `DecisionRecord`, `Effect`, `AuditReceipt`, `AuditError`, `SYSTEM_PRINCIPAL_ID`
+  (`00000000-0000-0000-0000-000000000001`) and `RecordingSink` (tests). `akr-audit` re-exports all of it (`pub use
+  akr_domain::audit::*`) and holds the sinks: `TracingSink` in this phase; `PgAuditSink`, the canonical encoder, the
+  chain and the verifier from phase 02. Every spelling in the later phase files (`audit::AuditSink`,
+  `AuditEvent::new(&kinds::X, ..)`) resolves unchanged. `common` and `jobs` never depend on `akr-audit`.
+- **Canon.** `Canon { Null, Bool, Int, Str, Array, Object }` is the payload value type and lives in `akr_domain::audit`
+  with the port; it has no float (`Canon::from_json` refuses one). The byte encoding of an entry stays in `audit`
+  (phase 02).
+- **Kinds.** The four kinds of this phase are statics in `akr_domain::audit::kinds` (`SETTING_UPDATED`,
+  `FLAG_UPDATED`, `RESTORE_DRILL_RECORDED`, `JOB_DEAD`) with the catalogue values of phase 02 section 7.13. A later
+  phase adds its kinds to that module and to `akr_audit::CATALOGUE`.
+- **Signatures.** `SettingsService::apply(tx, key, value, expected_version, actor: &Actor, request: &RequestCtx,
+  source)` and `FlagsService::update(tx, key, UpdateFlag, expected_version, actor: &Actor, request: &RequestCtx)`; the
+  repository receives `actor.id()`. In `setting.updated`, `before` and `after` hold the value with decimals written as
+  decimal text; `source` is `{type: direct}` or `{type: change_request, id}`. In `flag.updated`, each side is
+  `{enabled, scope: {branches, roles}}`.
+- **Order inside `apply`.** Registry lookup (an unknown key is 404) -> `SettingsRepository::lock` (row lock) -> type
+  and rule of the registry (422 `E_VALIDATION`, pointer `/value`) -> the floor of the row (422 `E_BELOW_FLOOR`; not
+  checked for `null`) -> governed and `Direct` (409 `E_NOT_ALLOWED_IN_STATE`, reason `governed`) -> update with the
+  version check -> hooks (7.25) -> the audit emit, last.
+- **The registry.** `settings_registry::REGISTRY` declares per key: type, nullable, governed, the seeded default, a
+  rule (`Range { min, max }`, `OneOf`, `Timezone`) and `cli_writable`. The ranges are sanity limits of the software
+  (for example `idempotency.ttl_days` 1 to 90, `jobs.lease_s` 30 to 86,400, `outbox.max_attempts` 1 to 100); the
+  regulatory limit of a key is the `floor` of its row. The CLI exemption of section 3 is `cli_writable` on the key
+  plus the service instance `SettingsService::for_cli`, which only `akr-ctl` builds.
+- **Getters.** The typed getters are `async` and named after the key (`idempotency_ttl_days()`, `jobs_lease_s()`,
+  `bank_timezone()`, `schedule(key)`); a `duration_s` key returns a `Duration`. A row that cannot be read, or that no
+  longer fits its type, gives the seeded default with a warning. After a failed read the last values are served and
+  the read is tried again after 5 s.
+- **After commit.** With 7.17 the middleware commits after the handler returns, so "publish `settings.changed` after
+  commit" (section 3) is work registered on the request transaction: `RequestTx::after_commit(future)`. The middleware
+  runs it after a successful commit and drops it on a rollback. `SettingsService::notify_changed(key)` drops the local
+  cache and calls the port `SettingsNotifier` (the Valkey adapter is in the binaries). `akr-ctl` has no notifier: the
+  other processes see its change within the 30 s age of their cache.
+- **Keyset and Page.** `Keyset` and `Page<T>` (7.26) are defined in `akr_domain::page`, because the repository traits
+  of later phases (in `domain`) take a `Keyset` and return a `Page<T>`. `common::cursor` re-exports them and holds the
+  wire form: `CursorCodec` signs a position with HMAC-SHA-256 under the key `keys/cursor-hmac` (read at start by
+  `akr-api` only) and binds it to the name of its list, so a cursor of one list is refused on another. `PageQuery {
+  limit, cursor }` is the query; `Paged<T> { items, next_cursor }` is the body. `limit` is 1 to 200 (default 50); a
+  value outside is 422 at `/limit` (`out_of_range`); a cursor that does not verify is 400 `E_BAD_REQUEST`, reason
+  `cursor_malformed`.
+- **Problem bodies.** The body is `{ type, title, status, code, errors?, correlation_id }`, plus `current_version` on
+  `E_VERSION_CONFLICT`. It has no free-text field. The reason of a 400 or of a 409 `E_NOT_ALLOWED_IN_STATE` travels as
+  `errors[0] { pointer: "", code: <reason> }`. The correlation id reaches the body through a task-local value set by
+  the correlation middleware.
+- **Idempotency ports.** `common::idempotency` declares `IdempotencyStore { claim(tx, principal_id, key, endpoint,
+  request_hash, lease) -> bool; find(tx, principal_id, key); complete(tx, principal_id, key, status, content_type,
+  sealed_body); delete_older_than(days, batch) }` (adapter `db::PgIdempotencyStore`; SQLSTATE `55P03` on the claim is
+  the 409 of 7.17), `PrincipalId(Uuid)` (the request extension the auth slot sets) and `RequestTx` (`lock()`,
+  `after_commit()`, and `take()` for the middleware). A handler that still holds the transaction when it returns makes
+  `take()` fail, and the request ends 500 with a rollback.
+- **Config.** One more environment variable: `AKR_DEV_PRINCIPAL` (`true` or `false`), the switch of the `X-Dev-Principal`
+  stub. It defaults to on in `development` and `test` and to off in `staging` and `production`; production refuses to
+  start with it on (section 6 item 5). `Config::validate` reports every refusal at once. Its test for "`S3_ENDPOINT`
+  points at the store instead of the guard" is: the first DNS label of the host must be `s3guard`. It also refuses the
+  in-memory crypto (7.31), the tracing sink (7.14) and `AllowAllAuthorizer`. The process makes itself undumpable in
+  `staging` and `production`; `RLIMIT_CORE = 0` is checked, not set (the container sets `ulimits.core = 0`).
+
+### 7.33 Corrections to the base text (build gaps, MEDIUM and LOW; DR-425)
+1. **Section 2, the layering sentence.** `akr-domain` depends on `sqlx` for three things only: the `FromRow` and `Type`
+   derives, the `Json` wrapper, and the transaction type in port signatures. It has no runtime feature, opens no
+   connection and holds no SQL text. It does not depend on axum.
+2. **Section 2, the port lines.** `SettingsRepository` and `FlagsRepository` also have `lock(tx, key) -> Option<row>`
+   (`SELECT ... FOR UPDATE`), so the value that is validated is the value that is replaced. `ClassificationRepository`
+   also has `list()` (the redaction layer loads it once at start). The `actor` of an `update` is `Option<Uuid>`.
+   `DomainError { NotFound, VersionConflict { current }, Validation(Vec<FieldViolation>), BelowFloor { key },
+   NotAllowedInState(reason), Database }` is defined in `akr-domain` and mapped to `AppError` in `common`.
+3. **Schedules.** A `schedule.<kind>` value has six fields, seconds first (`0 30 2 * * *` is 02:30:00), read on the
+   wall clock of `bank.timezone`.
+4. **Section 1, provisioning.** `akr_migrate` is created `LOGIN CREATEROLE`: migration 0001 creates the NOLOGIN roles.
+   Provisioning runs in two halves: before the migrations (the database, `akr_migrate`, the schema `admin`), and after
+   them (the LOGIN roles, their passwords and role settings).
+5. **Section 4, the `openbao` row.** OpenBao 2.7 no longer locks memory, and refuses to start when `disable_mlock` is
+   in its configuration. The host therefore runs with swap off, as the `akr-api` row already requires.
+6. **Section 3, `Config::from_env` step 2: how the KV capability is dropped.** Each binary has an AppRole
+   `akr-<bin>` whose login token carries the policy `akr-<bin>-boot`: read on the KV items of the AppRole lines, and
+   `update` on `auth/token/create/akr-<bin>-run`. After its reads the binary creates a token from the token role
+   `akr-<bin>-run` (policy `akr-<bin>-run`: its transit rights, `auth/token/renew-self`, `sys/seal-status`,
+   `sys/health`), switches to it and revokes the login token. A lost run token is replaced by a new login followed by
+   the same exchange. `akr-api` reads `keys/cursor-hmac`; a binary reads the `keys/` entries of the purposes it uses.
+7. **KV item shapes.** `db/<role>` is `{host, port, database, username, password, sslmode, sslrootcert}` (the
+   environment list of section 3 names no database host; the URL is never built as text). `s3/<name>` is
+   `{access_key_id, secret_access_key}`. `keys/<name>` is `{key}` (7.31).
+8. **Development without OpenBao.** When `BAO_ADDR` is unset and `AKR_ENV` is not `production`, a binary reads
+   `DATABASE_URL` (and `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`) from the environment and wires `InMemoryCrypto`
+   from a fixed development seed. Production refuses each of these variables and the in-memory crypto.
+9. **Section 6 item 4, idempotency.** "An abandoned in-flight row older than the lease is taken over" is replaced by
+   the two tests of 7.17: a request killed after the handler and before the commit leaves no row, and a retry runs
+   the handler once; two requests with one key, of which the first holds its transaction longer than the lease, give
+   one handler run and a 409 or a replay for the second.
+
+### 7.34 The job harness and the database crate as built (build gaps, HIGH and MEDIUM; DR-426)
+1. **The scheduler enqueues the next slot, once.** Section 3 step 6 relies on the coalesce key alone, but the
+   unique index `uq_jobs_coalesce_queued` covers queued rows only: once a slot's job has run, a later scheduler round
+   would enqueue the same slot again. As built, `Worker::schedule_once` does this for each periodic kind, in one
+   transaction: `JobStore::lock_schedule(tx, kind)` takes `pg_advisory_xact_lock(hashtext('schedule:' || kind))` and
+   returns `clock_timestamp()` read after the wait; the next slot after that instant is computed from
+   `schedule.<kind>` in `bank.timezone`; `JobStore::enqueue_slot` inserts the job with `run_at = slot`, `coalesce_key
+   = '<kind>:<slot, RFC 3339 UTC>'` and payload `{"slot": ...}` only when no row with that kind and key exists in any
+   status. Two workers therefore name the same slot and one of them inserts it. Only a future slot is ever computed,
+   so the retention delete of finished jobs cannot bring a slot back.
+2. **The reaper buries a job that used its last attempt.** Section 3 step 5 sends every expired lease back to
+   `queued`; a job that kills its worker would then run for ever. `JobStore::reap_expired(tx, kind, lease)` sets
+   `dead` and `finished_at` when `attempts >= max_attempts` and `queued` otherwise, with `last_error = 'lease
+   expired'`, leaves `locked_by` as it was (7.2), and returns `(id, attempts, dead)`. The reaper emits `job.dead` for
+   each dead row in the same transaction and adds to `akr_jobs_dead_total{kind}`.
+3. **Every harness write names its claim.** `complete`, `complete_in`, `fail` and `bury` test `status = 'running'
+   AND attempts = $attempt` (the rule of 7.18, applied to all four). They return whether a row changed; a worker
+   whose claim was taken back changes nothing.
+4. **Store ports as built** (`akr_jobs::store`; adapters `akr_db::PgJobStore`, `PgOutboxStore`, `PgTimerStore`).
+   `JobStore`: `begin`, `enqueue(tx, JobInsert) -> Option<Uuid>` (then `pg_notify('akr_jobs', kind)`, delivered at
+   commit), `lock_schedule`, `enqueue_slot`, `claim(kind, concurrency, limit, worker_id) -> Vec<Job>` (one
+   transaction: the advisory lock of 7.2, the count of running rows, then the claim), `heartbeat(id, worker_id)`,
+   `complete(id, attempt)`, `complete_in(tx, id, attempt)`, `fail(id, attempt, error, backoff)`, `bury(tx, id,
+   attempt, error)`, `reap_expired`, `delete_finished_older_than(days, batch)`, `counts()`.
+   `OutboxStore`: `begin`, `append(tx, id, topic, payload)`, `claim(tx, topics, max_attempts) -> Option<OutboxRow>`,
+   `mark_dispatched(tx, id)`, `defer(id, error, backoff)`, `delete_dispatched_older_than(days, batch)`,
+   `counts(max_attempts) -> { pending, stuck }`.
+   `TimerStore`: `begin`, `schedule(tx, TimerInsert)`, `cancel(tx, id) -> u64`, `cancel_for_owner(tx, owner_kind,
+   owner_id, kind) -> u64`, `claim_due(tx, kinds, limit) -> Vec<Timer>`, `delete_terminal_older_than(days, batch)`,
+   `due_count()`.
+5. **Kinds and registries.** `JobKind::new(name)` with the const builders `.concurrency(n)`, `.max_attempts(n)`,
+   `.lease(d)` and `.scheduled_by(setting_key)`; a kind is a `static`, and `NewJob::new(&KIND)` and
+   `JobRegistry::register(&KIND, handler)` take it by reference (the handler's `KIND` must equal the kind's name).
+   `TimerKind { name, owner_kinds, job }`, where `job` is the `JobKind` named `timer_<name>`;
+   `TimerRegistry::register(&KIND)`. The sweep hands the job the timer's payload plus `timer_id`, `owner_kind` and
+   `owner_id`. A timer or a job of a kind the binary does not know is never claimed.
+6. **Correlation.** The correlation id of the request or job that enqueues travels in the payload field
+   `correlation_id`; the harness runs the handler inside that correlation scope. A payload must be a JSON object.
+7. **Handler outcomes.** A handler that panics is a retryable failure. The text kept in `last_error` is redacted
+   and cut to 500 characters.
+8. **Outbox.** The dispatcher runs a round every second and delivers one row per transaction: the handler's
+   effects and `dispatched_at` commit together, and a failure rolls the effects back, then adds one to `attempts`
+   and moves `available_at` by `backoff(attempts + 1)`.
+9. **Payload check.** `akr_jobs::payload::check(&Value)` is the test helper behind "ids and codes only": a leaf
+   field is named like an id, a code, a count or an instant, and a string value is a UUID, an RFC 3339 instant, a
+   date or a lower-case machine code of at most 64 characters. A field that only groups other fields may have any
+   name. Every phase that adds a job kind or a topic runs it over its payloads in a test.
+10. **The database crate.** `akr_db::connect(&DbSecret, application, max_connections)` builds the pool from the KV
+    item, never from a URL, and sets `application_name` to the binary's name. `MIGRATOR` embeds `backend/migrations`.
+    `migration_state(pool)` answers `Current`, `Behind` or `Ahead` by comparing the newest embedded version with the
+    newest applied one; it reads `admin._sqlx_migrations`, or the ledger on the search path when that table does not
+    exist (a test database). TLS is rustls over aws-lc-rs (sqlx feature `tls-rustls-aws-lc-rs`), the provider the HTTP
+    client already links. `listen_for_jobs(pool, wake, shutdown)` holds the `LISTEN akr_jobs` connection and wakes the
+    poll loop; after a lost connection it wakes the loop once and reconnects.
+11. **Coverage checks.** `uncovered_columns` and `uncovered_tables` read `pg_catalog` over `akr_db::AKR_SCHEMAS`
+    (the twelve schemas; a phase that creates a schema adds it there), skip partitions (7.14) and skip the migration
+    ledger `_sqlx_migrations`, which is a table of the migration tool and carries no classification or retention row.
+12. **Tests need a database.** `backend/crates/db/tests/it` runs every test on its own database through
+    `#[sqlx::test(migrations = "../../migrations")]`; `DATABASE_URL` names a role that may create databases (the
+    development superuser; in CI the service container's). Role checks use `SET ROLE`. Compile-time SQL is checked
+    against `backend/.sqlx`, written by `cargo sqlx prepare --workspace -- --all-targets` and committed; the tests run
+    with `SQLX_OFFLINE=true`.
+
+### 7.35 Telemetry, the shared router, the authorisation slot, the object store and the guard as built (build gaps, HIGH and MEDIUM; DR-427)
+1. **Telemetry.** `Telemetry::init(&CoreConfig)` installs, once per process, three sinks with the redactor in front
+   of each: JSON lines on stdout (`service`, `instance`, `level`, `target`, `timestamp`, `message`, `fields`), spans
+   to the collector when `OTLP_ENDPOINT` is set, and the Prometheus recorder. An `OTLP_ENDPOINT` the exporter cannot
+   be built for stops the start. **Every binary loads `admin.column_classification` at start** and hands it to the redactor, so
+   every binary role needs `SELECT` on that table; section 1 gave it to `akr_app` and `akr_ingest` only, and
+   `akr-assess` could not start. Migration 0004 now grants it to `akr_assess` too (corrected in section 1), and a
+   test connects as each of the three roles.
+2. **`akr_common::infra` is the shared outside of every binary.** `router(probe)` serves `/healthz` and `/readyz`
+   from a `ReadinessProbe`; `management_router(render)` serves `/metrics` on the management bind only; `serve` and
+   `shutdown_signal` give every binary the same graceful stop. **Each long-running binary answers `<binary>
+   healthcheck`**: `infra::healthcheck(binary)` reads the bind from `AKR_BIND`, sends `GET /readyz` to it over
+   loopback (3 s limit) and exits 0 on a 200 and 1 otherwise. The runtime images are distroless and have no shell, so
+   this is the compose health check of
+   `akr-api`, `akr-worker`, `akr-ingestd`, `akr-assess` and `akr-s3guard`.
+3. **AppRole from files.** `BAO_ROLE_ID_FILE` is accepted beside `BAO_ROLE_ID` (one of the two; compose cannot put a
+   file's content into an environment variable). The secret id is always a file (`BAO_SECRET_ID_FILE`).
+4. **The authorisation slot is minimal on purpose.** `AuthzRequest { principal_id, request, action, resource }`,
+   `ResourceKind::System` and `ResourceRef::System` (both `non_exhaustive`; phase 03 adds the kinds it protects),
+   `Decision { effect, policy_ids }`, and the port `Authorizer { authorize, invalidate_resource }`.
+   `AllowAllAuthorizer::new(env)` answers `AuthzError::AllowAllInProduction` in production.
+5. **The object store client is our own.** `akr-objectstore` signs with its own SigV4 code and speaks the few S3
+   calls the product uses; no SDK is linked. A write is one signed part with `Content-MD5` and the SHA-256 checksum;
+   keys are plain paths. A presigned URL is signed for the endpoint's host, and the edge sets that `Host` when it
+   proxies `/files/` (7.10), so the signature the browser carries is the one the store verifies.
+   `akr_objectstore::connect(&CoreConfig, Option<S3Credential>)` gives the S3 client, pointed at the guard, when
+   `S3_ENDPOINT` is set (the credential is the KV item `s3/presign` for `akr-api` and `s3/writer` for `akr-worker`);
+   without `S3_ENDPOINT` it gives a store in memory outside production and refuses in production. `buckets::ALL`
+   names the five buckets.
+6. **The WORM suite is a library** (`akr_objectstore::conformance`): `run(&S3Client, &Options) -> Report` with 15
+   checks, each recording which server answered (the guard's refusals carry `x-akr-s3guard-rule`, the store's do
+   not), and `verify_restore(&S3Client, &[ManifestEntry]) -> Report` for the restore drill. It works in its own
+   bucket, `akr-conformance`, which it creates locked; that makes the suite an installer act: it runs with the store's
+   root credential from an address in `AKR_S3GUARD_INSTALLER_CIDRS`, and the writer credential is refused
+   (`CreateBucket` 403, by design). `akr-ctl store conformance` prints the report; a report with no check is a
+   failure.
+7. **The guard as built.** Ten rule ids, the label of `akr_s3guard_rejected_total{rule}` and the value of the
+   response header `x-akr-s3guard-rule`: `admin_path`, `bucket_write_outside_installer`,
+   `delete_outside_quarantine`, `operation_not_allowed`, `query_credentials_on_write`, `s3_select`,
+   `snowball_auto_extract`, `store_internal_header`, `unsigned_amz_header`, `unsigned_payload_trailer`. The seven
+   rules that answer published advisories run first and the allow-list last. A path the guard and the store might
+   read differently (an encoded slash, a dot segment, an empty segment, a broken escape) is refused, not
+   interpreted, and `/minio/health/*` is refused to clients. The guard checks no signature (the store does): it
+   forwards the path, the query and `Host` as they arrived, in one part of known length, and drops the hop-by-hop and
+   `Forwarded` headers. Inside the internal networks it speaks plain HTTP (the networks have no route out and the
+   request is signed); it holds no OpenBao role and no secret. It is on `z5_mgmt` as well, with its metrics on
+   9101, because nothing could otherwise scrape its counter or receive its traces (the service table in section 4
+   and `deploy/zones.yaml` say so).
+8. **The development store is not the product's store.** `objectstore` in the dev overlay is upstream MinIO at a
+   pinned digest, used because the Silo build of RQ-03 does not exist yet. It never goes into a bundle; the release
+   pipeline builds the store image from source.
+
+### 7.36 The four binaries as built (build gaps, HIGH and MEDIUM; DR-427)
+1. **`AppState` (akr-api)** holds, beside the fields of section 4: `idempotency: IdempotencyService`, `cursors:
+   Arc<CursorCodec>` and `auth: AuthSlot`. With the cargo feature `fault-injection` (tests only) it also holds
+   `faults`, which is how the test of 7.17 kills a request between the handler and the commit.
+2. **Layers.** Correlation, the trace span and the metrics wrap every route, the probes included; the principal and
+   the idempotency layer wrap `/api/v1` only, as plain layers on the nest. The body limit is 2 MiB, set with
+   `DefaultBodyLimit` and enforced where a body is buffered: 413 `E_PAYLOAD_TOO_LARGE` in problem+json, inside the
+   correlation scope. There is no request timeout layer in this phase (the role's `statement_timeout` bounds the
+   database work). A known path with the wrong method answers 400 `E_BAD_REQUEST` with the detail
+   `method_not_allowed`, in problem+json (the catalogue has no code of its own for it).
+3. **The auth slot** answers 401 `E_UNAUTHENTICATED` when no principal is named. The idempotency layer still
+   answers 500 when it meets a request without a principal: that is the second gate, and it stays.
+4. **Idempotency.** A replay returns the status, the content type and the body, and nothing else of the first
+   response. `RequestTx::lock()` is synchronous and returns an owning guard. The lease length is read before the
+   transaction opens and passed to `claim`. The ledger sweep rests between batches. A wait on an in-flight key that
+   ends with SQLSTATE 55P03 (`lock_timeout`) or 57014 (the role's `statement_timeout` came first) is
+   `E_IDEMPOTENCY_IN_FLIGHT`, not a 500.
+5. **`_echo`** answers `{ "echo": <body>, "execution_id": <uuid> }`, so a test can tell a replay from a second run.
+   The phase 00 API cannot start in production at all (the tracing sink and the allow-all authorizer are refused),
+   so "`_echo` is 404 in production" is proven by a test of the router, and section 6 item 5 reads that way.
+6. **The OpenAPI document.** The tag list holds `infra` only; each later phase adds its tags with its first path.
+   `akr-api openapi` prints the production document (no `_echo`) without starting the server, and `make
+   generate-api` uses it.
+7. **Valkey.** A binary starts while Valkey is down and reports it in `/readyz`; a command times out after 2 s. Only
+   `akr-api` listens on the settings bus; every binary reads a setting again once its cached value is 30 s old (5 s
+   after a read that failed, which keeps the last value).
+8. **`akr-worker`.** The `openbao` readiness check is absent under the development key provider. A marker that
+   cannot be read sets `akr_backup_age_seconds` to `+Inf`, so the alert on an old backup fires for a missing one
+   too. The failover gauge arrives with phase 30.
+9. **`akr-ingestd` and `akr-assess`** wire the probes, telemetry, the pool and the stop signal, and nothing else:
+   their loops and routes are phases 05 and 29. `akr-assess` is in the compose profile `phase2`.
+
+### 7.37 akr-ctl, the bundle, the zone matrix and the development OpenBao as built (build gaps, HIGH and MEDIUM; DR-427)
+1. **Where `akr-ctl` gets its passwords.** `--secrets-dir` (`AKR_SECRETS_DIR`) is a directory with one file per role
+   (`db_<role>`, `pg_superuser`). Phase 30 fills it from OpenBao during an install. `db provision` sets a role's
+   password by sending a SCRAM-SHA-256 verifier it computed itself, so the password is in no statement and no log; a
+   password is printable ASCII (no SASLprep step). The SQL of `db provision` and `db check` is checked at run time
+   (it names roles and databases) and lives in `akr-db`.
+2. **Role time limits**, set by `db provision` and read back by `db check`:
+
+   | Role | `statement_timeout` | `idle_in_transaction_session_timeout` | Also |
+   |-|-|-|-|
+   | `akr_app` | 300 s | 120 s | |
+   | `akr_ingest` | 1800 s | 300 s | |
+   | `akr_assess` | 2 s | 10 s | |
+   | `akr_readonly` | 60 s | 60 s | `default_transaction_read_only = on` |
+   | `akr_monitor` | 10 s | 10 s | |
+
+   `akr_retention_login` is provisioned once the migration of phase 23 creates its role; until then `db provision`
+   and `db check` report it as waiting, not failed. `make migrate` runs `db provision` again after `db migrate`,
+   because a login role can be made a member only of roles the migrations created.
+3. **`db check`** has 23 findings on the phase 00 schema. PostgreSQL stores the collation locale `ar-u-kn-true` as
+   `ar-u-kn`; the check compares with the stored form.
+4. **Commands and exit codes.** 0 done; 1 failed; 2 refused (a bundle that does not verify, a store that fails the
+   suite, a matrix that does not match). `bundle build`, `bundle verify`, `net render` and `net matrix` act on files
+   only and need neither `AKR_ENV` nor a database: an operator verifies a bundle on a host that has no installation
+   yet. Every command that changes the installation emits `ctl.command_run` with the operating-system user and
+   session (section 3 table).
+5. **Restore drill.** `ops record-restore-drill --result passed|failed --evidence <file>`: the evidence must exist
+   and not be empty, and its SHA-256 goes into `restore_drill.recorded`. A drill that failed is recorded and does
+   **not** move `ops.last_restore_drill_at`, so the alert keeps counting from the last restore that worked.
+6. **The bundle format (format 1).** A directory: `manifest.json` (release, creation time, every other file with
+   its SHA-256, sorted by path) and `manifest.json.sig` (Ed25519 over the manifest's bytes, base64); `images/`, an
+   OCI image layout in which each image's cosign signature is the tag `sha256-<digest>.sig` of the same repository;
+   `chart/*.tgz` each with a `.sig`; `sbom/` with the CycloneDX bills of materials and `sbom/vex.cdx.json`;
+   `notes.json` (Arabic and English); `notices/` (third-party licence texts); `rollback/plan.md`; `migrations/`,
+   `deploy/` and `docs/`. The key's fingerprint is the SHA-256 of its public key in DER form, in lower-case hex
+   (`openssl pkey -pubin -outform DER | sha256sum` gives the same value).
+7. **Verification order and refusal codes.** (a) fingerprint, before anything in the bundle is read:
+   `fingerprint_mismatch`; (b) manifest signature: `bundle_signature_invalid`; (c) image signatures:
+   `image_signature_invalid`; (d) every file is the one the manifest lists, no file is extra and none is gone:
+   `manifest_digest_mismatch`; (e) what every release carries: `sbom_missing`, `notes_missing`,
+   `rollback_plan_missing` and **`notices_missing`** (new; phase 25 section 1.2 and its verify step now list it);
+   (g) chart signatures: `chart_signature_invalid`. Because (d) runs before (g), a chart changed by one byte in a
+   finished bundle is refused as `manifest_digest_mismatch`; `chart_signature_invalid` is what a bundle gets whose
+   manifest was written over a chart that its signature does not cover (phase 30 section 6 item 5 now says so).
+   `bundle::build::seal` writes and signs the manifest of a tree that is already laid out; the tests use it to make
+   exactly that case.
+8. **`bundle build`** signs with a PEM Ed25519 key file for a development bundle (`--signing-key`); a release is
+   signed by the pipeline's key service. A bundle built without a key is written and does not verify.
+9. **`bundle import`** verifies first, then pushes every image and its signature to the registry with HTTP basic
+   authentication. It follows no redirect, accepts an upload `Location` only on the registry's own origin, and
+   speaks `https` only (plain `http` to a loopback address, for tests). A second import sends nothing.
+10. **`deploy/zones.yaml` (version 1)** has three maps: `networks` (`internal`, and a `subnet` for `z1_cbs`:
+    10.247.71.0/28), `services` (their networks and the ports they listen on for other services) and `edges` (who
+    may open a connection to whom, on which ports). It is read with yaml-rust2. `akr-ctl net matrix` gives every
+    ordered pair a verdict: `open` (an edge), `closed` (no shared network) or `zone` (a shared network and no edge:
+    in the compose profile a network is the unit of separation, and the cluster profile of phase 30 enforces each
+    edge alone). `make zone-check` probes from every running service's position with a one-shot container on that
+    service's networks and fails only when an `open` pair is closed or a `closed` pair is open. `akr-ctl net render`
+    prints the host rules for `z1_cbs`: the nftables table `inet akr_zones`, with a forward chain at priority
+    `filter - 10` that lets `akr-ingestd` alone reach the declared CBS listeners.
+11. **The development OpenBao** (`deploy/dev/bao-dev.sh`): one unseal share; the transit mount with `akr-kek` and
+    the Ed25519 signing keys; the KV mount `akr/` (`db/<role>`, `s3/presign`, `s3/writer`, `keys/*`, `sources/*`). Per
+    binary: a boot policy and a run policy, an AppRole whose token carries the boot policy and lives 10 minutes (30
+    at most), and a token role `<binary>-run` (orphan, renewable, period 1 h). The role and secret ids are written
+    into `deploy/dev/secrets`. The KV holds one view of the database:
+    `make bao-dev` writes the address a binary on the host uses (127.0.0.1:5470), `make bao-bundle` the address a
+    container uses (`postgres:5432`). OpenBao is sealed again whenever its container restarts; both targets unseal
+    it.
+12. **Store policies and users.** The policy files (`policy-presign.json`, `policy-writer.json`) are in
+    `deploy/compose/config/objectstore/`; `deploy/dev/store-dev.sh` creates the development users with `mc` inside
+    the dev store's container. A bucket, a policy line
+    or a KV path that only a later phase uses arrives with that phase.
+
+### 7.38 Compose, images, the pipeline, the frontend scaffold and the rule files as built (build gaps, HIGH and MEDIUM; DR-427)
+1. **Make targets.** `make up` starts the five stores a binary on the host needs (postgres, valkey, openbao,
+   objectstore, s3guard); `make up-all` starts every service; `stop` and `down` act on the compose project `akr-tms`
+   only and no target removes a volume or an image. Development ports on 127.0.0.1: PostgreSQL 5470, Valkey 6470,
+   OpenBao 8270, the store 9470, the guard 9471, the edge 8443; binaries on the host use 8080 to 8082 and 9101 to
+   9103.
+2. **Profiles.** A service that cannot start without something a later phase or the bank supplies is behind a
+   profile, so `up-all` stays green: `phase2` (`akr-assess`), `identity` (Kratos and Hydra with their migrations;
+   phase 01 writes their configuration), `backup` (pgBackRest and restic; they need the bank's repository), `siem`
+   (the log forwarder; it needs the bank's collector) and `standby` (the replica). Of the 7.8 list, the services and
+   volumes that belong to later phases arrive with those phases.
+3. **Volumes** beside the data volumes: `pgsocket` (the socket pgBackRest uses), `backuprepo` (an install points it
+   at the backup server's share), `backupmarker` (written by the backup services, mounted read-only into
+   `akr-worker` at `/var/lib/akr/backup`), `clamdb`, `promdata`, `alertdata` and `pgstandby`.
+4. **The edge.** Caddy's binary carries the file capability `cap_net_bind_service`, and with `cap_drop: ALL` the
+   kernel refuses to run it; the service adds `NET_BIND_SERVICE` back (it gains nothing: `no-new-privileges`
+   discards the file capability). The edge picks its certificate by server name, so a probe names the host
+   (`https://localhost:8443`), not an address. It answers `/edge-health` itself. The rules of 7.10 are in the
+   Caddyfile from this phase: the security headers on the browser application, `Cache-Control: no-store` on
+   `index.html` (inside a `route` block, so it applies after `try_files` rewrote the path) and a year for
+   `/assets/*`, 404 on `/api/v1/directory/events`, and `/branding.json` with `no-cache`. `AKR_WWW_DIR` and
+   `AKR_BRANDING_FILE` say what is mounted; the default branding file is `deploy/branding.json`:
+   `{ "bank_name": { "ar": "...", "en": "..." } }`. Phases 06 and 08 use that shape.
+5. **Networks.** The dev overlay adds `dev_host` (10.247.72.0/28) for the published ports. 172.31.247.0/28
+   overlapped an existing Docker network on the build machine; the two fixed subnets are in 10.247.0.0/16, and an
+   install may change them in its override file.
+6. **Images.** One Dockerfile (`deploy/images/akr/`) builds every AKR binary: `rust:1.97.1-slim-bookworm`, a build
+   with `cargo auditable`, and `distroless/cc-debian12:nonroot` at run time. `deploy/images.lock` names every image
+   the product pulls, by the digest of its multi-platform index (or `build` for one the pipeline builds), with the
+   tag it was resolved from; `tools/ci/check_images_lock.py` fails the build on a reference in `deploy/` that is not
+   in it (25 images today). Gotenberg is the upstream image until RQ-11 builds ours with the fonts.
+7. **Supply-chain files.** `backend/deny.toml` (licence allow-list, crates.io as the only source, the CBS drivers
+   and `akr-sources` banned outside `akr-ingestd`); `tools/ci/check_driver_isolation.sh` (the same rule read from
+   `cargo tree`); `deploy/waivers.toml` (a waiver has an id, a scanner, a component, an owner, a reason and an end
+   date at most 90 days ahead; an expired one fails the build; `tools/ci/waiver_exports.py` writes the VEX statement
+   from it).
+8. **The pipeline** is two Gitea workflows on the runner label `akr-build`. `ci.yml`: lint, supply chain, test,
+   frontend. `release.yml`: images (build, scan, bill of materials, sign), object store, bundle
+   (`tools/ci/stage_bundle.sh`, then `akr-ctl bundle build`).
+9. **The frontend scaffold** (`frontend/`): Vite 7, React 19, TypeScript 5.9, TanStack Router (file routes) and
+   Query, axios, Orval 8.22 (`tags-split`, `react-query`, the axios mutator `customInstance`, `headers: true`), pnpm
+   10.33.0 with exact pins. `index.html` is `lang="ar" dir="rtl"`. One route calls the generated `useHealthz`. The
+   dev server proxies `/api`, `/healthz` and `/readyz` to 127.0.0.1:8080. Generated and committed:
+   `frontend/openapi.json`, `src/api/generated`, `src/api/models`, `src/routeTree.gen.ts`. The frontend job of
+   `ci.yml` today is: frozen install, `make generate-api` with no difference allowed, the licence check
+   (`tools/ci/check_frontend_licences.sh` over the production dependencies), `tsc -b` and `vite build`. Phase 08
+   adds tokens, the shell, lint, tests and the rest of its pipeline.
+10. **Licence lists.** The Rust allow-list and the frontend allow-list (`MIT`, `MIT-0`, `Apache-2.0`,
+    `BSD-2-Clause`, `BSD-3-Clause`, `ISC`, `0BSD`, `MPL-2.0`, `CC0-1.0`, `Unlicense`) are wider than the one sentence
+    in `tech-stack.md`; the owner or counsel confirms them (status.md, Blockers).
+11. **Rule files.** Section 4 lists the eleven rule files; they are in `.claude/rules/`, ported from the DBS with the
+    AKR differences marked. `file-edits.md` binds this repository from now on: a tracked file is read and changed
+    with the editor tools only, and generated files are written by their generator.
+12. **An unreleased migration corrected in place.** SQLx stores the SHA-384 of each applied file. When a migration
+    that no bank has received is corrected (0004 here), a development database that already applied it is repaired
+    by applying the change by hand and setting `admin._sqlx_migrations.checksum` to the new file's digest; a fresh
+    database needs nothing. Once a release has shipped a migration, it is never edited: the correction is a new
+    migration.
+
+### 7.39 What section 6 showed on the build machine, and what stays open (DR-427)
+Run on 2026-10-11 against the development stack; the commands and their output are in `research/_progress.md`
+(steps C16 to C20).
+
+- **Passed.** Item 1 on the development database and again on a fresh one (0001 to 0004 apply, a second run
+  applies nothing, `db check` 23 of 23). Item 2. Item 3: clippy with warnings as errors; the driver isolation
+  script; `cargo deny check` (cargo-deny 0.20.2): bans, licences and sources clean, and one advisory, RUSTSEC-2024-0436
+  (`paste` 1.0.15 is unmaintained, not vulnerable; a build-time macro crate under `utoipa-axum` 0.2.0), accepted with
+  a waiver that ends on 2027-01-08 (`deploy/waivers.toml`, `backend/deny.toml`); in a scratch copy of the workspace
+  with `tiberius` added to `akr-worker`, `cargo deny check bans` fails with "crate 'tiberius' is explicitly banned".
+  Item 4: 402 tests, 0
+  failed, 0 ignored, the store and guard tests included. Item 5, every case. Item 6: `make generate-api` twice with no
+  difference; typecheck and build clean. Item 7: the drill moved the setting from null to the instant and the three
+  events were printed. Item 8: `make zone-check` with 14 services up (207 pairs match, 0 fail); the WORM suite, 15
+  of 15, through the guard and against the store; the guard's 403 for `?select&select-type=2` and for an `X-Minio-`
+  header, both counted; `backup_check` set `akr_backup_age_seconds` to 5 s after the marker was touched; a bundle
+  built, verified and refused after one changed byte in an image layer, through the command line.
+- **Not run, because this machine cannot:** the Silo build from source (RQ-03: the source pin is empty and the
+  tag is unverified); signing with the vendor's key service and cosign; `cosign save` output read by `bundle verify`
+  (the layout is written to cosign's naming, and the two have not met); the import into a real Harbor (a mock
+  registry stands in); Trivy, Syft and `cargo audit`; the two workflows (no runner). Each is a first-run item of
+  the release pipeline and is listed in status.md.
+- **Defined and not started:** Gotenberg, ClamAV, and the profiles `identity`, `backup`, `siem` and `standby`.
+- **Open, with the phase that owns it:** the replication role of the standby is not provisioned (phase 30); the log
+  forwarder sits on the internal `z5_mgmt` and has no route to the bank's SIEM collector (phase 25 or 30); restic
+  takes no OpenBao snapshot yet (phase 30); `akr_retention_login` waits for phase 23; `akr_jobs_dead_total` has no
+  series until a first job dies, which a dashboard must show as zero and not as missing (phase 03, the cockpit); a
+  scheduled kind cannot be run on demand before the cockpit of phase 03 (bringing a queued slot forward by hand uses
+  that slot up); the waiver for `paste` ends on 2027-01-08 and is looked at again when `utoipa-axum` is next
+  updated.
 
 ## What This Phase Does NOT Touch
 

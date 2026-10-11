@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM admin.outbox\n             WHERE id IN (\n                 SELECT id FROM admin.outbox\n                 WHERE dispatched_at IS NOT NULL AND dispatched_at < now() - $1::bigint * interval '1 day'\n                 ORDER BY dispatched_at\n                 LIMIT $2\n                 FOR UPDATE SKIP LOCKED)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "890417d71055a45f051478972157384eb2d77d43b2b837f0934900f10a6ea325"
+}

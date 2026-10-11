@@ -12,7 +12,7 @@ drafts in batches, each reviewed, corrected and aligned by the lead; phases 09 t
 
 | # | Phase | Status | Started | Completed | Tables + | Tables ~ | Routes + | Services + |
 |-|-|-|-|-|-|-|-|-|
-| 00 | Platform Foundation | Spec ready | | | 8 | 0 | 0 (infra only) | 5 + crypto, store and S3 guard ports |
+| 00 | Platform Foundation | Done on the build machine (section 6 run 2026-10-11; the release-pipeline steps that need a runner, a registry or the vendor key are open, see Blockers & Notes) | 2026-10-11 | 2026-10-11 | 8 (migrations 0001 to 0004) | 0 | 0 (infra only: `/healthz`, `/readyz`, `/api/v1/openapi.json`, and `_echo` outside production) | 5 + crypto, store and S3 guard ports; six binaries; 402 tests |
 | 01 | Identity & Sessions | Spec ready | | | 7 | 3 (idempotency_keys, settings, feature_flags FKs) | 22 | 4 + RateLimiter, PasswordPolicy, ClientCredentials |
 | 02 | Audit Trail & Evidence Core | Spec ready | | | 5 | 0 | 0 (no business routes) | 8 (PgAuditSink, PgAccessLog, AnchorService, Verifier, PartitionMaintenance, EvidenceStore, RenderService, PackService) |
 | 03 | Authorisation, Users & Roles | Spec ready | | | 4 | 1 (users.enabled_at, branch FK) | 32 | 11 (AuthzService, MaskingLayer, Simulator, AccessMatrixBuilder, UserAdminService, CredentialResetService, OffboardingService, BranchService, PoolAdminService, DelegationService, OpsCockpit) |
@@ -367,3 +367,36 @@ discovery delta of 2026-10-09 (102 items, DR-35 to DR-42).
   (the emergency evidence); phase 05 adds source documents only.
 - CBS discovery folded in 2026-10-09 (cbs-discovery/, DR-35 to DR-42). Phases 05, 06, 10 and 11 must use it: change
   strategy per table, per-branch business date, unpopulated fields, composite keys, system-generated postings.
+- **Phase 00 built on 2026-10-11 (DR-424 to DR-427; phase 00 sections 7.30 to 7.39).** Section 6 on the build
+  machine: 402 tests pass, lint and `cargo deny` clean, the zone matrix matches with 14 services up, the WORM suite
+  passes 15 of 15 through the guard and against the store, a bundle built by `akr-ctl` verifies and is refused after
+  one changed byte. What is open after it:
+  - **Not run, no machine for it yet (first-run items of the release pipeline):** the two Gitea workflows (no runner
+    with the label `akr-build`); Trivy, Syft and `cargo audit`; signing with the vendor's key service and cosign;
+    `cosign save` output read by `akr-ctl bundle verify`; `bundle import` into a real Harbor (a mock registry stands
+    in).
+  - **RQ-03, the product's object store:** the Silo source pin is empty and its tag is a placeholder. Development
+    runs upstream MinIO at a pinned digest, which never goes into a bundle. No release can be built before RQ-03
+    closes.
+  - **Waiver:** RUSTSEC-2024-0436 (`paste` 1.0.15, unmaintained, a build-time macro crate under `utoipa-axum`
+    0.2.0) is accepted until 2027-01-08 (`deploy/waivers.toml`). The owner confirms or replaces it.
+  - **Licence allow-lists** (`backend/deny.toml`, `tools/ci/check_frontend_licences.sh`) are wider than the sentence
+    in tech-stack.md (they add MPL-2.0, CC0-1.0, Unlicense, 0BSD and others that the dependency trees need). The
+    owner or counsel confirms them.
+  - **Defined in the compose file and never started:** Gotenberg and ClamAV (used from phase 02; Gotenberg is the
+    upstream image until RQ-11), Kratos and Hydra (profile `identity`; phase 01 writes their configuration),
+    pgBackRest and restic (profile `backup`), the log forwarder (profile `siem`), the standby (profile `standby`).
+  - **Phase 23:** the login role `akr_retention_login` is provisioned once that phase's migration creates its role;
+    `db provision` and `db check` report it as waiting until then.
+  - **Phase 25 or 30:** the log forwarder is on the internal network `z5_mgmt` and has no route to the bank's SIEM
+    collector; the phase that turns it on adds the network and the edge in `deploy/zones.yaml`.
+  - **Phase 30:** the standby's replication role is not provisioned; restic takes no OpenBao snapshot yet; the
+    failover gauge; `akr-ctl` reading its passwords from OpenBao during an install instead of a secrets directory.
+  - **Phase 03:** a scheduled job kind cannot be run on demand before the cockpit; `akr_jobs_dead_total` has no
+    series until a first job dies, which the cockpit shows as zero.
+  - **Phase 08:** `.claude/rules/frontend.md` and `form-templates.md` are ported by that phase (phase 00 ported the
+    eleven of its own list); its pipeline adds lint, tests, the bundle budget and Playwright to the five frontend
+    steps that exist now.
+  - **Development leftovers on the build machine:** a scratch database `akr_p00_verify` in the dev PostgreSQL; the
+    slot `backup_check:2026-10-12T03:00:00Z` was used by the verification, so that one run is skipped on the dev
+    stack.

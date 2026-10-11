@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM admin.idempotency_keys\n             WHERE (principal_id, key) IN (\n                 SELECT principal_id, key FROM admin.idempotency_keys\n                 WHERE created_at < now() - $1::bigint * interval '1 day'\n                 ORDER BY created_at\n                 LIMIT $2\n                 FOR UPDATE SKIP LOCKED)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8bf9e36ceaecee91e1757840fe207bf64cce2fa9174da02fa3c973c3761f42a0"
+}

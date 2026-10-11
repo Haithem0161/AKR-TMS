@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE admin.jobs\n               SET status = CASE WHEN attempts >= max_attempts THEN 'dead'::admin.job_status\n                                 ELSE 'queued'::admin.job_status END,\n                   finished_at = CASE WHEN attempts >= max_attempts THEN now() END,\n                   last_error = 'lease expired'\n               WHERE id IN (\n                   SELECT id FROM admin.jobs\n                   WHERE kind = $1 AND status = 'running'\n                     AND locked_at < now() - make_interval(secs => $2)\n                   FOR UPDATE SKIP LOCKED)\n               RETURNING id, attempts, (status = 'dead') AS \"dead!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "dead!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "d12322c8dcfd37b4d322addc317f1230dab2f55cd1955ce28e4113b8adc0fc80"
+}

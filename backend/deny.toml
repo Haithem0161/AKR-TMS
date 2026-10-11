@@ -1,0 +1,71 @@
+# cargo-deny: licences, advisories, banned crates and sources. An advisory ignored here needs a waiver
+# in deploy/waivers.toml (tools/ci/check_waivers.py).
+
+[graph]
+targets = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = [
+    { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained, not vulnerable; a build-time macro crate under utoipa-axum (waiver in deploy/waivers.toml)" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+# Permissive licences and file-level copyleft only. Anything else is a decision, not a default.
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "BSL-1.0",
+    "MPL-2.0",
+    "OpenSSL",
+    "CDLA-Permissive-2.0",
+]
+
+[licenses.private]
+# The workspace's own crates are not published and carry no SPDX licence.
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+# Driver isolation (TS-02): only akr-sources may depend on a CBS driver, and only akr-ingestd may depend
+# on akr-sources. A read-only connection to the bank's core is not something any other binary can open.
+[[bans.deny]]
+crate = "tiberius"
+wrappers = ["akr-sources", "akr-ingestd"]
+reason = "CBS drivers are reachable from akr-ingestd only (TS-02)"
+
+[[bans.deny]]
+crate = "oracle"
+wrappers = ["akr-sources", "akr-ingestd"]
+reason = "CBS drivers are reachable from akr-ingestd only (TS-02)"
+
+[[bans.deny]]
+crate = "odbc-api"
+wrappers = ["akr-sources", "akr-ingestd"]
+reason = "CBS drivers are reachable from akr-ingestd only (TS-02)"
+
+[[bans.deny]]
+crate = "akr-sources"
+wrappers = ["akr-ingestd"]
+reason = "the source adapters are linked into akr-ingestd only (TS-02)"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

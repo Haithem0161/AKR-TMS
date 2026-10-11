@@ -1,0 +1,20 @@
+# The waiver register (SP-72). A finding that the build accepts is listed here with its owner, the reason
+# it is not exploitable or not yet fixable in AKR-TMS, and the day the waiver ends. An expired waiver
+# fails the build (tools/ci/check_waivers.py), and so does an ignored advisory in backend/deny.toml that
+# has no waiver here. The release's VEX statement is written from this file.
+#
+#   [[waiver]]
+#   id      = "RUSTSEC-2026-0000"      # the advisory, CVE or licence finding
+#   scanner = "cargo-deny"             # cargo-deny, cargo-audit or trivy
+#   component = "name 1.2.3"           # the crate or image the finding is in
+#   owner   = "platform"               # the team that answers for it
+#   reason  = "..."                    # why the release ships with it
+#   expires = 2026-12-31               # at most 90 days ahead
+
+[[waiver]]
+id = "RUSTSEC-2024-0436"
+scanner = "cargo-deny"
+component = "paste 1.0.15"
+owner = "platform"
+reason = "Unmaintained, not vulnerable. A build-time macro crate pulled in by utoipa-axum 0.2.0 (the routes! macro); no code of it is in a shipped binary. Dropped when utoipa-axum releases without it."
+expires = 2027-01-08

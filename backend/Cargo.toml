@@ -1,0 +1,112 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "api", "worker", "ingestd", "assess", "s3guard", "ctl"]
+
+# Layers are separated by CRATE boundaries so the compiler enforces the layering of
+# .claude/rules/ddd.md: akr-domain cannot import axum because it does not depend on it.
+#
+# Every version is pinned once, in [workspace.dependencies] (RQ-01). A crate names a dependency with
+# `workspace = true` and adds only the features it needs.
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "UNLICENSED"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+# CI runs `clippy --all-targets -- -D warnings`, which turns these into errors (SP-70).
+unwrap_used = "warn"
+expect_used = "warn"
+todo = "warn"
+dbg_macro = "warn"
+
+[workspace.dependencies]
+akr-audit = { path = "crates/audit" }
+akr-authz = { path = "crates/authz" }
+akr-common = { path = "crates/common" }
+akr-crypto = { path = "crates/crypto" }
+akr-db = { path = "crates/db" }
+akr-domain = { path = "crates/domain" }
+akr-dsl = { path = "crates/dsl" }
+akr-jobs = { path = "crates/jobs" }
+akr-objectstore = { path = "crates/objectstore" }
+akr-sources = { path = "crates/sources" }
+akr-telemetry = { path = "crates/telemetry" }
+
+aes-gcm = "0.11.1"
+async-trait = "0.1.92"
+axum = { version = "0.8.9", features = ["macros"] }
+base64 = "0.23.1"
+bytes = "1.12.1"
+chrono = { version = "0.4.45", features = ["serde"] }
+chrono-tz = "0.10.4"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+croner = "4.0.1"
+ed25519-dalek = "3.0.0"
+fred = "10.1.0"
+futures-util = "0.3.34"
+getrandom = "0.4.3"
+hex = "0.4.3"
+hmac = "0.13.0"
+http = "1.5.0"
+http-body-util = "0.1.5"
+# Content-MD5 is a transfer check the S3 protocol requires on lock and retention writes; nothing relies on it for security.
+md-5 = "0.10.6"
+metrics = "0.24.6"
+metrics-exporter-prometheus = { version = "0.18.3", default-features = false }
+opentelemetry = { version = "0.33.1", default-features = false, features = ["trace"] }
+opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
+opentelemetry_sdk = { version = "0.33.1", default-features = false, features = ["trace"] }
+regex = "1.13.1"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "stream", "http2"] }
+rustix = { version = "1.1.5", features = ["process", "system"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.152"
+sha2 = "0.11.0"
+# SQLx 0.8 is the planned pin (RQ-01) and matches the sqlx-cli that writes .sqlx/. No features here: the
+# domain crate takes the derives and types only, the infrastructure crates add the runtime and macros.
+sqlx = { version = "0.8.6", default-features = false }
+subtle = "2.6.1"
+thiserror = "2.0.21"
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "time", "sync", "signal", "net", "fs"] }
+tokio-util = { version = "0.7.20", features = ["rt"] }
+toml = "1.1.8"
+tower = { version = "0.5.3", features = ["util"] }
+tower-http = { version = "0.6.11", features = ["trace", "limit", "catch-panic", "timeout", "sensitive-headers"] }
+tracing = "0.1.44"
+tracing-opentelemetry = { version = "0.34.0", default-features = false }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt", "json", "registry", "std"] }
+url = "2.5.8"
+utoipa = { version = "5.5.0", features = ["axum_extras", "uuid", "chrono", "preserve_order", "preserve_path_order"] }
+utoipa-axum = "0.2.0"
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum", "vendored"] }
+uuid = { version = "1.28.0", features = ["serde", "v7"] }
+yaml-rust2 = { version = "0.13.0", default-features = false }
+zeroize = "1.9.1"
+
+# Line tables only: a panic backtrace still names file and line, and incremental rebuilds of the
+# crate chain (domain -> db -> jobs -> api) stay short.
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.test]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+[profile.test.package."*"]
+debug = false
+
+[profile.release]
+overflow-checks = true
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

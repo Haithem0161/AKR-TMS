@@ -1,0 +1,50 @@
+# Development overlay. The binaries run on the host with `cargo run`, so the stores they use are published
+# on loopback through one extra network. Nothing here ships in the release bundle.
+
+networks:
+  # A fixed subnet: the host reaches the guard from this network's gateway, which dev.env names as the
+  # installer's address.
+  dev_host:
+    ipam: { config: [{ subnet: 10.247.72.0/28, gateway: 10.247.72.1 }] }
+
+services:
+  postgres:
+    networks: [dev_host]
+    ports: ["127.0.0.1:5470:5432"]
+  valkey:
+    networks: [dev_host]
+    ports: ["127.0.0.1:6470:6379"]
+  openbao:
+    networks: [dev_host]
+    ports: ["127.0.0.1:8270:8200"]
+
+  s3guard:
+    networks: [dev_host]
+    ports: ["127.0.0.1:9471:9000"]
+  caddy:
+    networks: [dev_host]
+    ports: ["127.0.0.1:8443:443"]
+
+  # Development stand-in for the Silo build: the upstream image at a pinned digest. It is never part of a
+  # release bundle (deploy/images.lock names the Silo build), and it lacks the Silo repairs, so the WORM
+  # and security suites that certify a release run against the Silo build in the release pipeline.
+  objectstore:
+    image: minio/minio@sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e
+    depends_on:
+      objectstore-perms: { condition: service_completed_successfully }
+    networks: [dev_host]
+    ports: ["127.0.0.1:9470:9000"]
+
+  # The upstream image owns /data as root; the Silo build owns it as the store's user and needs no such step.
+  objectstore-perms:
+    image: minio/minio@sha256:a1ea29fa28355559ef137d71fc570e508a214ec84ff8083e39bc5428980b015e
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    security_opt: ["no-new-privileges:true"]
+    network_mode: none
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c", "chown 10001:10001 /data"]
+    volumes:
+      - storedata:/data

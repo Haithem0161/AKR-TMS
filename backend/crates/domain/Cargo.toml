@@ -1,0 +1,27 @@
+[package]
+name = "akr-domain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+croner.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# Derives and the transaction type in repository signatures only. This crate opens no connection and
+# holds no SQL text (.claude/rules/ddd.md).
+sqlx = { workspace = true, features = ["postgres", "uuid", "chrono", "json", "derive"] }
+thiserror.workspace = true
+utoipa.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
