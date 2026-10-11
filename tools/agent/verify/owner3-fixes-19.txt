@@ -1,0 +1,24 @@
+Replacements of round 2 of the owner-decision check, key 19. 3 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [P-19b-1]
+FILE: docs/plan/phase-19.md
+WHY: P-19b-1 | CONFIRMED | MEDIUM (agent: HIGH) | the default-deny note of section 3.13 (line ~1594) says "for CFG and CHK the `rfi_prefill_map.read` and `rfi_prefill_map.propose` permits". The Cedar text of section 7.21 item 9 gives CHK the read only. The Cedar text is exact and the tests follow it, so nothing fails; the prose is wrong | "for CFG the `rfi_prefill_map.read` and `rfi_prefill_map.propose` permits and for CHK the `rfi_prefill_map.read` permit of section 7.21".
+OLD: and for CFG and CHK the `rfi_prefill_map.read` and `rfi_prefill_map.propose` permits of section 7.21)
+NEW: and for CFG the `rfi_prefill_map.read` and `rfi_prefill_map.propose` permits and for CHK the `rfi_prefill_map.read` permit of section 7.21)
+
+=== F2 [P-19b-2]
+FILE: docs/plan/phase-19.md
+WHY: P-19b-2 | CONFIRMED | LOW (agent: MEDIUM) | the check "`DELETE FROM casework.rfi_prefill_map` fails ... as the owner `akr_migrate` with `pre-fill map rows are never deleted`" stands under `make migrate`, where the table is empty; the guard is a row trigger, so the owner's statement raises only when a row exists. The neighbouring checks of the same item name their rows, so a builder runs the item with fixture rows; the wording is made exact | "a `DELETE` of a row fails ...". The twin line of phase 13 section 7.17 item 14 (`DELETE FROM feat.source_tags`) gets the same words.
+OLD: `DELETE FROM casework.rfi_prefill_map` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `pre-fill map rows are never deleted`.
+NEW: A `DELETE` of a row of `casework.rfi_prefill_map` fails, as `akr_app` with permission denied (no DELETE grant; with or without a row) and as the owner `akr_migrate` with `pre-fill map rows are never deleted` (the guard is a row trigger, so the owner's statement needs a row).
+
+=== F3 [P-19b-3]
+FILE: docs/DESIGN-SYSTEM.md
+WHY: P-19b-3 | CONFIRMED | LOW (agent: MEDIUM) | DESIGN-SYSTEM.md (line ~850) says "CHK and M read the tab"; phase 19 section 7.21 item 11 says CFG, CHK and M. CFG is named as the proposer in the sentence before, so no screen is built wrong | "CFG, CHK and M read the tab".
+OLD: through a change request. CHK and M
+read the tab;
+NEW: through a change request. CFG, CHK and M
+read the tab;

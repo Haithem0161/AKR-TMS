@@ -1,0 +1,10 @@
+Replacements of round 2 of the owner-decision check, key 18. 1 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [L2-3]
+FILE: docs/plan/phase-18.md
+WHY: L2-3 | LEAD FIND | LOW | phase 18 section 6 item 9 (line ~1246), last clause: "a `casework.case_acl` row cannot change its `access` (the guard raises)". `akr_app` holds UPDATE (revoked_by, revoked_at) only (line ~428), so for `akr_app` the statement is refused with permission denied; the guard message `an access grant is revoked, never changed` is reached as the owner. The clause names no role, so no stated check fails | the clause names both roles.
+OLD: a `casework.case_acl` row cannot change its `access` (the guard raises).
+NEW: a `casework.case_acl` row cannot change its `access` (permission denied for `akr_app`, whose column grant is `revoked_by` and `revoked_at`; as the owner `akr_migrate` the guard raises `an access grant is revoked, never changed`).

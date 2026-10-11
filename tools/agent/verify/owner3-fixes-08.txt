@@ -1,0 +1,16 @@
+Replacements of round 2 of the owner-decision check, key 08. 2 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [P-08-1]
+FILE: docs/plan/phase-08.md
+WHY: P-08-1 | CONFIRMED | MEDIUM | section 7.x item 3 shows the change request as text for A2, whom G10 does not list, but the base X3 text (line ~403) says "For a change-request task the panel links to G10 detail" for every role, and the "Waiting on others" rows of an A2 maker open that panel (phase 04 section 3.7 `waiting`). The link leads A2 to a screen the role does not hold | line ~403: the panel links to G10 detail for a role that G10 lists (the screen table) and shows the reference as text for any other role.
+OLD: For a change-request task the panel links to G10 detail.
+NEW: For a change-request task the panel links to G10 detail for a role that G10 lists (the screen table above) and shows the reference of the request as text for any other role (an A2 maker of a corpus case, section 7.11 item 3).
+
+=== F2 [P-08-2]
+FILE: docs/plan/phase-08.md
+WHY: P-08-2 | CONFIRMED | LOW | "no response gives the size limit": `GET /admin/settings` gives it to ADM (phase 03). The form's users, A2 and M, cannot read it, so the behaviour is right and the wording is not | "no response open to A2 or M gives the size limit".
+OLD: (the client checks the type only; no response gives the size limit, so a file
+NEW: (the client checks the type only; no response open to A2 or M gives the size limit, so a file

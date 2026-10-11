@@ -1,0 +1,97 @@
+Replacements of round 1 of the owner-decision check, key 13b. 15 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-13-5]
+FILE: docs/plan/phase-13.md
+WHY: O-13-5 | CONFIRMED | HIGH | step 2 allows an add whose active row is in `retire` (the only way to change a payer name), but the activation inserts the adds first, so `uq_source_tags_active` refuses the insert every time | the activation closes the retires first and inserts the adds after, in the approval transaction.
+OLD: | Insert each `add` as `active` with the hashes resolved again; close each `retire` as `ended` (with `valid_to`) or `void` (`retired_at = now()`, `retired_by_request`); enqueue `source_tag_refresh`; audit `source_tag.applied` |
+NEW: | In this order: close each `retire` as `ended` (with `valid_to`) or `void`, both with `retired_at = now()` and `retired_by_request` = this request; then insert each `add` as `active` with the hashes resolved again; enqueue `source_tag_refresh`; when a feature reads a tag of the change set, enqueue `feature_compute {reopen_from}` (first point below); audit `source_tag.applied` |
+
+=== F2 [O-13-8]
+FILE: docs/plan/phase-13.md
+WHY: O-13-8 | CONFIRMED | MEDIUM | a tag change moves what a tag-reading feature gives for months already computed, and nothing recomputes them (the hourly run skips a month whose basis did not change) | the `source_tag` activation, when `reading_features` is not empty, also enqueues `feature_compute {reopen_from}` with the month-end of the month of the earliest date the change set moves (the earliest `valid_from` of an add or of a voided row, the earliest `valid_to` of an end); section 3.2 step 5 then updates only rows whose value changed. Section 4 job row names the third enqueuer. // O-13-8 final design | the activation enqueues `feature_compute {reopen_from}` under the coalesce key `feature_compute:reopen:<reopen_from>`: under the plain key `feature_compute` a queued hourly run swallows the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen is lost. The reopened months are computed again whatever their `basis` says. The replay enqueue of base section 3.2 has the same weakness; it is written down as a new entry of phase 13 "Open doubts" and not changed (base text; for the user report as a build point).
+OLD:    - **Volume effect.** `neutral` when both impact lists are empty: nothing reads the tags yet.
+NEW:    - **Order, and months already computed.** The retires are closed before the adds are inserted, because an add may take the place of a row that the same change set retires (item 6 step 2; this is how a payer name is changed) and `uq_source_tags_active` allows one active row per tag and account. A tag change also moves what a tag-reading feature gives for months that are already computed, and the hourly run does not take those months again. So, when `reading_features` of the stored impact is not empty, the activation enqueues `feature_compute {reopen_from}`, where `reopen_from` is the month-end of the month of the earliest date the change set moves: the earliest of the `valid_from` of every add, the `valid_from` of every voided row and the `valid_to` of every ended row (a row ended on day D still holds on D, so the month of D is the first that can change). The job is enqueued with the coalesce key `feature_compute:reopen:<reopen_from>`, a key of its own: under the key `feature_compute` a queued hourly run would swallow the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen would be lost; the kind's concurrency of 1 still runs the jobs one at a time. Section 3.2 step 1 then takes every month from `reopen_from`, computes it again whatever its `basis` says (the register is not part of the basis), and step 5 updates only the rows whose value changed.
+   - **Volume effect.** `neutral` when both impact lists are empty: nothing reads the tags yet.
+
+=== F3 [O-13-8]
+FILE: docs/plan/phase-13.md
+WHY: O-13-8 | CONFIRMED | MEDIUM | a tag change moves what a tag-reading feature gives for months already computed, and nothing recomputes them (the hourly run skips a month whose basis did not change) | the `source_tag` activation, when `reading_features` is not empty, also enqueues `feature_compute {reopen_from}` with the month-end of the month of the earliest date the change set moves (the earliest `valid_from` of an add or of a voided row, the earliest `valid_to` of an end); section 3.2 step 5 then updates only rows whose value changed. Section 4 job row names the third enqueuer. // O-13-8 final design | the activation enqueues `feature_compute {reopen_from}` under the coalesce key `feature_compute:reopen:<reopen_from>`: under the plain key `feature_compute` a queued hourly run swallows the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen is lost. The reopened months are computed again whatever their `basis` says. The replay enqueue of base section 3.2 has the same weakness; it is written down as a new entry of phase 13 "Open doubts" and not changed (base text; for the user report as a build point).
+OLD: enqueued by a `feature_definition` activation (with `catchup`) and by a replay of phase 11 |
+NEW: enqueued by a `feature_definition` activation (with `catchup`), by a replay of phase 11 and by a `source_tag` activation that a feature reads (with `reopen_from` and a coalesce key of its own, section 7.17 item 7) |
+
+=== F4 [O-13-8]
+FILE: docs/plan/phase-13.md
+WHY: O-13-8 | CONFIRMED | MEDIUM | a tag change moves what a tag-reading feature gives for months already computed, and nothing recomputes them (the hourly run skips a month whose basis did not change) | the `source_tag` activation, when `reading_features` is not empty, also enqueues `feature_compute {reopen_from}` with the month-end of the month of the earliest date the change set moves (the earliest `valid_from` of an add or of a voided row, the earliest `valid_to` of an end); section 3.2 step 5 then updates only rows whose value changed. Section 4 job row names the third enqueuer. // O-13-8 final design | the activation enqueues `feature_compute {reopen_from}` under the coalesce key `feature_compute:reopen:<reopen_from>`: under the plain key `feature_compute` a queued hourly run swallows the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen is lost. The reopened months are computed again whatever their `basis` says. The replay enqueue of base section 3.2 has the same weakness; it is written down as a new entry of phase 13 "Open doubts" and not changed (base text; for the user report as a build point).
+OLD: after the tag is voided the row is gone and `segment_assign` is enqueued when a segment reads `tag.payroll`.
+NEW: after the tag is voided the row is gone and `segment_assign` is enqueued when a segment reads `tag.payroll`. With the fixture feature `payroll_credit_1m` active, the activation of a change set that voids a tag whose `valid_from` lies two months back enqueues one `feature_compute` job with that month's month-end as `reopen_from`, also while an hourly `feature_compute` job is queued, and after it ran the feature rows of the two months no longer count the credits.
+
+=== F5 [O-13-5]
+FILE: docs/plan/phase-13.md
+WHY: O-13-5 | CONFIRMED | HIGH | step 2 allows an add whose active row is in `retire` (the only way to change a payer name), but the activation inserts the adds first, so `uq_source_tags_active` refuses the insert every time | the activation closes the retires first and inserts the adds after, in the approval transaction.
+OLD: a second `active` row with the same tag and `account_hk` fails on `uq_source_tags_active`.
+NEW: a second `active` row with the same tag and `account_hk` fails on `uq_source_tags_active`. A change set that retires a row and adds the same subject under the same tag with another payer name activates without error (retires first).
+
+=== F6 [O-13-9]
+FILE: docs/plan/phase-13.md
+WHY: O-13-9 | CONFIRMED | MEDIUM | base section 4 "Only the worker reads `canon`; the API reads `feat` only" is no longer true: the proposal of item 6 reads `canon.account` and `canon.counterparty` in the API | the base line names the exception (read only, as `akr_app`, which holds the SELECT grants).
+OLD: - **Network zones:** no change. Only the worker reads `canon` for this phase; the API reads `feat` only.
+NEW: - **Network zones:** no change. The worker reads `canon` for this phase; the API reads `feat`, and `canon.account` and `canon.counterparty` (read only, as `akr_app`, which holds the SELECT grants of phase 10) for the source-tag proposal of section 7.17 item 6 only.
+
+=== F7 [O-13-10]
+FILE: docs/plan/phase-13.md
+WHY: O-13-10 | CONFIRMED | LOW | "`screens.ts` lists the tab for CFG ... and for CHK, M and CH": a D3 tab has no role list (phase 09 section 7.5) | the tab renders when the caller may call the GET; "Propose changes" when the caller may call the POST.
+OLD: built in this phase on the phase 08 layer; `screens.ts` lists the tab for CFG (propose) and for CHK, M and CH (read).
+NEW: built in this phase on the phase 08 layer. The tab has no role list of its own (phase 09 section 7.5): it renders when the caller may call `GET /ref/source-tags` (CFG, CHK, M and CH in the shipped bundle), and "Propose changes" renders when the caller may call the POST (CFG).
+
+=== F8 [O-13-11]
+FILE: docs/plan/phase-13.md
+WHY: O-13-11 | CONFIRMED | LOW | "two more rows of section 3.10" and "two more rows of section 3.11": the 3.11 table gained one row for both actions and the two events are named in the sentence after the 3.10 table | wording corrected.
+OLD: 9. **Audit events** (two more rows of section 3.10):
+NEW: 9. **Audit events** (the two events named after the table of section 3.10):
+
+=== F9 [O-13-11]
+FILE: docs/plan/phase-13.md
+WHY: O-13-11 | CONFIRMED | LOW | "two more rows of section 3.10" and "two more rows of section 3.11": the 3.11 table gained one row for both actions and the two events are named in the sentence after the 3.10 table | wording corrected.
+OLD: 10. **Cedar actions** (two more rows of section 3.11; policies in `81_features.cedar`;
+NEW: 10. **Cedar actions** (one more row of section 3.11, for both actions; policies in `81_features.cedar`;
+
+=== F10 [L-1]
+FILE: docs/plan/phase-13.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // L-1 in phase 13: the block's check now gives permission denied for `akr_app` and the guard message for the owner.
+OLD: As `akr_app`: `DELETE FROM feat.source_tags` fails with `source tags are never deleted`; an `UPDATE` of an `ended` row fails with `source tag is closed`;
+NEW: `DELETE FROM feat.source_tags` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `source tags are never deleted`. As `akr_app`: an `UPDATE` of the `state` of an `ended` row fails with `source tag is closed`;
+
+=== F11 [O-19-3]
+FILE: docs/plan/phase-13.md
+WHY: O-19-3 | CONFIRMED | HIGH | `PrefillMapChange` has no `reason_code` and `reason_text`, which phase 04 `create` requires, so the stated curl check (201) would get 422 | the DTO gains both fields; the curl body carries them. Same fix for `SourceTagChange` of phase 13 section 7.17.
+OLD: as CFG `POST /api/v1/ref/source-tags` with one `add` on a counterparty and `Idempotency-Key: tag-0001` gives 201
+NEW: as CFG `POST /api/v1/ref/source-tags` with one `add` on a counterparty, a `reason_code` of family `change`, a `reason_text` and `Idempotency-Key: tag-0001` gives 201
+
+=== F12 [L-6]
+FILE: docs/plan/phase-13.md
+WHY: L-6 | LOW | the base proposal DTOs of phase 13 (`NewFeatureDefinition`, `NewSegment`) do not name `reason_code` and `reason_text`, which phase 04 `create` requires (the same gap as O-19-3 in base text) | one sentence added to the DTO list of section 2.
+OLD:   min size, `base_version?`), `PeerBuildRequest { currency }`. No Update struct:
+NEW:   min size, `base_version?`), `PeerBuildRequest { currency }`. Both proposals also carry `reason_code` and
+  `reason_text`, which phase 04 `create` requires (a code of a family the target accepts, section 3.7). No Update struct:
+
+=== F13 [O-13-8]
+FILE: docs/plan/phase-13.md
+WHY: O-13-8 | CONFIRMED | MEDIUM | a tag change moves what a tag-reading feature gives for months already computed, and nothing recomputes them (the hourly run skips a month whose basis did not change) | the `source_tag` activation, when `reading_features` is not empty, also enqueues `feature_compute {reopen_from}` with the month-end of the month of the earliest date the change set moves (the earliest `valid_from` of an add or of a voided row, the earliest `valid_to` of an end); section 3.2 step 5 then updates only rows whose value changed. Section 4 job row names the third enqueuer. // O-13-8 final design | the activation enqueues `feature_compute {reopen_from}` under the coalesce key `feature_compute:reopen:<reopen_from>`: under the plain key `feature_compute` a queued hourly run swallows the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen is lost. The reopened months are computed again whatever their `basis` says. The replay enqueue of base section 3.2 has the same weakness; it is written down as a new entry of phase 13 "Open doubts" and not changed (base text; for the user report as a build point).
+OLD: A tag is matched on the other side of a posting only, so the debits of a tagged account itself are not marked.
+NEW: A tag is matched on the other side of a posting only, so the debits of a tagged account itself are not marked.
+- **Reopen enqueues and the coalesce key (found in the owner-decision round).** An enqueue of `feature_compute {reopen_from}` under the coalesce key `feature_compute` is dropped while another `feature_compute` job is queued (phase 00: `ON CONFLICT DO NOTHING`), and the reopen is lost. The source-tag activation uses a key of its own (section 7.17 item 7). The replay enqueue of section 3.2 has the same weakness as written and should take the same key form when it is built.
+
+=== F14 [O-19-3]
+FILE: docs/plan/phase-13.md
+WHY: O-19-3 | CONFIRMED | HIGH | `PrefillMapChange` has no `reason_code` and `reason_text`, which phase 04 `create` requires, so the stated curl check (201) would get 422 | the DTO gains both fields; the curl body carries them. Same fix for `SourceTagChange` of phase 13 section 7.17.
+OLD: an unknown subject gives 422 with `subject_not_found`;
+NEW: a body without `reason_code` gives 422 `E_VALIDATION`; an unknown subject gives 422 with `subject_not_found`;
+
+=== F15 [DR-422]
+FILE: docs/plan/phase-13.md
+WHY: DR-422 is the decision record that locks the design corrections of round 1. The row in docs/plan/research.md must say only what the phase files now say; each citing sentence in a phase block must name corrections that the block really carries.
+OLD: No CBS field feeds the tags, so the bank keeps them by hand as governed data: a register of paying sources, each marked `payroll`, `pension` or `government_source`. The register is read in two places, a feature filter and a static segment predicate, so public-salary and pension customers can form peer segments (S-17). Counterparty profiles stay as section 7.7 says: VB-05 is carried as counterparty-keyed features, and a counterparty profile is P2.
+NEW: No CBS field feeds the tags, so the bank keeps them by hand as governed data: a register of paying sources, each marked `payroll`, `pension` or `government_source`. The register is read in two places, a feature filter and a static segment predicate, so public-salary and pension customers can form peer segments (S-17). Counterparty profiles stay as section 7.7 says: VB-05 is carried as counterparty-keyed features, and a counterparty profile is P2. DR-422 locks the corrections of the check round of 2026-10-11: the order of the activation, the refusal of a double add, the default end date, the form `tag.<name> = true` in a feature filter, and the recompute of months already computed.

@@ -1,0 +1,73 @@
+Replacements of round 1 of the owner-decision check, key L1. 9 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [L-1]
+FILE: docs/plan/phase-06.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 06 section 6 item 1: `DELETE FROM scn.cbi_catalogue_items` (akr_app: SELECT, INSERT, UPDATE of two columns).
+OLD: `DELETE FROM scn.cbi_catalogue_items` (any row, as
+   the owner role too) fails with `register rows are never deleted`;
+NEW: `DELETE FROM scn.cbi_catalogue_items` (any row) fails, as
+   `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `register rows are never deleted`;
+
+=== F2 [L-1]
+FILE: docs/plan/phase-09.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 09 section 6 item 1: `DELETE FROM ref.countries`, `UPDATE ref.fx_rates`, `UPDATE admin.policy_packs` (akr_app: no DELETE on `ref`; SELECT, INSERT only on the two others).
+OLD: Negative checks, each
+   as the owner role and as `akr_app`: `DELETE FROM ref.countries` fails with `reference rows are never deleted`;
+   `UPDATE ref.fx_rates SET rate_to_iqd = 1` fails with `an FX rate is a fact`; a second
+NEW: Negative checks, each
+   as the owner role `akr_migrate` and as `akr_app`: `DELETE FROM ref.countries` fails with `reference rows are never deleted`
+   and `UPDATE ref.fx_rates SET rate_to_iqd = 1` fails with `an FX rate is a fact` (the two messages as the owner; as `akr_app`,
+   which holds neither privilege, both statements fail with permission denied); a second
+
+=== F3 [L-1]
+FILE: docs/plan/phase-09.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 09 section 6 item 1: `DELETE FROM ref.countries`, `UPDATE ref.fx_rates`, `UPDATE admin.policy_packs` (akr_app: no DELETE on `ref`; SELECT, INSERT only on the two others).
+OLD: `UPDATE admin.policy_packs SET document = document` fails with `versions are
+   append-only`; `akr_app` has no DELETE
+NEW: `UPDATE admin.policy_packs SET document = document` fails with `versions are
+   append-only` as the owner and with permission denied as `akr_app` (SELECT and INSERT only); `akr_app` has no DELETE
+
+=== F4 [L-1]
+FILE: docs/plan/phase-15.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 15 section 6 item 2: `UPDATE kyc.ratings` (akr_app: SELECT, INSERT only).
+OLD: as `akr_app`: `UPDATE kyc.ratings SET level = 2` fails with `append-only`; `DELETE FROM kyc.ratings`
+   fails;
+NEW: as `akr_app`: `UPDATE kyc.ratings SET level = 2` fails with permission denied (no UPDATE grant; as the owner
+   `akr_migrate` it fails with `append-only`); `DELETE FROM kyc.ratings`
+   fails;
+
+=== F5 [L-1]
+FILE: docs/plan/phase-17.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 17 section 6 item 11: the `case_events` payload change (no UPDATE grant; item 12 already said so); the superuser variant now says the append-only trigger is disabled for that statement, or it could not run.
+OLD: 11. Case chain: a test-only superuser change to one `case_events` payload is refused for `akr_app` by the trigger (`case_events` has no UPDATE
+    grant); the same change made by a superuser in the test database makes
+NEW: 11. Case chain: a change to one `case_events` payload is refused for `akr_app` with permission denied (`case_events` has no UPDATE
+    grant; item 12); the same change made by a superuser in the test database, with `trg_case_events_append_only` disabled for that statement, makes
+
+=== F6 [L-1]
+FILE: docs/plan/phase-20.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 20 section 6 item 5: `UPDATE casework.ops_tasks SET task_ref` (`task_ref` is not in the column grant).
+OLD: `UPDATE casework.ops_tasks SET task_ref = ...` fails with `the identity of an operations task does not change`;
+NEW: `UPDATE casework.ops_tasks SET task_ref = ...` fails with permission denied (`task_ref` is not in the column grant) and, as the owner `akr_migrate`, with `the identity of an operations task does not change`;
+
+=== F7 [L-1]
+FILE: docs/plan/phase-21.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 21 section 6 item 10: `UPDATE rpt.filings SET goaml_reference` (not in the column grant) and `DELETE FROM rpt.fiu_feedback` (no DELETE grant); the message is `fiu_feedback is append only` (TG_TABLE_NAME has no schema name).
+OLD: an `UPDATE rpt.filings SET goaml_reference` fails with `the filing record is written once`;
+NEW: an `UPDATE rpt.filings SET goaml_reference` fails with permission denied (`goaml_reference` is not in the column grant) and, as the owner `akr_migrate`, with `the filing record is written once`;
+
+=== F8 [L-1]
+FILE: docs/plan/phase-21.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 21 section 6 item 10: `UPDATE rpt.filings SET goaml_reference` (not in the column grant) and `DELETE FROM rpt.fiu_feedback` (no DELETE grant); the message is `fiu_feedback is append only` (TG_TABLE_NAME has no schema name).
+NOTE: a later entry of the same round changed part of this NEW text again. Skip check 1 for the exact text; check the text as it stands in the file now.
+OLD: a `DELETE FROM rpt.fiu_feedback` fails with `rpt.fiu_feedback is append only`.
+NEW: a `DELETE FROM rpt.fiu_feedback` fails with permission denied (no DELETE grant) and, as the owner `akr_migrate`, with `rpt.fiu_feedback is append only`.
+
+=== F9 [L-1]
+FILE: docs/plan/phase-21.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 21 section 6 item 10: `UPDATE rpt.filings SET goaml_reference` (not in the column grant) and `DELETE FROM rpt.fiu_feedback` (no DELETE grant); the message is `fiu_feedback is append only` (TG_TABLE_NAME has no schema name).
+OLD: as the owner `akr_migrate`, with `rpt.fiu_feedback is append only`.
+NEW: as the owner `akr_migrate`, with `fiu_feedback is append only` (the guard prints `TG_TABLE_NAME`, which has no schema name).

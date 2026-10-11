@@ -1,0 +1,16 @@
+Replacements of round 2 of the owner-decision check, key 10. 2 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [P-10-1]
+FILE: docs/plan/phase-10.md
+WHY: P-10-1 | CONFIRMED | MEDIUM | section 7.26 item 5 ends "takes a new label ... at the next load of its source row, or in the apply of a mapping replay". Phase 11 lands only changed rows (section 3.2 step 2: an unchanged row is not landed), so for an unchanged source row the next load does nothing and only the replay reaches the name | the sentence says both cases: a changed source row lands again and its name row is replaced with the mapped label; an unchanged source row is not landed again, so a mapping edit alone reaches it only in the apply of a mapping replay (phase 11 section 3.8).
+OLD: A name already stored takes a new label when its row is mapped again: at the next load of its source row, or in the apply of a mapping replay (phase 11 section 3.8).
+NEW: A name already stored takes a new label when its row is mapped again. A source row that changed lands again, and its name row is replaced with the mapped label. A source row that did not change is not landed again (phase 11 section 3.2 step 2), so a mapping edit alone reaches it only in the apply of a mapping replay (phase 11 section 3.8).
+
+=== F2 [P-10-2]
+FILE: docs/plan/phase-10.md
+WHY: P-10-2 | CONFIRMED | LOW | the DR-422 sentence of section 7.27 was appended after "This phase's parts:", so the colon no longer leads to the list | the sentence moves before "This phase's parts:".
+OLD: This phase's parts: DR-422 locks the corrections of the check round of 2026-10-11: the payment columns and the grant date are compared as mapped values, and the index on `(facility_id, seq)` is not unique.
+NEW: DR-422 locks the corrections of the check round of 2026-10-11: the payment columns and the grant date are compared as mapped values, and the index on `(facility_id, seq)` is not unique. This phase's parts:

@@ -1,0 +1,136 @@
+Replacements of round 2 of the owner-decision check, key 13. 14 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [P-13b-1]
+FILE: docs/plan/phase-13.md
+WHY: P-13b-1 | CONFIRMED | MEDIUM (agent: HIGH) | the Network zones line of section 4 (line ~934) lets the API read `canon.account` and `canon.counterparty` "for the source-tag proposal of section 7.17 item 6 only", but item 7 runs `check_before_decision` (steps 2 and 3 again) and the activation ("hashes resolved again") in the approval transaction, which is in akr-api | "for the source-tag proposal, its decision check and its activation (section 7.17 items 6 and 7)". Nothing is blocked (the grants exist), so MEDIUM.
+OLD: for the source-tag proposal of section 7.17 item 6 only.
+NEW: for the source-tag proposal, its decision check and its activation (section 7.17 items 6 and 7) only.
+
+=== F2 [P-13b-2]
+FILE: docs/plan/phase-13.md
+WHY: P-13b-2 | CONFIRMED | MEDIUM | item 7 says "the hourly run does not take those months again". Section 3.2 step 1 takes every month-end within `features.catchup_months` (3) back from the newest on every run and step 3 runs the upsert of section 3.1, which updates changed values. So the hourly run does reach the last three months; the reopen is needed for older months only. The fixture of item 14 ("two months back") lies inside the window | the reason is restated (the hourly run reaches only the catch-up window); the fixture uses a `valid_from` five months back and says "those months". // L2-2 | LEAD FIND while deciding P-13b-2 | HIGH (a stated check fails) | the upsert of section 3.1 never touches a row that the recompute no longer produces, and `akr_app` has no DELETE on `feat.feature_values` (deliberate, line ~314). After a tag is voided, a customer whose only matching credits came from that source produces no group, so the old row keeps its value for the reopened months and for the catch-up months. The test of item 14 ("the feature rows ... no longer count the credits") fails for such a customer. The same holds in base text for any re-run in which a group disappears (a replay that cancels the only posting) | DESIGN TO WRITE (section 7.17 item 7, extending section 3.2 step 5 and the comment of `FeatureValueWriter::write_month_end`): a write for a `(M, feature)` pair that already has rows also resets, in the same transaction, every row of that pair that the SELECT did not produce: kinds `count` and `sum` get `value = 0`, status `value` (absent means zero, section 3.2 step 4); every other kind gets `value = NULL`, status `no_history` (as a zero denominator does, section 3.1 step ~8, line ~551), `basis` as the run's; a row already in that reset form is not written again. No new grant: UPDATE (value, status, basis, computed_at) is granted. The test of item 14 gains the customer whose only credits were tagged (its row becomes 0). CHECK FIRST when writing: the list of kinds in section 3.1 (lines ~535 to 551) and that `rows_written` counts these updates.
+OLD: and the hourly run does not take those months again. So, when
+NEW: and the hourly run takes again only the months within `features.catchup_months` (section 3.2 step 1). So, when
+
+=== F3 [P-13b-4]
+FILE: docs/plan/phase-13.md
+WHY: P-13b-4 | CONFIRMED | LOW | "(a row ended on day D still holds on D, so the month of D is the first that can change)": the first date that can change is the day after D; taking the month of D is at most one month early and harmless | reworded.
+OLD: (a row ended on day D still holds on D, so the month of D is the first that can change)
+NEW: (a row ended on day D still holds on D, so the first date that can change is the day after D; taking the month of D is at most one month early, which costs one recompute and changes no value)
+
+=== F4 [P-13b-3]
+FILE: docs/plan/phase-13.md
+WHY: P-13b-3 | CONFIRMED | LOW | "a queued hourly run would swallow the enqueue": the phase 00 scheduler (section 3.x step 6, line ~549) enqueues a periodic kind with the key `<kind>:<slot ISO>`, so the hourly job never holds the plain key `feature_compute`. What swallows a plain-key enqueue is another plain-key job (the catch-up enqueue of a `feature_definition` activation, a replay enqueue) | item 7, the test of item 14 ("also while an hourly ... job is queued") and the Open doubts entry say "a queued `feature_compute` job with the plain key".
+OLD: under the key `feature_compute` a queued hourly run would swallow the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen would be lost;
+NEW: under the plain key `feature_compute` another queued job with that key (the catch-up enqueue of a feature activation, or the enqueue of a replay) would swallow the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen would be lost; the scheduler's hourly job is not one of them, because its key is `feature_compute:<slot>` (phase 00);
+
+=== F5 [L2-2]
+FILE: docs/plan/phase-13.md
+WHY: Lead find of round 2 (HIGH, a stated check failed): the month-end upsert of phase 13 section 3.1 never touched a row that a re-run no longer produces, and `akr_app` has no DELETE on feat.feature_values, so after a voided source tag or a replay the old value stayed. Fix as written (new section 7.18, DR-423): the write of a pair (feature, as_of) also resets, in the same statement, every stored row of the pair that holds a value and that the SELECT did not produce: `value` NULL, status `no_history` (`beyond_window` for the kind `days_since`), `basis` = the run's basis plus `reason: no_activity`. A reader takes a row without a value as an absent row. Only a row with status `value` is reset, so a second run writes nothing. The other L2-2 entries are pointers to section 7.18 from the base text, the test of section 7.17 and DATA-MODEL.md.
+OLD: computes it again whatever its `basis` says (the register is not part of the basis), and step 5 updates only the rows whose value changed.
+NEW: computes it again whatever its `basis` says (the register is not part of the basis), step 5 updates only the rows whose value changed, and section 7.18 resets the rows the recompute no longer produces (a customer whose only matching credits came from the changed tag).
+
+=== F6 [P-13b-2/3]
+FILE: docs/plan/phase-13.md
+WHY: P-13b-2 | CONFIRMED | MEDIUM | item 7 says "the hourly run does not take those months again". Section 3.2 step 1 takes every month-end within `features.catchup_months` (3) back from the newest on every run and step 3 runs the upsert of section 3.1, which updates changed values. So the hourly run does reach the last three months; the reopen is needed for older months only. The fixture of item 14 ("two months back") lies inside the window | the reason is restated (the hourly run reaches only the catch-up window); the fixture uses a `valid_from` five months back and says "those months". // L2-2 | LEAD FIND while deciding P-13b-2 | HIGH (a stated check fails) | the upsert of section 3.1 never touches a row that the recompute no longer produces, and `akr_app` has no DELETE on `feat.feature_values` (deliberate, line ~314). After a tag is voided, a customer whose only matching credits came from that source produces no group, so the old row keeps its value for the reopened months and for the catch-up months. The test of item 14 ("the feature rows ... no longer count the credits") fails for such a customer. The same holds in base text for any re-run in which a group disappears (a replay that cancels the only posting) | DESIGN TO WRITE (section 7.17 item 7, extending section 3.2 step 5 and the comment of `FeatureValueWriter::write_month_end`): a write for a `(M, feature)` pair that already has rows also resets, in the same transaction, every row of that pair that the SELECT did not produce: kinds `count` and `sum` get `value = 0`, status `value` (absent means zero, section 3.2 step 4); every other kind gets `value = NULL`, status `no_history` (as a zero denominator does, section 3.1 step ~8, line ~551), `basis` as the run's; a row already in that reset form is not written again. No new grant: UPDATE (value, status, basis, computed_at) is granted. The test of item 14 gains the customer whose only credits were tagged (its row becomes 0). CHECK FIRST when writing: the list of kinds in section 3.1 (lines ~535 to 551) and that `rows_written` counts these updates. // P-13b-3 | CONFIRMED | LOW | "a queued hourly run would swallow the enqueue": the phase 00 scheduler (section 3.x step 6, line ~549) enqueues a periodic kind with the key `<kind>:<slot ISO>`, so the hourly job never holds the plain key `feature_compute`. What swallows a plain-key enqueue is another plain-key job (the catch-up enqueue of a `feature_definition` activation, a replay enqueue) | item 7, the test of item 14 ("also while an hourly ... job is queued") and the Open doubts entry say "a queued `feature_compute` job with the plain key".
+OLD: the activation of a change set that voids a tag whose `valid_from` lies two months back enqueues one `feature_compute` job with that month's month-end as `reopen_from`, also while an hourly `feature_compute` job is queued, and after it ran the feature rows of the two months no longer count the credits.
+NEW: the activation of a change set that voids a tag whose `valid_from` lies five months back (outside `features.catchup_months`) enqueues one `feature_compute` job with that month's month-end as `reopen_from`, also while a `feature_compute` job with the plain key is queued, and after it ran the feature rows of those months no longer count the credits: the row of a customer with other payroll credits holds the smaller sum, and the row of a customer whose only payroll credits came from the voided tag holds no value (`no_history`, `basis.reason = no_activity`; section 7.18).
+
+=== F7 [P-13b-3]
+FILE: docs/plan/phase-13.md
+WHY: P-13b-3 | CONFIRMED | LOW | "a queued hourly run would swallow the enqueue": the phase 00 scheduler (section 3.x step 6, line ~549) enqueues a periodic kind with the key `<kind>:<slot ISO>`, so the hourly job never holds the plain key `feature_compute`. What swallows a plain-key enqueue is another plain-key job (the catch-up enqueue of a `feature_definition` activation, a replay enqueue) | item 7, the test of item 14 ("also while an hourly ... job is queued") and the Open doubts entry say "a queued `feature_compute` job with the plain key".
+OLD: is dropped while another `feature_compute` job is queued (phase 00: `ON CONFLICT DO NOTHING`), and the reopen is lost.
+NEW: is dropped while another job with that plain key is queued (phase 00: `ON CONFLICT DO NOTHING`; the scheduler's hourly job has the key `feature_compute:<slot>` and is not one), and the reopen is lost.
+
+=== F8 [L2-1]
+FILE: docs/plan/phase-13.md
+WHY: Lead fix of round 2 (LOW), from an agent note: the SQL comment above feat.counterparty_links in phase 13 said "Owner akr_app"; every table is owned by `akr_migrate` and this one is written by `akr_app`.
+OLD: Counterparty to party links. Owner akr_app; retention R2
+NEW: Counterparty to party links. Owner akr_migrate; written by akr_app; retention R2
+
+=== F9 [P-DR-2]
+FILE: docs/plan/phase-13.md
+WHY: P-DR-2 | CONFIRMED | MEDIUM (agent: HIGH) | claim (6) names phase 13, but phase 13 section 6 item 1 (lines ~972 to 973, a sentence that wraps over two lines and was missed by the round 1 sweep) still expects `feature definition content is immutable` as `akr_app` for `UPDATE feat.feature_definitions SET expression = '{}'`, and `akr_app` holds UPDATE (state, retired_at) only (line ~317) | the check line says permission denied for `akr_app` and the guard message for the owner `akr_migrate`. // Lead sweep made again for P-DR-2 (every check paragraph of phases 00 to 31 that expects a guard message, read against the GRANT lines; this time over wrapped lines): phase 13 `feat.peer_groups (state)`, phase 14 `ref.list_entries` INSERT and `alert.screening_alerts (state)`, phase 15 `kyc.rating_models (document, status)`, phase 16 `scn.scenario_versions (document)`, phase 20 `casework.ops_tasks (cbs_reference, verification_level)` and `casework.freezes (state)`, phase 21 `rpt.report_versions`, `rpt.filings (ack_at)` and `rpt.letters (state)` are all in the column grants, so their guard messages are right as written. One more clause is not exact: L2-3 below.
+OLD: `UPDATE feat.feature_definitions SET expression = '{}'` fails with `feature definition content is immutable`;
+NEW: `UPDATE feat.feature_definitions SET expression = '{}'` fails with permission denied (`expression` is not in the
+   column grant) and, as the owner `akr_migrate`, with `feature definition content is immutable`;
+
+=== F10 [P-19b-2]
+FILE: docs/plan/phase-13.md
+WHY: P-19b-2 | CONFIRMED | LOW (agent: MEDIUM) | the check "`DELETE FROM casework.rfi_prefill_map` fails ... as the owner `akr_migrate` with `pre-fill map rows are never deleted`" stands under `make migrate`, where the table is empty; the guard is a row trigger, so the owner's statement raises only when a row exists. The neighbouring checks of the same item name their rows, so a builder runs the item with fixture rows; the wording is made exact | "a `DELETE` of a row fails ...". The twin line of phase 13 section 7.17 item 14 (`DELETE FROM feat.source_tags`) gets the same words.
+OLD: `DELETE FROM feat.source_tags` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `source tags are never deleted`.
+NEW: A `DELETE` of a row of `feat.source_tags` fails, as `akr_app` with permission denied (no DELETE grant; with or without a row) and as the owner `akr_migrate` with `source tags are never deleted` (the guard is a row trigger, so the owner's statement needs a row).
+
+=== F11 [L2-2]
+FILE: docs/plan/phase-13.md
+WHY: Lead find of round 2 (HIGH, a stated check failed): the month-end upsert of phase 13 section 3.1 never touched a row that a re-run no longer produces, and `akr_app` has no DELETE on feat.feature_values, so after a voided source tag or a replay the old value stayed. Fix as written (new section 7.18, DR-423): the write of a pair (feature, as_of) also resets, in the same statement, every stored row of the pair that holds a value and that the SELECT did not produce: `value` NULL, status `no_history` (`beyond_window` for the kind `days_since`), `basis` = the run's basis plus `reason: no_activity`. A reader takes a row without a value as an absent row. Only a row with status `value` is reset, so a second run writes nothing. The other L2-2 entries are pointers to section 7.18 from the base text, the test of section 7.17 and DATA-MODEL.md.
+OLD:     /// Set-based insert-or-update on the primary key; touches only rows whose basis differs. Returns (inserted, updated).
+NEW:     /// Set-based insert-or-update on the primary key; touches only rows whose basis differs. Returns (inserted, updated).
+    /// Section 7.18: the same statement resets the rows of the pair that the SELECT no longer produces; they count as updated.
+
+=== F12 [L2-2]
+FILE: docs/plan/phase-13.md
+WHY: Lead find of round 2 (HIGH, a stated check failed): the month-end upsert of phase 13 section 3.1 never touched a row that a re-run no longer produces, and `akr_app` has no DELETE on feat.feature_values, so after a voided source tag or a replay the old value stayed. Fix as written (new section 7.18, DR-423): the write of a pair (feature, as_of) also resets, in the same statement, every stored row of the pair that holds a value and that the SELECT did not produce: `value` NULL, status `no_history` (`beyond_window` for the kind `days_since`), `basis` = the run's basis plus `reason: no_activity`. A reader takes a row without a value as an absent row. Only a row with status `value` is reset, so a second run writes nothing. The other L2-2 entries are pointers to section 7.18 from the base text, the test of section 7.17 and DATA-MODEL.md.
+OLD:    zero rows. A re-run with changed data updates only the rows whose value changed.
+NEW:    zero rows. A re-run with changed data updates only the rows whose value changed. A row that the re-run no longer
+   produces is not left as it was: it is reset (section 7.18).
+
+=== F13 [L2-2]
+FILE: docs/plan/phase-13.md
+WHY: Lead find of round 2 (HIGH, a stated check failed): the month-end upsert of phase 13 section 3.1 never touched a row that a re-run no longer produces, and `akr_app` has no DELETE on feat.feature_values, so after a voided source tag or a replay the old value stayed. Fix as written (new section 7.18, DR-423): the write of a pair (feature, as_of) also resets, in the same statement, every stored row of the pair that holds a value and that the SELECT did not produce: `value` NULL, status `no_history` (`beyond_window` for the kind `days_since`), `basis` = the run's basis plus `reason: no_activity`. A reader takes a row without a value as an absent row. Only a row with status `value` is reset, so a second run writes nothing. The other L2-2 entries are pointers to section 7.18 from the base text, the test of section 7.17 and DATA-MODEL.md.
+OLD: 
+## Decisions
+
+NEW: 
+### 7.18 A recompute resets the rows it no longer produces (owner-decision check round 2, HIGH; DR-423)
+The month-end statement of section 3.1 inserts or updates the rows its SELECT produces and leaves every other row of the pair `(feature, as_of)` as it was, and `akr_app` has no DELETE on `feat.feature_values` (section 1, by design). When a re-run no longer produces a group that an earlier run stored, the old value stayed. Two cases reach it: a replay that cancels the only posting an entity had in the window (section 3.2, `reopen_from`), and a source tag that is voided or ended when its credits were a customer's only match (section 7.17 item 7). The row then kept a value the data no longer supports, in the reopened months and in every later run.
+
+1. **Rule.** The write of a pair `(feature, as_of)` also resets, in the same statement, every stored row of that pair that holds a value and whose `(entity_id, currency)` the SELECT did not produce. The reset sets `value` to NULL, `status` to `no_history` (`beyond_window` for the kind `days_since`, as section 7.11 says of an account with no posting in its window), `basis` to the run's basis with the member `"reason": "no_activity"` added, and `computed_at` to `now()`. No row is deleted and no grant changes: `akr_app` holds UPDATE on these four columns (section 1). The reset runs only for a pair that passes the gate of section 3.2 step 2; a `not_ready` or `dark` pair writes nothing, as before.
+2. **Readers.** A row without a value is read as an absent row. Section 3.4 step 2 and the profile build of section 3.6 already take `status = value` only; "absent" in section 3.2 step 4 and in section 3.5 step 1 means no row with a value. So a reset row gives zero for a `count` or `sum` feature under a `computed` run and "not applicable" for the other kinds, and it is not counted in a segment statistic.
+3. **The statement.** `FeatureCompiler::compile` wraps the SELECT of the feature as the CTE `cur` (one row per `(entity_id, currency)`, with the value and the status the INSERT of section 3.1 selected) and emits one statement of four parts for every kind. For `credit_turnover_1m` it replaces the SQL of section 3.1:
+
+```sql
+WITH cur AS MATERIALIZED (
+    SELECT a.customer_id AS entity_id, t.currency AS currency, SUM(t.amount) AS value, 'value'::text AS status
+    FROM canon.txn t
+    JOIN canon.account a ON a.id = t.account_id AND a.recorded_to IS NULL
+    WHERE t.booking_date BETWEEN $4 AND $2 AND t.dr_cr = 'C' AND t.status = 'posted' AND t.system_generated IS NOT TRUE
+    GROUP BY a.customer_id, t.currency
+), had AS MATERIALIZED (                      -- the keys stored before this statement (one snapshot for all parts)
+    SELECT entity_id, currency FROM feat.feature_values WHERE feature_id = $1 AND as_of = $2
+), up AS (
+    INSERT INTO feat.feature_values (entity, entity_id, feature_id, currency, as_of, value, status, basis, computed_at)
+    SELECT 'customer', entity_id, $1, currency, $2, value, status, $3, now() FROM cur
+    ON CONFLICT (entity, entity_id, feature_id, currency, as_of) DO UPDATE
+        SET value = EXCLUDED.value, status = EXCLUDED.status, basis = EXCLUDED.basis, computed_at = now()
+        WHERE feat.feature_values.value IS DISTINCT FROM EXCLUDED.value
+           OR feat.feature_values.basis IS DISTINCT FROM EXCLUDED.basis
+    RETURNING entity_id, currency
+), gone AS (
+    UPDATE feat.feature_values v
+       SET value = NULL, status = 'no_history', basis = $3 || '{"reason": "no_activity"}'::jsonb, computed_at = now()
+     WHERE v.feature_id = $1 AND v.as_of = $2 AND v.status = 'value'
+       AND NOT EXISTS (SELECT 1 FROM cur c WHERE c.entity_id = v.entity_id AND c.currency = v.currency)
+    RETURNING 1
+)
+SELECT (SELECT count(*) FROM up u WHERE NOT EXISTS
+            (SELECT 1 FROM had h WHERE h.entity_id = u.entity_id AND h.currency = u.currency)) AS inserted,
+       (SELECT count(*) FROM up u WHERE EXISTS
+            (SELECT 1 FROM had h WHERE h.entity_id = u.entity_id AND h.currency = u.currency))
+     + (SELECT count(*) FROM gone)                                                             AS updated;
+```
+
+   `up` and `gone` never touch the same row: `up` writes the keys of `cur`, `gone` the stored keys that are not in `cur`. The lookup of `had` and `gone` uses `idx_feature_values_feature` inside the one monthly partition of `$2`. `write_month_end` reads the one result row and returns `(inserted, updated)`; reset rows count as updated, so `feature_runs.rows_written` and the audit event `feature.computed` include them. Only a row with `status = 'value'` is reset, so a second run for the same months still writes zero rows (section 3.2 step 5). A reset row whose entity has activity again is written by `up` with the run's basis, without the reason.
+4. **Tests** (added to section 6): a month with the customers A and B is computed; the fixture then cancels B's only posting of the month and the job runs with `reopen_from` = that month-end. B's row then has `value` NULL, `status = 'no_history'` and `basis->>'reason' = 'no_activity'`; A's row is unchanged; the run reports one updated row and the next run reports zero. `segment_stats_refresh` for the period does not count B in `n`. When B has a posting again and the month is reopened, B's row holds the new value and a basis without `reason`. As `akr_app`, `DELETE FROM feat.feature_values` still fails with permission denied (section 6 item 1).
+
+## Decisions
+
+
+=== F14 [L2-2]
+FILE: docs/DATA-MODEL.md
+WHY: Lead find of round 2 (HIGH, a stated check failed): the month-end upsert of phase 13 section 3.1 never touched a row that a re-run no longer produces, and `akr_app` has no DELETE on feat.feature_values, so after a voided source tag or a replay the old value stayed. Fix as written (new section 7.18, DR-423): the write of a pair (feature, as_of) also resets, in the same statement, every stored row of the pair that holds a value and that the SELECT did not produce: `value` NULL, status `no_history` (`beyond_window` for the kind `days_since`), `basis` = the run's basis plus `reason: no_activity`. A reader takes a row without a value as an absent row. Only a row with status `value` is reset, so a second run writes nothing. The other L2-2 entries are pointers to section 7.18 from the base text, the test of section 7.17 and DATA-MODEL.md.
+OLD: ; sparse by activity | as_of (month) | R4 |
+NEW: ; sparse by activity (a row that a recompute no longer produces is kept without a value: `no_history`, `basis.reason = no_activity`; phase 13 section 7.18) | as_of (month) | R4 |

@@ -60,6 +60,50 @@ recheck5:
   high: []
   fixes_applied: true
   clean_pass: true
+owner_round1:
+  done: 2026-10-11
+  scope: the section 7+ blocks of the seven owner decisions (DR-414 to DR-420) in ten phase files
+  raised: 96
+  confirmed: 95
+  rejected: 1
+  lead_finds: 7
+  by_severity: {high: 10, medium: 42, low: 49}
+  high: [O-07-1, O-07-2, O-13-5, O-19-3, O-19-8, O-19-17, O-19-20, O-25-1, O-26-1, O-26-2]
+  fixes_applied: true
+  clean_pass: false
+owner_round2:
+  done: 2026-10-11
+  scope: the 208 replacements of round 1
+  raised: 29
+  confirmed: 29
+  rejected: 0
+  lead_finds: 4
+  by_severity: {high: 2, medium: 12, low: 17}
+  high: [P-07b-7, L2-2]
+  fixes_applied: true
+  clean_pass: false
+owner_round3:
+  done: 2026-10-11
+  scope: the 46 replacements of round 2
+  raised: 5
+  confirmed: 5
+  rejected: 0
+  lead_finds: 1
+  by_severity: {high: 0, medium: 0, low: 6}
+  high: []
+  fixes_applied: true
+  clean_pass: false
+owner_round4:
+  done: 2026-10-11
+  scope: the 4 replacements of round 3
+  raised: 0
+  confirmed: 0
+  rejected: 0
+  lead_finds: 0
+  by_severity: {high: 0, medium: 0, low: 0}
+  high: []
+  fixes_applied: true
+  clean_pass: true
 gaps:
   - V-00-12-a
   - V-04-08-a
@@ -224,30 +268,40 @@ or old text that a later block already overrides.
 
 ## Decisions that narrow the scope
 
-These are the lead's decisions where a requirement had no data source or map in the plan. Each one is carried in part
-and the rest is marked P2. The product owner should confirm them.
+These were the lead's decisions where a requirement had no data source or map in the plan. The pass carried each one
+in part and marked the rest P2. The product owner answered all nine on 2026-10-10. Seven answers overturn the lead's
+decision, and the plan now carries them; two confirm it. The section "Owner decisions (2026-10-10)" below says how
+the changed text was checked.
 
-1. **Staff-behaviour rule pack (SP-36, phase 01).** The rules that the exported audit kinds can feed ship in
-   `deploy/siem/use_cases.yaml`. Rules that need allowed reads are P2, because allowed reads are not exported. The
-   shipped rules carry proposed time windows and thresholds, and the bank tunes them in its own SIEM (phase 25).
-2. **Test corpora (phases 07, 14).** The goAML rejection corpus and the screening known-answer corpus grow by release
-   only. A bank cannot add to them in this version (N-44 is carried in part).
-3. **Counterparty profiles and batch tags (phase 13).** VB-05 is carried as counterparty-keyed features only. The
-   payroll and pension batch tags and the government-source flag of S-17 are P2: no core banking field feeds them.
-4. **RFI pre-fill (M-44, phase 19).** P2. The plan holds no map from the Wolfsberg question keys to canonical fields.
-5. **SIEM dead letters (phase 25).** Resolving a dead letter is P2. The tile counts the last seven days.
-6. **Islamic scenarios (phase 26).** SCN-ISL-07 for a bank whose qard hasan sits in schedule tables is P2 until the
-   schedule mapping names a repayment event. The related-person leg of SCN-ISL-06 reads the mapped flag or a family
-   relation to a staff party.
-7. **Payments with no UETR (phases 10, 29).** Matching a released payment needs the bank's mapping to fill
-   `message_refs.internal_ref`. The gateway team names the column. Without it the payment is `no_match_key`.
-8. **Backup and restore (phase 30).** The offline copy (SP-88) is a monthly procedure of the bank's operators, and no
-   repository is object-locked. The credential rotation after a ransomware restore is an ordered runbook of existing
-   commands. No route serves a stored drill or restore report: the operator keeps the file and the security officer
-   sees the audit event.
-9. **Label of a Latin name (phase 08).** A Latin name shown under an Arabic or Kurdish name is always labelled
-   "typed". The labels "card", "passport" and "generated" of the design system are not used: no mapped field says
-   that a name was read from a document, and the product generates no Latin form.
+1. **Staff-behaviour rule pack (SP-36).** Lead: rules that need allowed reads are P2. **Owner: export allowed reads
+   too.** Every access event now goes to the bank's SIEM as an access line, and seven behaviour rules ship (phase 25
+   section 7.23, DR-414). A bank can switch the export off. Canary access and the DBA and operator rules stay out.
+2. **Test corpora.** Lead: the corpora grow by release only. **Owner: banks add cases in this version.** A bank adds
+   goAML cases and screening known-answer cases through change control (phase 07 section 7.6, phase 08 section 7.11,
+   phase 14 section 7.19, DR-415). The product masks an uploaded goAML file and keeps only the masked copy. Screening
+   cases are reported and never block a list update.
+3. **Counterparty profiles and batch tags.** Lead: the payroll and pension tags and the government-source flag are
+   P2. **Owner: the bank keeps the tags by hand.** A register of paying sources is changed through change control,
+   and features and static segments can read it (phase 13 section 7.17, phase 18 section 7.29, DR-416). A
+   counterparty profile stays P2.
+4. **RFI pre-fill (M-44).** Lead: P2. **Owner: build it.** The desk gets proposed answers for an incoming
+   correspondent request, from a map the bank manages; a person records each answer (phase 19 section 7.21, DR-417).
+5. **SIEM dead letters.** Lead: resolving one is P2. **Owner: add resolve.** An administrator can send a dead letter
+   again or mark it resolved with a code, and each act is audited (phase 25 section 7.24, DR-418).
+6. **Islamic scenarios.** Lead: the facility leg of SCN-ISL-07 waits for a schedule mapping. **Owner: map schedules
+   in this version.** The canonical model gains instalments and the grant date of a facility (phase 26 section 7.13,
+   phase 10 section 7.27, DR-419). The related-person leg of SCN-ISL-06 is unchanged.
+7. **Payments with no UETR (phases 10, 29).** **Owner: confirmed as planned.** Matching a released payment needs the
+   bank's mapping to fill `message_refs.internal_ref`. Without it the payment is `no_match_key` (DR-421).
+8. **Backup and restore (phase 30).** **Owner: confirmed as planned.** The offline copy is a monthly procedure of the
+   bank's operators, no repository is object-locked, the rotation after a ransomware restore is a runbook, and no
+   route serves a stored drill or restore report (DR-421).
+9. **Label of a Latin name.** Lead: always "typed". **Owner: keep all four labels.** The bank's mapping says whether
+   a name came from the card, the passport, typing or a program, and the screens show it (phase 10 section 7.26,
+   phase 08 section 7.10, phase 18 section 7.28, DR-420).
+
+The owner also answered the open design item DS-O1: the product ships with the light theme only for now, and the
+owner decides on the dark theme when the phase 08 shell is on screen (DR-421).
 
 The other lead decisions are design choices inside a phase. DR-413 lists the main ones, and the verdict file gives
 each one beside its claim.
@@ -425,4 +479,97 @@ is ready for implementation.
   (rounds 2, 3 and 4; one of them high). So a fresh read of the whole plan would probably still find some gaps, most
   of them small. This report does not claim that none are left.
 - A gap met while building is fixed in the phase file in the same change, as `planning.md` asks.
-- The nine decisions under "Decisions that narrow the scope" still wait for the user's word.
+- The nine decisions under "Decisions that narrow the scope" were answered by the owner on 2026-10-10. The plan
+  changes that follow from them are described in "Owner decisions (2026-10-10)" below.
+
+## Owner decisions (2026-10-10)
+
+The owner's nine answers are listed under "Decisions that narrow the scope" above. Seven of them changed the plan
+(DR-414 to DR-420). The changes were written into the phase files as new blocks under "7+. Gap Additions", with the
+base text corrected where a block replaces it, and the system documents were brought in step (API.md, DATA-MODEL.md,
+MODULES.md, DSL.md, DESIGN-SYSTEM.md). They add 14 routes (API.md has 595 rows) and 6 tables. This section says how
+the new text was checked and what the check found.
+
+**Method.** The owner chose the check: one Haiku agent per changed phase reads the new text, the lead decides each
+finding, and building starts after a clean round. No fresh pass over the whole plan was run (DR-421).
+- Round 1: ten agents, one per changed phase file (02, 07, 08, 10, 13, 14, 18, 19, 25, 26), read the new blocks and
+  ran six tests on them: the text is present and readable; no other line of the phase says something else; every
+  name it uses exists; its SQL is valid and agrees with the tables; its counts are right; and it is complete by the
+  rules of `.claude/rules/planning.md`. The prompt is `tools/agent/p-owner.txt` and the agents' files are
+  `tools/agent/verify/owner-NN.md`.
+- Rounds 2 to 4: each round read only the replacements that the round before had made, one agent per phase (a large
+  phase in two parts), each replacement with the lead's verdict line beside it. The prompts are
+  `tools/agent/p-owner2.txt` to `p-owner4.txt`, the inputs `tools/agent/verify/ownerN-fixes-KEY.txt` and the agents'
+  files `tools/agent/verify/ownerN-KEY.md`.
+- The lead read every finding against the phase text before changing anything, and rated it on the scale of this
+  report. All verdicts are in `tools/agent/owner-verdict.md`. All fixes are exact text replacements, logged in
+  `tools/agent/owner-fixes.txt` (258 entries).
+- The agents had no database: SQL was checked by reading. One agent of round 1 (phase 25) started a throwaway
+  PostgreSQL container of its own to test SQL and removed it; the later prompts forbid that.
+
+**Result.** A true gap is a confirmed finding (a defect raised twice is counted once) or a find of the lead.
+
+| Round | Text read | Agents | Raised | Confirmed | Rejected | Lead finds | True gaps | High | Medium | Low | Replacements |
+|-|-|-|-|-|-|-|-|-|-|-|-|
+| 1 | the new blocks in ten phase files | 10 | 96 | 95 | 1 | 7 | 101 | 10 | 42 | 49 | 208 |
+| 2 | the 208 replacements of round 1 | 16 | 29 | 29 | 0 | 4 | 31 | 2 | 12 | 17 | 46 |
+| 3 | the 46 replacements of round 2 | 11 | 5 | 5 | 0 | 1 | 6 | 0 | 0 | 6 | 4 |
+| 4 | the 4 replacements of round 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+That is 138 true gaps, 12 of them high, and all are fixed. In round 1 one confirmed finding repeated another, and in
+round 2 two did. Round 4 found nothing and changed nothing, so no further round follows.
+
+**The 12 high gaps.**
+
+| Gap | Phase | What was wrong | Fix |
+|-|-|-|-|
+| O-07-1 | 07 | The check before a decision queued the intake job of a bank's goAML test case and then refused the decision. A refusal rolls the transaction back, so the job was never queued and the case could never be approved | The job is queued where the transaction commits, by the activation of the goAML profile; the check only refuses |
+| O-07-2 | 07 | A curl check expected the refusal `E_SCOPE` for a role that holds the scope; Cedar refuses it with `E_FORBIDDEN` | The check names the right role for each refusal |
+| O-13-5 | 13 | A source tag can only be renamed by retiring it and adding it again in one change set, but the activation inserted the new row first and the unique index refused it every time | The activation closes the retired rows first |
+| O-19-3 | 19, 13 | The change requests for the pre-fill map and for source tags had no reason code and reason text, which change control requires, so every proposal would be refused with 422 | Both request bodies carry the two fields |
+| O-19-8 | 19 | The proposed answer on PEP status read the core-system column and ignored the bank's own PEP register, so a PEP the bank had confirmed could be proposed as "no" | The answer reads the register first |
+| O-19-17 | 19 | The proposed answer on declared and actual activity read the customer profile, which the RFI desk may not read | It is computed for the MLRO only, under the purpose `investigation` |
+| O-19-20 | 19 | A flag `incomplete` on the list of account signatories told the desk, and through the answer another bank, that a hidden person holds the account | The names are computed for the MLRO only, and a hidden signatory is left out with no flag |
+| O-25-1 | 25 | The last CHECK of the dead-letter table was false for every open row, so no dead letter could be stored and one bad line would stop the SIEM stream | The CHECK is rewritten so that an open row passes |
+| O-26-1 | 26, 10 | A unique index on facility and instalment number refused the second schedule of a rescheduled loan and rolled the batch back | The index is a plain index |
+| O-26-2 | 26 | The text said a bank with no schedule mapping is graded B for SCN-ISL-07; the grader gives an optional input no effect on the grade, so the stated test would fail | The grade does not change; the facility legs are not evaluable until the inputs are published |
+| P-07b-7 | 07, 04 | A bank's test case that failed its intake could not be approved, and the same check also refused its rejection, so only its maker could end the request; the A2 role has no withdraw screen | Phase 04 section 7.21: a rejection of a change request is never held by the check |
+| L2-2 | 13 | A monthly feature value stayed stored when a recompute no longer produced it (a voided source tag, or a replay that cancels a customer's only posting), and the role has no DELETE on the table | Phase 13 section 7.18: the same statement clears the value of every row it no longer produces |
+
+**Design rules that the check locked.** Two decision rows record what the rounds changed in the design, as opposed
+to wording. DR-422 holds the corrections of round 1, in six groups: the writer rules for the new mapped columns
+(phases 10 and 26); the sensitive sources of the RFI pre-fill (phase 19); the activation order of source tags and
+the recompute of the features that read a changed tag (phase 13); the intake of a bank's goAML case, the audit of
+each deleted upload and the report of the bank's screening cases (phases 07 and 14); the dead-letter CHECK and the
+access events recorded while the export was off (phase 25); and the check lines about database roles. DR-423 holds
+the two rules of round 2 named in the table above (phase 13 section 7.18, phase 04 section 7.21). Round 3 changed no
+rule: its six gaps were wording in two check lines and in two summary lines of DATA-MODEL.md.
+
+One point on check lines came out of round 1 and holds for every phase. PostgreSQL refuses a statement on a missing
+privilege before any trigger runs. So a negative check as `akr_app` on a table or column it has no grant on expects
+"permission denied", and the guard's own message is expected as the owner `akr_migrate`. The lead swept the check
+lines of phases 00 to 31 for this twice and corrected them. A guard is a row trigger, so a guard check is run on a
+stored row; three check lines say so (phases 13 and 19), and the others leave it to the test's fixture row.
+
+**Checks after the fixes.** 423 decisions with 0 problems, and no plan file cites a decision that is not defined;
+595 API.md rows, all owned by a phase route table; 940 requirements carried, 268 named as not carried and 0 named
+nowhere.
+
+**What is still out, by decision.** These are stated in the phase files and are not gaps.
+- A counterparty profile stays P2; counterparties get features only (DR-416).
+- Canary access and the DBA and operator rules stay out of the SIEM rule pack (DR-414).
+- Four RFI answers stay typed by hand: source of wealth, beneficial owners, rating and screening history (DR-417).
+- The A2 role, which may propose a goAML test case, has no withdraw screen. The approver's rejection closes the
+  request (phase 08 section 7.11, phase 04 section 7.21).
+- The masked copy of an uploaded goAML file keeps its dates, a date of birth among them, and its enumeration codes,
+  because the rules read them; every name, number, amount and narrative is replaced (phase 07 section 7.6).
+
+**Points left for the build.** Each is written under "Open doubts" of its phase.
+- Instalment rows that a source replaces or deletes after a reschedule stay unpaid in the product (phase 26).
+- How the apply of a mapping replay meets the guard on an unchanged landed row (phase 11).
+- A replay queues the feature recompute under the plain job key, so the request is dropped while another job with
+  that key is queued. It should take a key of its own, as the source-tag activation does (phase 13).
+
+**Status.** `complete` stands. The check of the owner's changes ended with a clean round: 101, 31, 6 and then 0 true
+gaps. As with the verification pass, each round after the first read only the text that had changed, so the same
+caution applies: a gap met while building is fixed in the phase file in the same change.

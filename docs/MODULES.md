@@ -188,7 +188,11 @@ Phase file: docs/plan/phase-25.md (DR-235, DR-241, DR-245): SIEM forwarding (CEF
 akr-worker, zone `z2_bank`) and the pull API `GET /siem/events` (scope `siem.pull`, service principals), both through
 SECURITY DEFINER `audit.siem_page`: `siem`-flagged kinds only, no case id, no tier value, resource fields dropped for
 every non-normal row; a cursor that survives restarts, dead letters by id; the RFC 3161 time stamp per anchor (off by
-default).
+default). Owner decisions of 2026-10-10: record reads are exported too (every access event: allow, deny and conflict), through SECURITY DEFINER
+`audit.siem_access_page` and the pull route `GET /siem/access-events`, while the governed setting
+`siem.export_access_events` is on, and the seven staff-behaviour rules of SP-36 ship with them (DR-414; phase 25
+section 7.23); ADM can send a dead letter again or mark it resolved with a code, each act audited (DR-418; phase 25
+section 7.24).
 
 ## M5. Sources, Discovery & Ingestion [P0 discovery, P1 production]
 
@@ -352,7 +356,12 @@ nothing) / true (case + M14 freeze task + clocks).
 
 **API sketch:** `GET /api/v1/lists`, `GET /lists/{id}/versions`, `POST /screening/search`, `GET /screening/alerts`,
 `POST /screening/alerts/{id}/decision`, `GET/POST /screening/pair-memory`, `GET/POST /screening/good-guys`,
-`GET /screening/harness-runs`.
+`GET /screening/harness-runs`, `GET/POST /screening/harness-cases`.
+
+Owner decision DR-415 (phase 14 section 7.19): the bank adds its own known-answer cases through change control (CR
+`harness_case`, material). The name is sealed and a case holds no party or alert link. Gate and oracle runs report
+the bank's cases beside the shipped corpus and they never decide the gate; a list-setting or screening-policy change
+that loses a known hit is flagged in its dry run and is at least material. N-44 is carried; N-57 stays P2.
 
 **Screens:** S1 screening review (mockup 03), S2 screening queue, S3 list status and known-answer tests, S4 pair
 memory and exemption register.
@@ -430,7 +439,10 @@ suppressed; flag `pack.exposure`).
   coverage), the three-level segment register (static and risk overlay by change request, behavioural clusters from
   deterministic peer builds), robust segment statistics with the 200 floor (S-12), and expected profiles whose
   comparators stay detection logic (S-10, T-07); `/ref/segments`, `/feature-definitions`, `/peer-groups`,
-  `/parties/{id}/profiles`.
+  `/parties/{id}/profiles`. Owner decision DR-416 (phase 13 section 7.17): the bank keeps a register of paying
+  sources by hand, each marked payroll, pension or government source, through change control (CR `source_tag`;
+  `/ref/source-tags`; D3 tab Source tags); a feature filter and a static segment predicate may read a tag, so
+  public-salary and pension customers can form peer segments (S-17). A counterparty profile stays P2.
 - P2: typology exposure index across the bank, branches and correspondents (S-31).
 
 **Flows:** batch mapped -> outbox names accounts touched -> event scenarios at once, window scenarios for those
@@ -467,7 +479,11 @@ workflows `rfi_release_internal` (RFI desk) and `rfi_release_external` (MLRO), a
 request registers (TR-17 through outbox); UTR watches; hibernations with the intake gate, hit ledger and regret metric;
 evidenced network edges with hidden kinship, snapshots and network cases; QA samples with a `qa_review` read grant, rubric,
 findings and bulk reopen; clock breach stages and the alarm register; screens W6, W8, W10, W11, G3. M-51 to M-55, M-76 and
-T-22 are partly carried or open (phase-19 Open doubts).
+T-22 are partly carried or open (phase-19 Open doubts). Owner decision DR-417 (phase 19 section 7.21): for an
+incoming correspondent RFI the desk gets proposed answers computed from the product's own records (ten closed
+sources, four of them for the MLRO only), through a map of question key to source that the bank changes by change
+request (CR `rfi_prefill_map`; `/rfis/{id}/prefill`, `/rfi-prefill-map`); a proposal is never stored or sent, a person
+records each answer. M-44 is implemented.
 RFIs, watches, hibernations, network and QA are phase 19.
 Phase file: docs/plan/phase-31.md (DR-338 to DR-344, DR-347): the training workspace in schema `train` (synthetic
 cases, scored on the first attempt, screen W12); the capacity workbench by team only (measured handling times, fluid
@@ -516,7 +532,9 @@ calendar); late data amending an alert inside a decided case (flagged for the de
   an estimated grade in the Office's four levels, always labelled estimated (DR-72); field findings with path, line
   and fix, never a value; files deleted after the run (DR-69); no bank system connection needed. Phase 07 also
   delivers the profile registry as versioned data changed by change request (DR-68), the rule catalogue, the
-  regression corpus, a pre-screen plus sandboxed XSD validation (DR-70) and the Office schema watcher through the
+  regression corpus (shipped cases, plus cases the bank adds through change control: the system masks the uploaded
+  file, keeps only the masked copy as sealed evidence and no route returns it; DR-415, phase 07 section 7.6), a
+  pre-screen plus sandboxed XSD validation (DR-70) and the Office schema watcher through the
   bank's proxy, off by default, with `akr-ctl goaml import-xsd` for air-gapped banks (DR-71).
 - P1: report builder for STR, SAR, TFR, UTR, AIF (six steps: reason and indicators, subjects, transactions, narrative,
   validation, package); Iraqi name splitting, mother's name, year-only birth dates, governorate to `state`; six
@@ -736,7 +754,9 @@ widens the product contract-type list by four values), analyst-written possessio
 (`88_islamic.cedar`); missing evidence is a counts-only phase 24 register warning from job `islamic_evidence_sweep`, not
 an alert (DR-248); no Islamic factor in any score (DR-249); library SCN-ISL-01..08 in shadow, live through G9
 (DR-251); the Sharia board is not a user and reads counts through M, CH and IA (`dashboard.read`, DR-250). The Sharia
-view's screen id is `I1` in the DESIGN-SYSTEM catalogue (gap pass 1). Not carried by phase 26: I-09,
+view's screen id is `I1` in the DESIGN-SYSTEM catalogue (gap pass 1). Owner decision DR-419 (phase 26 section 7.13,
+phase 10 section 7.27): the base model gains `canon.facility_instalments` and `canon.facility.granted_on`, so a bank
+whose qard hasan sits in schedule tables maps them and the facility leg of SCN-ISL-07 runs. Not carried by phase 26: I-09,
 I-11..I-15, I-18, I-19, I-21..I-23, I-25, I-27..I-29 (phase 26 header; gap pass 1).
 
 ## M19. Assessment API (phase 2) [P2]
@@ -793,7 +813,8 @@ Phase file: docs/plan/phase-25.md (DR-236 to DR-240, DR-244): release bundles im
 recorded (no call-home); vendor support sessions (at most 8 h, SEC approval with step-up `access_change`, the `VS`
 grant can only read its own profile, automatic end); support bundles built by `akr-ctl support-bundle` (allow-list,
 per-bundle pseudonym key, signed, deleted after 30 days, disclosure record kept); help articles and "what changed"
-shipped in the signed bundle; ops tiles for SIEM lag and dead letters, release currency, open support sessions and
+shipped in the signed bundle; ops tiles for SIEM lag and dead letters (the dead-letter tile opens a table on A3 with
+"Resend" and "Mark resolved" for ADM, DR-418), release currency, open support sessions and
 active break-glass grants; screens A4 and X5.
 Phase file: docs/plan/phase-30.md (DR-317 to DR-337; migration 0095, no table, no route): profile M/L on three K3s
 servers from one catalogue that also renders the profile S compose bundle; zones as NetworkPolicies rendered from

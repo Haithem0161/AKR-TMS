@@ -1,0 +1,34 @@
+Replacements of round 2 of the owner-decision check, key 04. 2 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [P-07b-7]
+FILE: docs/plan/phase-04.md
+WHY: P-07b-7 | CONFIRMED | HIGH | section 7.6 item 7 says a case whose intake did not meet the expectation "cannot be approved: the approver rejects the request or its maker withdraws it", and phase 08 closes an A2 maker's unwanted proposal by "the approver's reject" (an A2 maker has no withdraw screen). But phase 04 runs the subject check before every engine action, Approve or Reject (section 3.2 `decide`; section 3.4 step 6; section 7.1), the hook has no action argument, and the `check_before_decision` row of item 7 returns `intake_not_met` whenever `met` is false. As written the approver's rejection of an unmet case is refused with 422 and the case stays `proposed`, holding its key and a place under `goaml.corpus_bank_cases_max`. The same holds in phase 04 base text for every change target (a request with a stale base or stale evidence could not be rejected), against the offboarding rule "Submitted requests made by the user stay: their checkers still decide them" (section 3.6) | DESIGN (new phase 04 section 7.21, DR-423): the trait `WorkflowSubject` gains `fn holds_reject(&self) -> bool` with the default `true`; engine step 6 is skipped for a `Reject` when it is `false`; the change subject returns `false`, so a rejection of a change request runs neither the evidence-age check nor the target's check. Every other subject keeps the default. Phase 07 item 7 says that an issue refuses an approval and points to the rule. // By lead severity: HIGH 1 (P-07b-7), MEDIUM 13 (P-07a-1, P-07b-1, P-07b-6, P-08-1, P-10-1, P-11-1, P-13b-1, P-13b-2, P-19b-1, P-26-1, P-26-3, P-DR-1, P-DR-2), LOW 15.
+OLD: returned as 409 `E_STALE_BASE`, 422 `E_EVIDENCE_STALE` or 422 `E_VALIDATION`, and the task stays open.
+NEW: returned as 409 `E_STALE_BASE`, 422 `E_EVIDENCE_STALE` or 422 `E_VALIDATION`, and the task stays open. A `Reject` is not
+checked (section 7.21).
+
+=== F2 [P-07b-7]
+FILE: docs/plan/phase-04.md
+WHY: P-07b-7 | CONFIRMED | HIGH | section 7.6 item 7 says a case whose intake did not meet the expectation "cannot be approved: the approver rejects the request or its maker withdraws it", and phase 08 closes an A2 maker's unwanted proposal by "the approver's reject" (an A2 maker has no withdraw screen). But phase 04 runs the subject check before every engine action, Approve or Reject (section 3.2 `decide`; section 3.4 step 6; section 7.1), the hook has no action argument, and the `check_before_decision` row of item 7 returns `intake_not_met` whenever `met` is false. As written the approver's rejection of an unmet case is refused with 422 and the case stays `proposed`, holding its key and a place under `goaml.corpus_bank_cases_max`. The same holds in phase 04 base text for every change target (a request with a stale base or stale evidence could not be rejected), against the offboarding rule "Submitted requests made by the user stay: their checkers still decide them" (section 3.6) | DESIGN (new phase 04 section 7.21, DR-423): the trait `WorkflowSubject` gains `fn holds_reject(&self) -> bool` with the default `true`; engine step 6 is skipped for a `Reject` when it is `false`; the change subject returns `false`, so a rejection of a change request runs neither the evidence-age check nor the target's check. Every other subject keeps the default. Phase 07 item 7 says that an issue refuses an approval and points to the rule. // By lead severity: HIGH 1 (P-07b-7), MEDIUM 13 (P-07a-1, P-07b-1, P-07b-6, P-08-1, P-10-1, P-11-1, P-13b-1, P-13b-2, P-19b-1, P-26-1, P-26-3, P-DR-1, P-DR-2), LOW 15.
+OLD: 
+## What This Phase Does NOT Touch
+
+NEW: 
+### 7.21 A rejection of a change request is not held by the subject check (owner-decision check round 2, HIGH; DR-423)
+Section 3.2 (`decide`) and section 3.4 step 6 run the subject check before every action, a rejection included, and the hook of section 7.1 is not told which action it guards. For a change request this leaves a request that can be neither approved nor rejected whenever its check fails: a moved base, evidence past `change.evidence_max_age_days`, `shadow_too_short`, `volume_effect_changed` (section 7.9), or a refusal of a later phase's target such as `intake_not_met` (phase 07 section 7.6). Only its maker could then end it, by a withdraw. Section 3.6 says of an offboarded maker's submitted requests that "their checkers still decide them", and phase 07 section 7.6 with phase 08 section 7.11 closes an unmet corpus case by the approver's reject. So:
+
+1. Trait `WorkflowSubject` (section 2; section 7.1) gains one method with a default body:
+
+       fn holds_reject(&self) -> bool { true }
+
+2. Section 3.4 step 6 (as section 7.1 reads) now reads: "Subject check before decision: the subject's `check_before_decision` runs in the same transaction, before the action applies; it is skipped when the action is `TaskAction::Reject` and the subject's `holds_reject()` is `false`. A refusal rolls the action back and the task stays open."
+3. The change subject returns `false`. A rejection of a change request therefore runs neither the evidence-age check of section 3.2 nor `ChangeTarget::check_before_decision`. Steps 1 to 5 of section 3.4 (task and instance state, step type, Cedar, four-eyes, step-up) apply as before, and the outcome handling of section 3.2 is unchanged: `set_decided(rejected)`, `target.on_closed(Rejected)`, audit `change_request.rejected`.
+4. Every other subject keeps the default `true`: the checks of the subjects of later phases (the case, RFI, freeze, operations-task, report and legal-hold subjects among them) run for a rejection as they do for an approval.
+5. Reading rule. Where this file or a later phase says that the check of a change target runs "at every deciding action" or refuses "the decision", it means every action other than a rejection. No target changes: `ChangeTarget::check_before_decision` keeps its signature and is not called for a rejection.
+6. Tests (added to section 6): a submitted `_dev_object` request whose dev row's version was bumped: approve -> 409 `E_STALE_BASE` and the task stays open; reject by the same approver, with a comment -> 200, the request is `rejected`, `on_closed(Rejected)` ran and `change_request.rejected` is in the audit trail. A request whose evidence is older than `change.evidence_max_age_days`: approve -> 422 `E_EVIDENCE_STALE`; reject -> 200. A test subject that keeps the default and whose check refuses: a reject returns that refusal and the task stays open.
+
+## What This Phase Does NOT Touch
+

@@ -1,0 +1,13 @@
+diff --git a/docs/plan/phase-18.md b/docs/plan/phase-18.md
+index 29b70b7..ba89298 100644
+--- a/docs/plan/phase-18.md
++++ b/docs/plan/phase-18.md
+@@ -1502,0 +1503,8 @@ Section 4.2: this phase also registers the timer kind `case_acl_expiry` (owner k
++Owner decisions (2026-10-10): two additions that follow from the owner's decisions on name labels (phase 10 section 7.26) and on source tags (phase 13 section 7.17); lead-written, checked in the owner-decision round (tools/agent/owner-verdict.md).
++
++### 7.28 Name rows of the party page carry `capture_source` (owner decision 9; DR-420)
++Step 3 of `GET /parties/{id}` (section 3.14) returns each current `canon.party_name` row in `PartyPage.names` as `{ raw, script, language, name_type, capture_source }`. `capture_source` is the column of phase 10 section 7.26 (`card`, `passport`, `typed` or `generated`), and the `Name` component of phase 08 shows it as the label of the Latin line (phase 08 section 7.10). No route, action, audit event or access rule changes: the field travels inside a response that the tier rule of section 3.10 already guards.
++
++### 7.29 Copy actions for the source ids in W5 (owner decision 3; DR-416)
++Each row of the transaction explorer W5 (section 5.3) gains two actions in its row menu, "Copy account id" and "Copy counterparty id"; the second is absent when the row's `counterparty_id` is null. They copy the `account_id` and `counterparty_id` that the row already returns (section 3.14 step 5), so the bank can name a paying source in the source-tag register (phase 13 section 7.17 item 13). No route, response field, action, audit event or access rule changes, and the copied value is an id the caller already holds. Test: the menu of a row with a counterparty shows both actions, and the clipboard holds the id after each.
++

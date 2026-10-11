@@ -1,0 +1,41 @@
+diff --git a/docs/plan/phase-10.md b/docs/plan/phase-10.md
+index 813ebc4..51b60f0 100644
+--- a/docs/plan/phase-10.md
++++ b/docs/plan/phase-10.md
+@@ -505,0 +506 @@ CREATE TABLE IF NOT EXISTS canon.party_name (
++    capture_source      TEXT NOT NULL DEFAULT 'typed' CHECK (capture_source IN ('card', 'passport', 'typed', 'generated')),   -- section 7.26
+@@ -807 +808 @@ FROM (VALUES
+-  ('party_name', 'internal', ARRAY['id','party_id','script','language','name_type','source_field','alias_class',
++  ('party_name', 'internal', ARRAY['id','party_id','script','language','name_type','source_field','capture_source','alias_class',
+@@ -2469,0 +2471,31 @@ From phase 29 on, `canon.payment_message.message_refs` has one named key: `inter
++Owner decisions (2026-10-10): the product owner overturned two lead decisions that touch this phase (the label of a Latin name, phase 08 section 7.9; the repayment event of schedule tables, phase 26); lead-written, checked in the owner-decision round (tools/agent/owner-verdict.md).
++
++### 7.26 `capture_source` of a name (owner decision 9; DR-420)
++The owner's decision: the four source labels of DESIGN-SYSTEM 7.6 (card, passport, typed, generated) are kept, and the mapping says which one applies to each name.
++
++1. **Column.** `canon.party_name` gains one column after `source_field` (written into the table DDL of section 1.2 in the same change; no new table):
++
++```sql
++    capture_source      TEXT NOT NULL DEFAULT 'typed' CHECK (capture_source IN ('card', 'passport', 'typed', 'generated')),
++```
++
++   The `internal` classification row of `party_name` (section 1.2) gains `capture_source`. Grants, indexes and the retention row are unchanged.
++2. **Meaning.** `card`: the bank copied the name from the national card. `passport`: the bank copied it from the passport. `typed`: staff keyed it with no document named as its source. `generated`: a program of the bank produced it from another name, for example a Latin form made from the Arabic name. The value says how the bank captured the name; the product does not check it against a document.
++3. **Mapping.** `capture_source` is a column of the entity `party_name` in `canonical-model.v1.json`: not `required`, not `monitored`. A mapping of `party_name` supplies it as any field of DSL.md B.3: a literal (`"capture_source": { "expr": "'passport'" }`) when every name of the source object has one source, or an `expr` over the source row when a column of the bank tells them apart. A mapping that leaves it out writes `typed` (the column default), which is what phase 08 showed for every Latin name before this decision.
++4. **Compiler** (section 3.2 step 5): a literal `expr` for `capture_source` that is not one of the four values is refused with `E_VALIDATION`, path `/fields/capture_source`.
++5. **Writer** (section 3.7): the compiler adds the validation rule `enum(capture_source, [card, passport, typed, generated])` with `on_fail: dq_issue` to every `party_name` mapping that supplies the field. A row whose value fails it is written with `typed` and counted as a data-quality issue, as DSL.md B.5 says for `dq_issue`. A change of `capture_source` changes the `row_hash`, so the row is replaced as any changed child row is (step 6).
++6. **Readers.** A response that returns rows of `canon.party_name` returns `capture_source` with each row (phase 18 `PartyPage`, its section 7.28). A response that returns one display string (`display_name` of phases 15 and 19) is unchanged. The `Name` component shows the label (phase 08 section 7.10).
++7. **Audit, Cedar, tipping-off.** No new route, event or action: the column travels with the name rows through the mapping change path (`mapping.*` events and the `mapping` change target of section 3.9). The value says nothing about a case.
++8. **Tests** (added to section 6): a `party_name` mapping with `"capture_source": { "expr": "'passport'" }` writes rows with `passport`; the same mapping without the field writes `typed`; the literal `'scan'` fails `validate` with `E_VALIDATION` at `/fields/capture_source`; `akr-ctl canon verify-catalogue` passes with the new column.
++
++### 7.27 `facility_instalment` and `facility.granted_on` in the writer (owner decision 6; DR-419)
++Phase 26 section 7.13 adds the table `canon.facility_instalments` and the column `canon.facility.granted_on` (migration `0083`), so that a schedule table gives the repayment event SCN-ISL-07 needs. This phase's parts:
++
++1. **Entity.** Phase 26 adds `facility_instalment` at the end of `CanonicalEntity` (32 names, after the two of section 7.3) and of `canonical-model.v1.json`, and registers the mapping family `<source>.facility_instalment`. In the dependency order of section 3.7 step 1 it follows `facility`.
++2. **Parent key** (section 3.7 step 2). The mapped row carries the source key of its facility in the field `facility_id`. The writer resolves it through `admin.xref` (entity `facility`) with one `get_many` call, as section 7.20 does for a payment link. A row whose facility has no `admin.xref` row is not written: a `RowConflict` of kind `parent_missing` is returned, and phase 11 records it as section 7.20 says.
++3. **Fact rule** (section 3.7 steps 3 and 5). `facility_instalment` is a fact. Its insert target is `uq_facility_instalments_source`. One exception to the fact rule, like the end of a hold (section 7.19): when the stored `paid_on` is null and the mapped `paid_on` is set, the writer calls `CanonRepository::pay_instalment(tx, id, paid_on, paid_amount, row_hash)`, which sets the three columns; no conflict is returned. Any other difference is a `RowConflict`.
++4. **`granted_on` of a facility.** `facility` stays a dimension. One exception to the dimension rule of step 3: when the stored `granted_on` is null and the mapped one is set, the writer calls `CanonRepository::set_granted_on(tx, id, granted_on, row_hash)`, which sets the two columns; no conflict is returned. Any other difference is a `RowConflict` as before. The grants for both updates are in phase 26's migration `0083`.
++5. **Repository.** `CanonRepository` gains `async fn pay_instalment(&self, tx: &mut Tx, id: Uuid, paid_on: NaiveDate, paid_amount: Option<Decimal>, row_hash: &[u8]) -> Result<u64, RepoError>;` and `async fn set_granted_on(&self, tx: &mut Tx, id: Uuid, granted_on: NaiveDate, row_hash: &[u8]) -> Result<u64, RepoError>;`.
++6. **Catalogue.** Phase 26 adds `facility.granted_on` and the columns of `facility_instalment` to `canonical-model.v1.json` in its own change, with the flags of its section 7.13 item 2, as it adds the two entities of section 7.3. `akr-ctl canon verify-catalogue` therefore passes before phase 26 (neither the file nor the database has them) and after it (both have them).
++7. **Tests** (added to section 6, run from phase 26 on): an instalment row whose facility key is unknown returns `parent_missing` and writes nothing; the same row after the facility has landed is written; a second version with `paid_on` set updates the row and returns no conflict; a second version with a different `amount` returns a `RowConflict`; a facility row that arrives again with `granted_on` set updates only `granted_on` and `row_hash`.
++

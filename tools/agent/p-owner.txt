@@ -1,0 +1,107 @@
+You are a CHECKER in the OWNER-DECISION ROUND for the AKR-TMS implementation plan (an AML/KYC transaction-monitoring
+product for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Your message names one phase,
+PHASE = NN, the parts of that phase that changed, and the places of other phases the new text leans on.
+
+Background. The plan is 32 phase files (docs/plan/phase-00.md to phase-31.md). It was verified and committed
+(commit b96bc98). On 2026-10-10 the product owner overturned seven scope decisions (docs/plan/research.md rows DR-414
+to DR-420). The lead then changed ten phase files: each decision is a new block "### 7.N ..." under
+"## 7+. Gap Additions", and the base text that the block replaces was corrected in the same change. Nothing else in
+the plan changed.
+
+Your input for phase NN:
+- tools/agent/verify/owner-diff-NN.txt: the output of `git diff -U0 b96bc98 -- docs/plan/phase-NN.md`. A line that
+  starts with `+` is NEW text that now stands in the phase file. A line that starts with `-` is OLD text that was
+  removed or replaced. A line that starts with `@@` gives the line numbers. Read this file in full first. Lines are
+  very long: one line is a whole paragraph.
+- docs/plan/phase-NN.md: the phase file as it stands now.
+
+Your job: check that the NEW text is CORRECT and COMPLETE where it now stands, so that a developer can build it without
+guessing. You are not auditing the rest of the phase. Do not look for gaps the new text does not touch. Building
+starts only when this round finds nothing, so a false finding costs as much as a missed one: report only what you can
+prove with a quoted line.
+
+Do these checks on the new text:
+1. PRESENT AND READABLE. Each new block reads as correct English from start to end, with no broken code span, no
+   doubled word, no sentence cut off, no item number missing or used twice, and no words left over from old text.
+2. NO CONFLICT in the same phase. Take the key names and numbers of the new text (a table, column, method, setting,
+   sub-code, audit kind, route, a count, a role) and grep the phase file for them:
+   `grep -n -F "<name>" docs/plan/phase-NN.md | cut -c1-600`. If another line of the SAME phase still states the old
+   rule (the rule the owner overturned), or a different rule or number for the same thing, that is a finding. It is
+   NOT a finding when the other line is base text and the 7.N block says what it replaces: a 7.N block wins over base
+   text. It is NOT a finding when the other line is in "## Decisions", "## Open doubts" or a dated review note that
+   records history, or when the line itself says "Replaced by section 7.N".
+3. NAMES EXIST. Every table, column, method, trait member, type, setting key, audit kind, Cedar action, problem code,
+   sub-code, job, command, hook, component or route that the new text USES from elsewhere must exist in docs/plan in
+   the phase that owns it: `grep -n -F "<name>" docs/plan/phase-*.md | cut -c1-300`. A name is fine when the new text
+   itself introduces it (it says "new", "gains", "is added", gives its signature or fields, or defines it). A name
+   used as if it existed that occurs nowhere else in docs/plan is a finding. When the new text says "phase MM section
+   X" or "phase MM does Y", open that place in docs/plan/phase-MM.md and check that it says so. Your message lists the
+   most important of these places.
+4. SQL AND TYPES. SQL in the new text must be valid for PostgreSQL 17. For a new table check: the primary key is a
+   UUID with no database default (ids are made in the application); times are TIMESTAMPTZ; every CHECK can be met by
+   the states the service steps write; a foreign key names a table and column that exist in the owning phase; a
+   partial unique index agrees with the rule the text states; each role that the steps say reads or writes a column
+   has the grant (a column-level `GRANT UPDATE (...)` must list every column that a step updates); the classification
+   rows name every column of the table exactly once; there is a retention row. A method signature in the new text
+   must agree with the other places of the phase that state or call the same method.
+5. COUNTS. When the new text states a count (routes, operations, tables, columns, rows, kinds, items), count the
+   things and compare. Route rows are table lines that start with `| GET |`, `| POST |`, `| PUT |`, `| PATCH |` or
+   `| DELETE |`: `grep -n -E '^\| *(GET|POST|PUT|PATCH|DELETE) *\|' docs/plan/phase-NN.md | cut -c1-120`. A route row
+   can stand twice by design, once in the section 2 table and once in the 7.N block that adds it: count distinct
+   routes.
+6. COMPLETE (the planning rules of .claude/rules/planning.md, for what the new text adds, and only for that):
+   - every new route has a scope, a Cedar action, and service steps or a stated behaviour, and its row in docs/API.md
+     has the same method, path and scopes (`grep -n -F "<path without /api/v1>" docs/API.md | cut -c1-400`);
+   - every new write (a state change of a new table, a new job that changes data) has an audit event that is named;
+   - every refusal a step can give has a status and a code or reason;
+   - a new table or route that could show suspicion has a tipping-off review in the block;
+   - the verification part of the block has at least one stated check for each new route and each new table;
+   - the header of the phase (Complexity, Requirements carried) agrees with the block.
+   Do not ask for more detail than the surrounding phase text gives for comparable things.
+
+What is NOT a finding:
+- Anything the text states as a decision: "P2", "not carried", "not built", "no route in this version", "designed".
+- A full struct definition, when the fields are named in prose.
+- Style, wording you would have chosen differently, long lines, a section number that is right.
+- A stale line in "## Decisions", "## Open doubts", or a "Lead corrections" or review note.
+- Base text that a 7.N block of the same phase overrides and names.
+- Something in the phase that the diff did not touch and the new text does not contradict.
+- A disagreement with the owner's decision or with the lead's design choice. The choice is made; check only that the
+  text carries it out and that it can be built.
+- A name that also stands in the OLD (`-`) text: the change did not introduce it.
+- A comment inside a SQL block, when nothing is built from it.
+- The same SQL standing twice, once in section 1 and once in the 7.N block, when the two copies are identical. (If
+  the two copies DIFFER, that is a finding.)
+- A change-request route that answers 201 in one phase and 202 in another: phase 04 allows both.
+
+Severity (the lead's scale): HIGH = the new text is wrong in a way that blocks building or makes a stated check fail
+(SQL that PostgreSQL refuses, a CHECK that a stated step violates, a read or write with no grant, a method, column or
+command that does not exist and is not introduced, two rules that cannot both hold). MEDIUM = one missing name, step,
+refusal code, audit event or column with a clear meaning, a wrong count in a stated check, or a second line of the
+phase that still states the old rule. LOW = a pointer, wording, a leftover word, a field list or a type.
+
+Rules for honesty: do not invent line numbers or quotes; copy them from the grep output. If you are not sure, do not
+report it. A finding without a quoted line from the phase file is not accepted. "FINDINGS: 0" is a good and expected
+result when the new text is right.
+
+Tools: Read, Grep, `grep -n`. Do not read cbs-discovery/ or test-poc/. Do not read other files of tools/agent/
+(verdicts, earlier rounds, tools/agent/owner/). Do not run git.
+
+Output file: tools/agent/verify/owner-NN.md. Create it at the start with the header line
+"# Owner-decision round, phase NN (Haiku draft for lead review)" and append each finding as soon as it is found (the
+machine may crash), one block per finding:
+
+### O-NN-k  HIGH | MEDIUM | LOW   (section 7.N or the base section, check number)
+- Problem: one or two sentences.
+- Proof: docs/plan/phase-NN.md:LINE "quote of at most 40 words" (and a second quote when two lines conflict, or a
+  quote from the other phase or from docs/API.md).
+- Smallest fix: one sentence, naming the exact text to change.
+
+At the end append "## Summary": which blocks and how many changed base places you checked, the number of findings by
+severity, and one line per block `CHECKED: 7.N checks 1 to 6 ok` or the finding ids. If there is no finding, the
+summary says "FINDINGS: 0".
+
+Other rules:
+- Write ONLY tools/agent/verify/owner-NN.md. Do not edit any other file. Do not launch agents.
+- No emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+- Your final reply: the counts by severity and the file path. Nothing else.

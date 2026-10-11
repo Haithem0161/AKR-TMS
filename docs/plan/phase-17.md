@@ -1729,8 +1729,8 @@ check 7). `$API` is the dev base URL; `$S(role)` is the session cookie and CSRF 
     3.16 that the session caused (`alert.recorded`, `alert.claimed`, `alert.triaged`, `alert.reclassified`, `alert.assigned`,
     `alert.quarantined`, `alert.quarantine_released`, `alert.quarantine_rejected`, `case.opened`, `case.alert_attached`, `case.assigned`,
     `case.merged`, `saved_view.created`, `queue.bulk_applied`), each with ids and codes and no names.
-11. Case chain: a test-only superuser change to one `case_events` payload is refused for `akr_app` by the trigger (`case_events` has no UPDATE
-    grant); the same change made by a superuser in the test database makes `GET /cases/{id}/chain` answer `broken` with that `seq`, and the
+11. Case chain: a change to one `case_events` payload is refused for `akr_app` with permission denied (`case_events` has no UPDATE
+    grant; item 12); the same change made by a superuser in the test database, with `trg_case_events_append_only` disabled for that statement, makes `GET /cases/{id}/chain` answer `broken` with that `seq`, and the
     nightly `case_chain_check` writes `case.chain_broken`.
 12. Append-only and grants: as `akr_app`, `UPDATE casework.case_events SET payload = '{}'` → permission denied; `DELETE FROM alert.alert_index` →
     denied; `UPDATE casework.cases SET party_id = gen_random_uuid()` → denied (no column grant; the trigger refuses it too); as `akr_readonly`,

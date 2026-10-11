@@ -522,7 +522,9 @@ written "class P0" to avoid confusion with the macro-phases P0-P3.
 The shared `Name` component (UX-25), used by customer, screening, case, report and branch screens:
 
 - Arabic original first and larger, chain order, right to left, `lang="ar"` or `ckb`; the Latin transliteration
-  beneath, smaller, labelled with its source (card, passport, typed, generated).
+  beneath, smaller, labelled with its source (card, passport, typed, generated). The source is the
+  `capture_source` of the name row, which the bank's mapping sets (phase 10 section 7.26); a name with no stated
+  source is `typed`, and the product itself generates no Latin form (owner decision of 2026-10-10, DR-420).
 - Never truncated in a table: wrap to a second line; where a column is narrow, end-truncate with a popover of the
   full chain; never split into "first" and "last" name.
 - In comparisons, chain parts aligned one under another with role labels (given, father, grandfather, tribe or
@@ -693,7 +695,7 @@ Layout patterns:
 | W5 | Transaction explorer | `/parties/:id/transactions` | LIST | P1 |
 | W6 | Network view and network case | `/parties/:id/network` | WORK | P1 |
 | W7 | Decision dialogs | dialog in W3 | FORM | P1 |
-| W8 | RFI composer and RFI desk | `/rfi` | LIST + FORM | P1 (correspondents P2) |
+| W8 | RFI composer and RFI desk | `/rfi` | LIST + FORM | P1 (correspondents P2, except the panel Proposed answers, which is P1: phase 19 section 7.21, DR-417) |
 | W9 | Operations tasks and verification | `/ops-tasks` | INBOX (OPS) / LIST (M, A2) | P1 |
 | W10 | Watches and hibernations | `/watches` | REGISTER | P1 |
 | W11 | Internal reports and authority requests | `/requests` | REGISTER | P1 |
@@ -835,6 +837,32 @@ the bands per currency), Rail modes (one row per rail with its mode, effective-f
 with observed and required values) and Prohibited rules (read-only list with "Propose a rule"). Each panel says
 that a change is material and needs MLRO and CHK, and CH for a decrease.
 
+**D3 Policy studio, tab Source tags (phase 13 section 7.17; DR-416).** The register of the payers the bank marks by
+hand as payroll, pension or government source, as a table: the tag as a word, the payer name in the interface
+language with the other language under it, the payer reference, the subject kind as a word, the dates, the state as
+a word and a link to the change request on G10; filters by state and tag. "Propose changes" (CFG) opens a form with
+rows to add and rows to end or void, and shows the server's answer per row. The tab never shows an account number, a
+hash or the number of customers a tag reaches. CHK, M and CH read the tab.
+
+**D3 Policy studio, tab RFI pre-fill (phase 19 section 7.21; DR-417).** The map from a correspondent question to the
+record that answers it, as a table (question key, source as a word, the sensitive mark as a word), with the list of
+the sources the product offers. "Propose changes" (CFG) sets or removes rows through a change request. CFG, CHK and M
+read the tab; the RFI desk reads the map on W8.
+
+**W8 RFI desk, panel Proposed answers (phase 19 section 7.21; DR-417).** On an incoming correspondent RFI whose pack
+has `rfi.pre_fill` on. "Propose from our records" asks for a purpose code, then shows one proposal beside each open
+question: the answer text, the source as a word, the data time and "Use". "Use" puts the text into the "Record
+answer" form with the source "our records"; nothing is recorded until the person submits the form. A proposal from a
+sensitive source (four of the ten) says "Needs the MLRO" for a caller who is not the MLRO; the MLRO sees the
+activity figures only under the purpose Investigation.
+
+**S3 List status, tab Bank cases (phase 14 section 7.19; DR-415).** For SS and M only. The bank's own known-answer
+cases of the list: the name through the Name component (7.6), the entry key, the expectation in words ("Must match",
+"Must not match"), the state and the result of the latest run in words ("As expected", "Not as expected", "Entry no
+longer on the list"); "Add a case" and "Retire", both through a change request. For every S3 reader the harness
+result of a version gains one line with the three counts. On S1, a decided alert offers "Propose as a known-answer
+case", which opens the same form filled from what the screen already shows.
+
 **W6 Network view (mockup 06; UX-10, UX-61).** 7.16, plus "Open one case for the cluster" and "Add graph to evidence"
 with the snapshot note.
 
@@ -852,7 +880,16 @@ coverage certificate link.
 
 **E1 goAML checker (P0).** STEPPER in a reduced shell: upload or paste a goAML XML report the bank produced
 elsewhere; validation against the goAML schema and the Office's rules with each fault linked to its field and a
-bilingual explanation; a result page that can be printed. Nothing is filed from here.
+bilingual explanation; a result page that can be printed. Nothing is filed from here. The profile pages carry the
+panel **Bank cases** (phase 08 section 7.11; DR-415): the regression cases the bank added, each with its key, the
+expected result in words, the state and the last intake result; "Add a case" and "Retire" for A2 and M, both through
+a change request. The form says that the file is masked before it is kept and that the original is deleted. There is
+no file column and no download.
+
+**A3 Platform health, table SIEM dead letters (phase 25 section 7.24; DR-418).** The tile "SIEM dead letters" opens
+a table: time of the event, kind, stream, reason, attempts, state, and for a resolved row the resolver, the
+resolution and its code. ADM has "Resend" and "Mark resolved" (a dialog with three codes, one must be chosen) on an
+open row; SEC reads the table with no action. The table never shows the line itself.
 
 **E2 Discovery and CBI coverage gap report (P0).** DASH in a reduced shell: source profiles and field availability
 (M5), then the 173 CBI items against the bank's data with a readiness grade each (M7), then "Generate gap report"
@@ -968,7 +1005,7 @@ route-to-policy coverage test (8.1), the glyph-coverage test (3.1), collation pa
 
 | ID | Item | Decided by | When |
 |---|---|---|---|
-| DS-O1 | Approve, change or drop the proposed dark palette (2.8). Until approved, light only | Owner | Before P1 build of the shell |
+| DS-O1 | Approve, change or drop the proposed dark palette (2.8). Until approved, light only. Owner's answer of 2026-10-10 (DR-421): light only for now; the owner decides when the phase 08 shell is on screen | Owner | When the phase 08 shell is on screen |
 | DS-O2 | Confirm the Derived tokens (2.3) and the generated ramp steps (6.2) | Owner | Phase 08 design-token task |
 | DS-O3 | Chart time-axis direction in RTL and the chart library (Recharts or in-house only) | RTL spike (tech-stack.md open item) | P0 |
 | DS-O4 | Numeric ranges: reading order or left to right | First usability round with Iraqi staff (UX-03) | P0 / early P1 |

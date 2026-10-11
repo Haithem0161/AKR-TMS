@@ -1,0 +1,142 @@
+Replacements of round 1 of the owner-decision check, key 26. 20 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-26-3a]
+FILE: docs/plan/phase-26.md
+WHY: O-26-3 | CONFIRMED | MEDIUM | `paid_amount` has no catalogue flag, and a part payment that carries it with a null `paid_on` violates `CHECK (paid_amount IS NULL OR paid_on IS NOT NULL)` | the CHECK is dropped: `paid_amount` is the amount paid so far, optional, neither `required` nor `monitored`. The writer rule (phase 10 section 7.27 item 3) is restated: an instalment may change in `paid_on` and `paid_amount` while its stored `paid_on` is null; any other change, or a change after it is paid, is a `RowConflict`.
+OLD:     paid_amount         NUMERIC(28,6) CHECK (paid_amount IS NULL OR paid_amount >= 0),
+
+NEW:     paid_amount         NUMERIC(28,6) CHECK (paid_amount IS NULL OR paid_amount >= 0),   -- paid so far, when the source gives it
+
+
+=== F2 [O-26-1a]
+FILE: docs/plan/phase-26.md
+WHY: O-10-4 | CONFIRMED | same defect as O-26-1 | see O-26-1 | see O-26-1. // O-26-1 | CONFIRMED | HIGH | `uq_facility_instalments_seq UNIQUE (facility_id, seq)` is not the insert target of the fact write, so a second source key for the same instalment number (a rescheduled loan) raises a unique violation and rolls back the batch | the constraint becomes a plain index on `(facility_id, seq)`; 7.13 says why and that the bank's mapping leaves out superseded schedule rows. Both SQL copies and DATA-MODEL are changed. // O-26-1 addition: Open doubts 24 of phase 26 states the limit for a source that replaces or deletes schedule rows (rows already loaded stay unpaid in `canon`). No column was added: no schedule table has been studied.
+OLD:     CHECK (paid_amount IS NULL OR paid_on IS NOT NULL),
+    CONSTRAINT uq_facility_instalments_source UNIQUE (source_id, source_table, source_pk),
+    CONSTRAINT uq_facility_instalments_seq UNIQUE (facility_id, seq)
+);
+
+NEW:     CONSTRAINT uq_facility_instalments_source UNIQUE (source_id, source_table, source_pk)
+);
+-- (facility_id, seq) is an index, not a unique constraint: a rescheduled loan can give a number under a second source key.
+CREATE INDEX IF NOT EXISTS idx_facility_instalments_facility ON canon.facility_instalments (facility_id, seq);
+
+
+=== F3 [O-26-10]
+FILE: docs/plan/phase-26.md
+WHY: O-26-10 | CONFIRMED | LOW | "1 altered column list" against the header's "1 column added" | "1 column added".
+OLD: The phase now has 4 tables in 2 migrations and 1 altered column list (`canon.facility.granted_on`).
+NEW: The phase now has 4 tables in 2 migrations and 1 column added (`canon.facility.granted_on`). The source key is the table's only unique constraint: the fact write of phase 10 has one conflict target, and a second unique rule on `(facility_id, seq)` would fail the batch of a rescheduled loan whose new rows repeat the numbers. `paid_amount` may be set while `paid_on` is null (a part payment), so no CHECK ties the two.
+
+=== F4 [O-26-3c]
+FILE: docs/plan/phase-26.md
+WHY: O-26-3 | CONFIRMED | MEDIUM | `paid_amount` has no catalogue flag, and a part payment that carries it with a null `paid_on` violates `CHECK (paid_amount IS NULL OR paid_on IS NOT NULL)` | the CHECK is dropped: `paid_amount` is the amount paid so far, optional, neither `required` nor `monitored`. The writer rule (phase 10 section 7.27 item 3) is restated: an instalment may change in `paid_on` and `paid_amount` while its stored `paid_on` is null; any other change, or a change after it is paid, is a `RowConflict`.
+OLD: `paid_on` and `facility.granted_on` are `monitored` (inputs of SCN-ISL-07) and not `required`. One source row is one instalment. The mapping sets `paid_on` only when the source shows the instalment paid in full (a `filter` or an `expr` over the source's paid flag or amounts); a part payment leaves `paid_on` null.
+NEW: `paid_on` and `facility.granted_on` are `monitored` (inputs of SCN-ISL-07) and not `required`; `paid_amount` is neither: it is the amount paid so far, kept when the source gives it and read by no scenario. One source row is one instalment. The mapping sets `paid_on` only when the source shows the instalment paid in full (an `expr` over the source's paid flag or amounts); a part payment leaves `paid_on` null and may set `paid_amount`. Rescheduling: when the source keeps the rows that a new schedule replaced, the mapping leaves them out with a `filter`, so that an old unpaid row does not hold the facility unpaid. A replaced row that was loaded before the rescheduling stays in `canon`, since facts are not deleted; Open doubts 24 names this limit.
+
+=== F5 [O-26-12]
+FILE: docs/plan/phase-26.md
+WHY: O-26-12 | CONFIRMED | LOW | "a later version that only sets `paid_on`" does not match the writer rule | restated with the rule of O-26-3.
+OLD: the row is written as a fact, and a later version that only sets `paid_on` updates the row in place.
+NEW: the row is written as a fact, and while an instalment is unpaid a later version may set its `paid_on` and `paid_amount` in place; a paid instalment does not change.
+
+=== F6 [O-26-9/11]
+FILE: docs/plan/phase-26.md
+WHY: O-26-9 | CONFIRMED | MEDIUM | `not_evaluable_count` is used as if it existed | 7.13 item 4 introduces it: a measure alias of the SCN-ISL-07 document, an integer in the `measures` of the evaluation (phase 16). // O-26-11 | CONFIRMED | LOW | "names which loan was not evaluable only by its count" contradicts itself | the evidence gives only the count.
+OLD: The alert evidence names which loan was not evaluable only by its count (`not_evaluable_count` in the measures), so a gap in the mapping is seen.
+NEW: The SCN-ISL-07 document gains the measure alias `not_evaluable_count`, an integer: the number of the customer's facilities that were not evaluable in the evaluation. It stands in the `measures` of the alert evidence (phase 16). The evidence gives this count only, not which facility, so a gap in the mapping is seen.
+
+=== F7 [O-26-2a]
+FILE: docs/plan/phase-26.md
+WHY: O-26-2 | CONFIRMED IN PART | HIGH | (a) rejected: the schedule inputs are optional (`?`), and phase 06 section 3.2 rule 4 gives an optional need no effect on the grade, so an agreement-only bank is not graded down. (b) confirmed: for the same reason "B until the family is published" cannot follow, and the stated test "grades B" would fail | the 3.6 cell, item 5 and the test of item 8 say what the grader really does: the unmapped optional inputs are listed in `reasons`, the grade does not change, and the facility legs are not evaluable until the inputs are published. // O-26-2 final wording (differs from the first verdict line above): the cell is "readiness A (agreement source) or B (schedule source)", as the verified cell of SCN-ISL-06 and as the SCN-ISL-07 row read before the owner change; the `?` inputs are optional and never change the grade. The test of item 8 now checks only what phase 06 rule 4 guarantees (listed in `reasons`, same grade).
+OLD: The readiness cell reads: readiness A for an agreement source; for a schedule source A once `facility.granted_on` and the family `<source>.facility_instalment` are published, and B until then. The facility inputs are optional inputs (DSL A.3), so a bank with agreements only is not graded down for having no schedule mapping.
+NEW: The readiness cell reads: readiness A (agreement source) or B (schedule source), as for SCN-ISL-06. The three inputs marked `?` are optional inputs (DSL.md, CanonicalRef), and phase 06 section 3.2 rule 4 gives an optional input no effect on the grade. While `facility.granted_on` or the family `<source>.facility_instalment` is not published, the three are listed in the `reasons` of the readiness result and the facility legs are not evaluable (item 4); once they are published the facility legs run. A bank with agreements only is therefore not graded down for having no schedule mapping.
+
+=== F8 [O-26-2b]
+FILE: docs/plan/phase-26.md
+WHY: O-26-2 | CONFIRMED IN PART | HIGH | (a) rejected: the schedule inputs are optional (`?`), and phase 06 section 3.2 rule 4 gives an optional need no effect on the grade, so an agreement-only bank is not graded down. (b) confirmed: for the same reason "B until the family is published" cannot follow, and the stated test "grades B" would fail | the 3.6 cell, item 5 and the test of item 8 say what the grader really does: the unmapped optional inputs are listed in `reasons`, the grade does not change, and the facility legs are not evaluable until the inputs are published. // O-26-2 final wording (differs from the first verdict line above): the cell is "readiness A (agreement source) or B (schedule source)", as the verified cell of SCN-ISL-06 and as the SCN-ISL-07 row read before the owner change; the `?` inputs are optional and never change the grade. The test of item 8 now checks only what phase 06 rule 4 guarantees (listed in `reasons`, same grade).
+OLD: | readiness A (agreement source); for a schedule source A once `facility.granted_on` and the family `<source>.facility_instalment` are published, B until then (section 7.13) |
+NEW: | readiness A (agreement source) or B (schedule source); the inputs marked `?` are optional and do not change the grade: until they are published the facility legs are not evaluable (section 7.13) |
+
+=== F9 [O-26-2c]
+FILE: docs/plan/phase-26.md
+WHY: O-26-2 | CONFIRMED IN PART | HIGH | (a) rejected: the schedule inputs are optional (`?`), and phase 06 section 3.2 rule 4 gives an optional need no effect on the grade, so an agreement-only bank is not graded down. (b) confirmed: for the same reason "B until the family is published" cannot follow, and the stated test "grades B" would fail | the 3.6 cell, item 5 and the test of item 8 say what the grader really does: the unmapped optional inputs are listed in `reasons`, the grade does not change, and the facility legs are not evaluable until the inputs are published. // O-26-2 final wording (differs from the first verdict line above): the cell is "readiness A (agreement source) or B (schedule source)", as the verified cell of SCN-ISL-06 and as the SCN-ISL-07 row read before the owner change; the `?` inputs are optional and never change the grade. The test of item 8 now checks only what phase 06 rule 4 guarantees (listed in `reasons`, same grade).
+OLD: the four fixtures of item 6 pass; a schedule source with the family published grades A and the same source without it grades B for SCN-ISL-07.
+NEW: a second row with a new source key and a `(facility_id, seq)` that the table already holds is inserted; a row with `paid_amount` set and `paid_on` null is accepted; the four fixtures of item 6 pass; for SCN-ISL-07 a source without the family `<source>.facility_instalment` has the three optional inputs in the `reasons` of its readiness result and the same grade as the same source with the family published.
+
+=== F10 [O-26-7a]
+FILE: docs/plan/phase-26.md
+WHY: O-26-7 | CONFIRMED | MEDIUM | section 1 and the trailer still say `canon.facility` is not changed | both name the added column.
+OLD: The only existing table altered is `canon.product` (phase 10), and only its CHECK, as stated in 1.1.
+NEW: The existing tables altered are `canon.product` (phase 10), only in its CHECK, as stated in 1.1, and `canon.facility` (phase 10), which gains the column `granted_on` (section 7.13).
+
+=== F11 [O-26-8]
+FILE: docs/plan/phase-26.md
+WHY: O-26-8 | CONFIRMED | LOW (agent: MEDIUM) | the note of section 1.2 says "the two tables" | "the three tables and the column `granted_on` of `canon.facility`".
+OLD: `VALUES` rows cover every column of the two tables; a test (section 6, check 2)
+NEW: `VALUES` rows cover every column of the three tables and the column `granted_on` of `canon.facility`; a test (section 6, check 2)
+
+=== F12 [O-26-6a]
+FILE: docs/plan/phase-26.md
+WHY: O-26-6 | CONFIRMED | MEDIUM | section 3.2 items 1 and 2 still count two families and two entries | each gains the pointer to the third (section 7.13).
+OLD: 1. Two mapping families are added: `<source>.islamic_deal` (target entity `islamic_deal`) and `<source>.deal_party` (target entity
+   `deal_party`), one active family per source and entity (phase 10).
+NEW: 1. Two mapping families are added: `<source>.islamic_deal` (target entity `islamic_deal`) and `<source>.deal_party` (target entity
+   `deal_party`), one active family per source and entity (phase 10). Section 7.13 adds a third, `<source>.facility_instalment`.
+
+=== F13 [O-26-6b]
+FILE: docs/plan/phase-26.md
+WHY: O-26-6 | CONFIRMED | MEDIUM | section 3.2 items 1 and 2 still count two families and two entries | each gains the pointer to the third (section 7.13).
+OLD:    `canonical-model.v1.json` gets two entries (table, columns, classification, nullability).
+NEW:    `canonical-model.v1.json` gets two entries (table, columns, classification, nullability); section 7.13 adds a third entity,
+   `facility_instalment`, with its entry, and the column `facility.granted_on`.
+
+=== F14 [O-26-4]
+FILE: docs/plan/phase-26.md
+WHY: O-26-4 | CONFIRMED | MEDIUM | section 6 check 2 names three tables, so it does not cover the new table and column that item 8 says it covers | check 2 names `canon.facility_instalments` and `canon.facility.granted_on` too.
+OLD: 2. `cargo check`; then the classification check: every column of `canon.islamic_deals`, `canon.deal_parties` and `kyc.possession_evidence`
+   has a `admin.column_classification` row
+NEW: 2. `cargo check`; then the classification check: every column of `canon.islamic_deals`, `canon.deal_parties`, `canon.facility_instalments` and
+   `kyc.possession_evidence`, and the column `canon.facility.granted_on`, has a `admin.column_classification` row
+
+=== F15 [O-26-5]
+FILE: docs/plan/phase-26.md
+WHY: O-26-5 | CONFIRMED | MEDIUM | check 5 says "the two new entities" | "the three new entities and `facility.granted_on`".
+OLD: 5. `akr-ctl canon verify-catalogue`: the two new entities match the migrated columns.
+NEW: 5. `akr-ctl canon verify-catalogue`: the three new entities (with `facility_instalment` of section 7.13) and `facility.granted_on` match the migrated columns.
+
+=== F16 [O-26-7b]
+FILE: docs/plan/phase-26.md
+WHY: O-26-7 | CONFIRMED | MEDIUM | section 1 and the trailer still say `canon.facility` is not changed | both name the added column.
+OLD: beyond the widened CHECK; no change to `canon.facility`, `canon.account`, `canon.party` or the customer tables;
+NEW: beyond the widened CHECK; no change to `canon.facility` beyond the column `granted_on` of section 7.13; no change to `canon.account`, `canon.party` or the customer tables;
+
+=== F17 [O-26-1b]
+FILE: docs/plan/phase-26.md
+WHY: O-10-4 | CONFIRMED | same defect as O-26-1 | see O-26-1 | see O-26-1. // O-26-1 | CONFIRMED | HIGH | `uq_facility_instalments_seq UNIQUE (facility_id, seq)` is not the insert target of the fact write, so a second source key for the same instalment number (a rescheduled loan) raises a unique violation and rolls back the batch | the constraint becomes a plain index on `(facility_id, seq)`; 7.13 says why and that the bank's mapping leaves out superseded schedule rows. Both SQL copies and DATA-MODEL are changed. // O-26-1 addition: Open doubts 24 of phase 26 states the limit for a source that replaces or deletes schedule rows (rows already loaded stay unpaid in `canon`). No column was added: no schedule table has been studied.
+OLD: 23. **Routes that depend on the flag.** The flag is checked per request, which makes the router mount independent of it. A bank that never uses the pack may prefer the routes not mounted at all (a build flag); the behaviour required here is 404 either way.
+
+NEW: 23. **Routes that depend on the flag.** The flag is checked per request, which makes the router mount independent of it. A bank that never uses the pack may prefer the routes not mounted at all (a build flag); the behaviour required here is 404 either way.
+24. **Rescheduled and cancelled instalments** (section 7.13; found in the owner-decision round, 2026-10-11). No schedule table of a bank has been studied. A source that changes an unpaid instalment in place is handled: the payment still lands, and a changed due date or amount is recorded as a conflict (phase 10 section 7.27 item 3). A source that replaces a schedule by new rows, or deletes rows, leaves the rows already loaded in `canon` as unpaid, so the unpaid leg of SCN-ISL-07 can fire for that facility and its repeat leg never sees it repaid. Until a schedule source is studied, the bank's mapping leaves replaced rows out from the first load; a column that marks an instalment as replaced is added when a source needs it.
+
+
+=== F18 [O-26-1c]
+FILE: docs/DATA-MODEL.md
+WHY: O-10-4 | CONFIRMED | same defect as O-26-1 | see O-26-1 | see O-26-1. // O-26-1 | CONFIRMED | HIGH | `uq_facility_instalments_seq UNIQUE (facility_id, seq)` is not the insert target of the fact write, so a second source key for the same instalment number (a rescheduled loan) raises a unique violation and rolls back the batch | the constraint becomes a plain index on `(facility_id, seq)`; 7.13 says why and that the bank's mapping leaves out superseded schedule rows. Both SQL copies and DATA-MODEL are changed. // O-26-1 addition: Open doubts 24 of phase 26 states the limit for a source that replaces or deletes schedule rows (rows already loaded stay unpaid in `canon`). No column was added: no schedule table has been studied.
+OLD: paid_amount null; unique (facility_id, seq); one source row is one instalment;
+NEW: paid_amount null (the amount paid so far, when the source gives it); index on (facility_id, seq), not unique (a rescheduled loan can give a number under a second source key); one source row is one instalment;
+
+=== F19 [DOC-26]
+FILE: docs/DATA-MODEL.md
+WHY: System document in step with phase 26 section 7.13: migration 0083 grants `akr_ingest` UPDATE (granted_on, row_hash) on canon.facility, and the DATA-MODEL.md grants paragraph named only the instalment table.
+OLD: with UPDATE only on `(paid_on, paid_amount, row_hash)`; `akr_app` has SELECT;
+NEW: with UPDATE only on `(paid_on, paid_amount, row_hash)`, and UPDATE on `canon.facility (granted_on, row_hash)`; `akr_app` has SELECT;
+
+=== F20 [DR-422]
+FILE: docs/plan/phase-26.md
+WHY: DR-422 is the decision record that locks the design corrections of round 1. The row in docs/plan/research.md must say only what the phase files now say; each citing sentence in a phase block must name corrections that the block really carries.
+OLD: The owner's decision: the mapping gains the repayment event of a schedule table, so SCN-ISL-07 runs at a bank whose qard hasan sits in schedule tables too. This block replaces the last item of section 7.9 ("Schedule sources") and the readiness cell of the SCN-ISL-07 row of section 3.6. `canon.facility.events` is not used for it.
+NEW: The owner's decision: the mapping gains the repayment event of a schedule table, so SCN-ISL-07 runs at a bank whose qard hasan sits in schedule tables too. This block replaces the last item of section 7.9 ("Schedule sources") and the readiness cell of the SCN-ISL-07 row of section 3.6. `canon.facility.events` is not used for it. DR-422 locks the corrections of the check round of 2026-10-11: the plain index on `(facility_id, seq)`, `paid_amount` without `paid_on`, and what the grader does with the optional inputs.

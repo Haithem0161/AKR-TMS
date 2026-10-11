@@ -1,0 +1,42 @@
+Replacements of round 2 of the owner-decision check, key 26. 6 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [P-26-1]
+FILE: docs/plan/phase-26.md
+WHY: P-26-1 | CONFIRMED | MEDIUM | section 7.13 item 5 says "The three inputs marked `?`"; the row marks four (`facility.granted_on` and the three `facility_instalment` fields). "the three are listed in the `reasons`" is wrong in the same way | "The four inputs marked `?`"; "the ones not published are listed".
+OLD: The three inputs marked `?` are optional inputs (DSL.md, CanonicalRef)
+NEW: The four inputs marked `?` (`facility.granted_on` and the three `facility_instalment` fields) are optional inputs (DSL.md, CanonicalRef)
+
+=== F2 [P-26-1]
+FILE: docs/plan/phase-26.md
+WHY: P-26-1 | CONFIRMED | MEDIUM | section 7.13 item 5 says "The three inputs marked `?`"; the row marks four (`facility.granted_on` and the three `facility_instalment` fields). "the three are listed in the `reasons`" is wrong in the same way | "The four inputs marked `?`"; "the ones not published are listed".
+OLD: is not published, the three are listed in the `reasons` of the readiness result
+NEW: is not published, the inputs that are missing are listed in the `reasons` of the readiness result
+
+=== F3 [P-26-2]
+FILE: docs/plan/phase-26.md
+WHY: P-26-2 | CONFIRMED | LOW | "has a `admin.column_classification` row" | "has an".
+OLD: has a `admin.column_classification` row
+NEW: has an `admin.column_classification` row
+
+=== F4 [P-26-3]
+FILE: docs/plan/phase-26.md
+WHY: P-26-3 | CONFIRMED | MEDIUM | Open doubts 24 says a changed due date or amount "is recorded as a conflict (phase 10 section 7.27 item 3)". Item 3 reports it only when the payment columns did not move; in a version that also moves the payment it is neither written nor reported | the entry says both cases.
+OLD: the payment still lands, and a changed due date or amount is recorded as a conflict (phase 10 section 7.27 item 3).
+NEW: the payment still lands; a changed due date or amount that arrives with no payment change is recorded as a conflict, and one that arrives in the same version as the payment is neither written nor reported (phase 10 section 7.27 item 3).
+
+=== F5 [L2-4]
+FILE: docs/DATA-MODEL.md
+WHY: L2-4 | LEAD FIND from the agent's two notes | LOW | docs/DATA-MODEL.md line ~830 says that where the bank does not map the schedule "the scenario is declared not covered"; phase 26 section 7.13 item 5 says the grade does not change and the facility legs are not evaluable. Line ~889 says `akr_ingest` "may UPDATE only" a list that leaves out the phase 26 updates named further down | both lines are brought in step.
+OLD: where it does not, the scenario
+is declared not covered.
+NEW: where it does not, the facility
+legs of the scenario are not evaluable and its readiness grade does not change (phase 26 section 7.13 item 5).
+
+=== F6 [L2-4]
+FILE: docs/DATA-MODEL.md
+WHY: L2-4 | LEAD FIND from the agent's two notes | LOW | docs/DATA-MODEL.md line ~830 says that where the bank does not map the schedule "the scenario is declared not covered"; phase 26 section 7.13 item 5 says the grade does not change and the facility legs are not evaluable. Line ~889 says `akr_ingest` "may UPDATE only" a list that leaves out the phase 26 updates named further down | both lines are brought in step.
+OLD: and `status` and `status_history` of `payment_message`; no role has DELETE on
+NEW: and `status` and `status_history` of `payment_message` (phase 26 adds the updates named in its own paragraph below); no role has DELETE on

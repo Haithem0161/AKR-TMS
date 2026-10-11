@@ -1170,6 +1170,7 @@ a dash means the owning phase states none (the verification pass checks each).
 | `source` | 05 | R9 |
 | `gap_report_run` | 06 | R6 |
 | `goaml_profile` | 07 | R9 |
+| `goaml_corpus_case` (kind `snapshot`; phase 07 section 7.6, DR-415) | 07 | R9 (classification `secret-str`) |
 | `coverage_certificate` | 12 | R6 |
 | `fx_rate` | 09 (manual rates, evidence kind `upload`) | - |
 | `mapping_run` | 10 | - |

@@ -1,0 +1,101 @@
+Replacements of round 1 of the owner-decision check, key 13a. 16 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-13-12]
+FILE: docs/plan/phase-13.md
+WHY: O-13-12 | CONFIRMED | LOW | the owner note cites section 7.7, which says only that a counterparty profile is P2 | the note cites the header entry S-17 only.
+OLD: the government-source flag to P2 (header, S-17; section 7.7); lead-written,
+NEW: the government-source flag to P2 (header, S-17); lead-written,
+
+=== F2 [O-19-1]
+FILE: docs/plan/phase-13.md
+WHY: O-19-1 | CONFIRMED | LOW (agent: MEDIUM) | 7.21 item 1 says "owner `akr_app`"; tables are owned by `akr_migrate` and written by `akr_app` (phase 00) | "owner `akr_migrate`; written by `akr_app`". The same words in phase 13 section 7.17 item 1 are fixed with it. // Carried from phase 19 (already decided there): O-19-1 (owner words of item 1), O-19-3 (`reason_code`, `reason_text` in `SourceTagChange` and the curl body), O-19-4 (`ChangeRequestService::create` with origin Dedicated), O-19-5 (`ChangeRequestView`), O-19-9 (`insert` returns the row).
+OLD: added to migration `0044_feat_counterparty_links.sql` as its second part; owner `akr_app`):
+NEW: added to migration `0044_feat_counterparty_links.sql` as its second part; owner `akr_migrate`, written by `akr_app`):
+
+=== F3 [L-2]
+FILE: docs/plan/phase-13.md
+WHY: L-2 | LEAD FIND (from the agent's note) | MEDIUM | a feature `where` is a string under the DSL.md Filter subset, and item 3 never writes how a tag name stands in it | item 3: the name is written as a comparison with a boolean literal, `tag.payroll = true` or `tag.payroll = false`, as `txn.cash_flag = true` is in the shipped catalogue; `= true` compiles to the EXISTS, `= false` to NOT EXISTS; any other use is `E_FIELD_TYPE`. The fixture feature of item 14 uses `tag.payroll = true`.
+OLD: In the `where` of a feature definition (section 3.1) the name is true for a posting whose counterparty carries a row of that tag that holds on the posting's `booking_date`. The name says nothing about direction:
+NEW: In the `where` of a feature definition (section 3.1) the name is written as a comparison with a boolean literal, `tag.payroll = true` or `tag.payroll = false`, the form the Filter subset of DSL.md has (as `txn.cash_flag = true` in the shipped catalogue). `tag.payroll = true` holds for a posting whose counterparty carries a row of that tag that holds on the posting's `booking_date`; `tag.payroll = false` holds for every other posting. Any other use of the name in a `where` (the bare name, another operator, a value that is not a boolean) is `E_FIELD_TYPE`. The name says nothing about direction:
+
+=== F4 [L-2]
+FILE: docs/plan/phase-13.md
+WHY: L-2 | LEAD FIND (from the agent's note) | MEDIUM | a feature `where` is a string under the DSL.md Filter subset, and item 3 never writes how a tag name stands in it | item 3: the name is written as a comparison with a boolean literal, `tag.payroll = true` or `tag.payroll = false`, as `txn.cash_flag = true` is in the shipped catalogue; `= true` compiles to the EXISTS, `= false` to NOT EXISTS; any other use is `E_FIELD_TYPE`. The fixture feature of item 14 uses `tag.payroll = true`.
+OLD: `FeatureCompiler` compiles the name to the following, with the tag as a bound parameter:
+NEW: `FeatureCompiler` compiles `tag.<name> = true` to the following, with the tag as a bound parameter, and `tag.<name> = false` to `NOT` of the same expression:
+
+=== F5 [L-2]
+FILE: docs/plan/phase-13.md
+WHY: L-2 | LEAD FIND (from the agent's note) | MEDIUM | a feature `where` is a string under the DSL.md Filter subset, and item 3 never writes how a tag name stands in it | item 3: the name is written as a comparison with a boolean literal, `tag.payroll = true` or `tag.payroll = false`, as `txn.cash_flag = true` is in the shipped catalogue; `= true` compiles to the EXISTS, `= false` to NOT EXISTS; any other use is `E_FIELD_TYPE`. The fixture feature of item 14 uses `tag.payroll = true`.
+OLD: `cargo test`: the validator accepts `tag.payroll` in a `where` and refuses it in `field` (`E_UNKNOWN_ATTRIBUTE`);
+NEW: `cargo test`: the validator accepts `tag.payroll = true` and `tag.payroll = false` in a `where`, refuses the bare name there (`E_FIELD_TYPE`) and refuses the name in `field` (`E_UNKNOWN_ATTRIBUTE`);
+
+=== F6 [L-2]
+FILE: docs/plan/phase-13.md
+WHY: L-2 | LEAD FIND (from the agent's note) | MEDIUM | a feature `where` is a string under the DSL.md Filter subset, and item 3 never writes how a tag name stands in it | item 3: the name is written as a comparison with a boolean literal, `tag.payroll = true` or `tag.payroll = false`, as `txn.cash_flag = true` is in the shipped catalogue; `= true` compiles to the EXISTS, `= false` to NOT EXISTS; any other use is `E_FIELD_TYPE`. The fixture feature of item 14 uses `tag.payroll = true`.
+OLD: the compiled filter of a fixture feature `payroll_credit_1m` holds the `EXISTS` of item 3;
+NEW: the compiled filter of a fixture feature `payroll_credit_1m` (`where`: `txn.dr_cr = 'C' AND tag.payroll = true`) holds the `EXISTS` of item 3, and the same feature with `tag.payroll = false` holds `NOT EXISTS`;
+
+=== F7 [O-13-4]
+FILE: docs/plan/phase-13.md
+WHY: O-13-4 | CONFIRMED | MEDIUM (agent: HIGH) | "(or `false`) is true for a customer with a row" gives `false` the meaning of `true` | `value: true` -> EXISTS; `value: false` -> NOT EXISTS over the same subquery.
+OLD: `{ "ref": "tag.payroll", "op": "=", "value": true }` (or `false`) is true for a customer with a `feat.customer_source_tags` row of that tag. Only `=` with a boolean is accepted (`E_FIELD_TYPE` otherwise). The assignment of section 3.3 step 1 compiles it to `EXISTS (SELECT 1 FROM feat.customer_source_tags s WHERE s.customer_id = cu.id AND s.tag = $n)`, where `cu` is the customer row of the page.
+NEW: `{ "ref": "tag.payroll", "op": "=", "value": true }` is true for a customer with a `feat.customer_source_tags` row of that tag; with `"value": false` it is true for a customer with no such row. Only `=` with a boolean is accepted (`E_FIELD_TYPE` otherwise). The assignment of section 3.3 step 1 compiles `true` to `EXISTS (SELECT 1 FROM feat.customer_source_tags s WHERE s.customer_id = cu.id AND s.tag = $n)`, where `cu` is the customer row of the page, and `false` to `NOT EXISTS` over the same subquery.
+
+=== F8 [O-13-4]
+FILE: docs/plan/phase-13.md
+WHY: O-13-4 | CONFIRMED | MEDIUM (agent: HIGH) | "(or `false`) is true for a customer with a row" gives `false` the meaning of `true` | `value: true` -> EXISTS; `value: false` -> NOT EXISTS over the same subquery.
+OLD: a static segment with `tag.pension = true` compiles and a risk overlay with it is refused (`E_SEGMENT_INPUT_NOT_ALLOWED`);
+NEW: a static segment with `tag.pension = true` compiles to `EXISTS`, one with `tag.pension = false` to `NOT EXISTS`, and a risk overlay with either is refused (`E_SEGMENT_INPUT_NOT_ALLOWED`);
+
+=== F9 [O-19-3]
+FILE: docs/plan/phase-13.md
+WHY: O-19-3 | CONFIRMED | HIGH | `PrefillMapChange` has no `reason_code` and `reason_text`, which phase 04 `create` requires, so the stated curl check (201) would get 422 | the DTO gains both fields; the curl body carries them. Same fix for `SourceTagChange` of phase 13 section 7.17.
+OLD: DTOs: `SourceTagChange { add: Vec<NewSourceTag>, retire: Vec<RetireSourceTag> }`,
+NEW: DTOs: `SourceTagChange { add: Vec<NewSourceTag>, retire: Vec<RetireSourceTag>, reason_code: String, reason_text: String }` (the two reason fields are the ones phase 04 `create` requires),
+
+=== F10 [O-19-5]
+FILE: docs/plan/phase-13.md
+WHY: O-19-5 | CONFIRMED | LOW | `ChangeRequestAccepted` is not a phase 04 type | the response is the phase 04 `ChangeRequestView`. Same fix in phase 13 section 7.17 item 5. // O-19-5 in phase 13, corrected by the lead while fixing: phase 13 section 2 defines `ChangeRequestAccepted` itself (the response of its two base proposal routes), so the source-tag POST keeps that schema and the block now says where it is defined. The change to `ChangeRequestView` holds for phase 19 only, where the block had called it a phase 04 type.
+OLD: `SourceTagChange` and `ChangeRequestAccepted` (reused). Repository trait
+NEW: `SourceTagChange` and `ChangeRequestAccepted` (the response schema of section 2, reused: the change request id, class, route and volume effect). Repository trait
+
+=== F11 [O-19-9]
+FILE: docs/plan/phase-13.md
+WHY: O-19-9 | CONFIRMED | LOW | `insert` returns `()`, while the phase rule is `RETURNING` on every insert | `insert` returns the row.
+OLD:     async fn insert(&self, tx: &mut Tx, row: &SourceTag) -> Result<(), RepoError>;
+NEW:     async fn insert(&self, tx: &mut Tx, row: &SourceTag) -> Result<SourceTag, RepoError>;   // RETURNING
+
+=== F12 [O-13-1]
+FILE: docs/plan/phase-13.md
+WHY: O-13-1 | CONFIRMED | MEDIUM (agent: HIGH) | the activation cell of item 7 reads as if only `void` sets `retired_at` and `retired_by_request`; the two CHECKs of item 1 need both for `ended` too. The `close` method already takes the request id for both modes, so the value is at hand; the cell must say it | cell and trait comment: `retired_at = now()` and `retired_by_request` on both; `ended` also sets `valid_to`.
+OLD:     /// Sets `ended` (with `valid_to`) or `void` on an `active` row; `Ok(false)` when the row is no longer active.
+NEW:     /// Sets `ended` (with `valid_to`) or `void` on an `active` row, and for both `retired_at = now()` and
+    /// `retired_by_request = cr`; `Ok(false)` when the row is no longer active.
+
+=== F13 [O-13-6]
+FILE: docs/plan/phase-13.md
+WHY: O-13-6 | CONFIRMED | MEDIUM | two adds of one change set that share a hash for one tag (an account and a counterparty row of the same account) pass step 2 and the second insert breaks the unique index at activation | step 2: an add that shares a hash with an earlier add of the same tag is sub-code `already_tagged` at its `/add/<i>/subject_id`.
+OLD: and that is not in `retire`, is sub-code `already_tagged`. Each is 422 `E_VALIDATION` at `/add/<i>/subject_id`.
+NEW: and that is not in `retire`, is sub-code `already_tagged`. So is an entry that shares a hash with an earlier entry of `add` for the same tag (an account and a counterparty row of that account, for example), at the later entry. Each is 422 `E_VALIDATION` at `/add/<i>/subject_id`.
+
+=== F14 [O-13-2]
+FILE: docs/plan/phase-13.md
+WHY: O-13-2 | CONFIRMED | MEDIUM (agent: HIGH) | the default `valid_to` of an `end` (last closed business date) falls before `valid_from` for a row whose `valid_from` is today or the open business day, which the CHECK `valid_to >= valid_from` refuses at activation | the default is the later of the row's `valid_from` and the last closed business date.
+OLD: `end` takes `valid_to` between the row's `valid_from` and today, and defaults to the last closed business date (phase 11 `FreshnessQuery`);
+NEW: `end` takes `valid_to` between the row's `valid_from` and today, and defaults to the later of the row's `valid_from` and the last closed business date (phase 11 `FreshnessQuery`), so the default never falls before `valid_from`;
+
+=== F15 [O-19-4]
+FILE: docs/plan/phase-13.md
+WHY: O-19-4 | CONFIRMED | MEDIUM (agent: HIGH) | item 6 step 5 does not say that the request is submitted. Phase 04 fixes the rule for every dedicated route (`create(origin = Dedicated)` with `submit = true`), so a developer has it, but the step must say it | step 5 names `ChangeRequestService::create` with origin Dedicated, so `submit` runs in the same transaction. Same fix in phase 13 section 7.17 item 6.
+OLD:    5. Create the change request through phase 04 `ChangeRequestService` (kind `source_tag`, `object_key` `source_tags`, reason family `change`), route `cr_material`.
+NEW:    5. Create the change request with phase 04 `ChangeRequestService::create` (origin Dedicated, so `submit` runs in the same transaction; kind `source_tag`, `object_key` `source_tags`, the caller's `reason_code` of family `change` and `reason_text`), route `cr_material`.
+
+=== F16 [O-13-7]
+FILE: docs/plan/phase-13.md
+WHY: O-13-7 | CONFIRMED | MEDIUM | the impact lists hold readers of "a tag name of the change set", but a retire entry carries no tag, so a change set that only ends a tag a segment reads could be `neutral` | a retire entry's tag is the tag of the row it names; the impact counts those tags too.
+OLD: and the two lists hold the keys of the active static segments and active feature definitions that read a tag name of the change set.
+NEW: and the two lists hold the keys of the active static segments and active feature definitions that read a tag name of the change set. The tag names of a change set are the tags of its `add` entries and the tags of the rows that its `retire` entries name (read by `id`), so a change set that only ends or voids a tag has its readers counted too.

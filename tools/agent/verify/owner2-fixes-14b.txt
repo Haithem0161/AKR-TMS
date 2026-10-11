@@ -1,0 +1,82 @@
+Replacements of round 1 of the owner-decision check, key 14b. 13 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-14-8]
+FILE: docs/plan/phase-14.md
+WHY: O-14-8 | CONFIRMED | LOW | "hash the identifiers as a search does (section 3.12 step 3)": that step normalises the name | "(section 7.16)".
+OLD: Normalise `name` with the names crate (section 3.1) and hash the identifiers as a search does (section 3.12 step 3).
+NEW: Normalise `name` with the names crate (section 3.1), as section 3.12 step 3 does for a search, and hash the identifiers into `Identifiers` on receipt (section 7.16).
+
+=== F2 [O-14-9]
+FILE: docs/plan/phase-14.md
+WHY: O-14-9 | CONFIRMED | LOW | the bundle tests leave out CH | add CH.
+OLD: Bundle tests: CFG, CHK, IA and AS are refused both actions;
+NEW: Bundle tests: CFG, CHK, CH, IA and AS are refused both actions;
+
+=== F3 [O-14-10]
+FILE: docs/plan/phase-14.md
+WHY: O-14-10 | CONFIRMED | LOW | the tipping-off review does not say that the stored request body holds the entry key, the sealed query and its hash, nor that `reason_text` is plain text | item 12 says both; the form carries the hint to write no name in the reason.
+OLD: The change request, which CHK reads, and the audit events hold the list code, the expectation and the trial result.
+NEW: The change request as its approvers read it (the diff of item 5) and the audit events hold the list code, the expectation and the trial result. The stored body of the request also holds the entry key, the sealed query and its keyed hash (item 4 step 7): the diff leaves all three out, and no reader of the request can open the sealed query. `reason_text` is plain text that the approvers read, so the form asks the maker to write no name in it (item 11).
+
+=== F4 [O-14-11]
+FILE: docs/plan/phase-14.md
+WHY: O-14-11 | CONFIRMED | LOW | "each list the change touches" is not defined for `screening_policy` | every enabled list for `screening_policy`; the list of the key for `list_setting`.
+OLD: The dry run also scores the active `hit` cases of each list the change touches, under the old and the new configuration.
+NEW: The dry run also scores the active `hit` cases of each list the change touches, under the old and the new configuration. A `list_setting` change touches the list of its object key; a `screening_policy` change touches every enabled list.
+
+=== F5 [O-14-12]
+FILE: docs/plan/phase-14.md
+WHY: O-14-12 | CONFIRMED | LOW | "`akr_readonly` gets no grant, as for the alert tables": two alert tables do grant it | name the comparable tables.
+OLD: `akr_readonly` gets no grant, as for the alert tables.
+NEW: `akr_readonly` gets no grant, as for `alert.screening_alerts`, `alert.screening_decisions`, `alert.pair_memory` and `alert.good_guy_rules`.
+
+=== F6 [L-1]
+FILE: docs/plan/phase-14.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // L-1 in phase 14: the base check line of section 6 item 2 was wrong for two statements (`DELETE FROM ref.list_versions`, `UPDATE alert.screening_decisions`): `akr_app` has neither privilege. Both now say permission denied as `akr_app` and the guard message as the owner `akr_migrate`.
+OLD: `DELETE` fails with `known-answer cases are never deleted`; an UPDATE of a `rejected` row fails;
+NEW: a `DELETE` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `known-answer cases are never deleted`; as `akr_app` an UPDATE of the `state` of a `rejected` row fails with the guard's `is final` message;
+
+=== F7 [L-1]
+FILE: docs/plan/phase-14.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // L-1 in phase 14: the base check line of section 6 item 2 was wrong for two statements (`DELETE FROM ref.list_versions`, `UPDATE alert.screening_decisions`): `akr_app` has neither privilege. Both now say permission denied as `akr_app` and the guard message as the owner `akr_migrate`.
+OLD: 2. Negative DDL as `akr_app`: `DELETE FROM ref.list_versions` fails with `list versions are never deleted`; `UPDATE ref.list_entries` fails with permission denied;
+NEW: 2. Negative DDL as `akr_app`: `DELETE FROM ref.list_versions` fails with permission denied (no role has a DELETE grant), and as the owner `akr_migrate` with `list versions are never deleted`; `UPDATE ref.list_entries` fails with permission denied;
+
+=== F8 [L-1]
+FILE: docs/plan/phase-14.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // L-1 in phase 14: the base check line of section 6 item 2 was wrong for two statements (`DELETE FROM ref.list_versions`, `UPDATE alert.screening_decisions`): `akr_app` has neither privilege. Both now say permission denied as `akr_app` and the guard message as the owner `akr_migrate`.
+OLD: `UPDATE alert.screening_decisions` fails with `screening_decisions is append-only`;
+NEW: `UPDATE alert.screening_decisions` fails with permission denied (no UPDATE grant), and as `akr_migrate` with `screening_decisions is append-only`;
+
+=== F9 [O-14-14]
+FILE: docs/plan/phase-14.md
+WHY: O-14-14 | CONFIRMED | LOW | "a fourth row of the section 3.10 table": that table keeps three rows | "a fourth target".
+OLD: 5. **Change target `harness_case`** (a fourth row of the section 3.10 table; reason family `change`;
+NEW: 5. **Change target `harness_case`** (a fourth target; the table of section 3.10 keeps its three rows; reason family `change`;
+
+=== F10 [O-07-10]
+FILE: docs/plan/phase-14.md
+WHY: O-07-10 | CONFIRMED | LOW | "the target refuses and the request ends `failed`": phase 04 rolls back an immediate approval and ends `failed` only on the scheduled path | say both. The same words in phase 14 section 7.19 item 5 (and any other owner block) are fixed with it. (Verify phase 04 lines ~1023 and ~1103.)
+OLD: `add`: `lock`; not `proposed` -> the target refuses and the request ends `failed`; `activate`;
+NEW: `add`: `lock`; not `proposed` -> the target refuses (phase 04 section 3.2: an immediate approval is rolled back with the error, and a scheduled activation ends `failed`); `activate`;
+
+=== F11 [O-07-10]
+FILE: docs/plan/phase-14.md
+WHY: O-07-10 | CONFIRMED | LOW | "the target refuses and the request ends `failed`": phase 04 rolls back an immediate approval and ends `failed` only on the scheduled path | say both. The same words in phase 14 section 7.19 item 5 (and any other owner block) are fixed with it. (Verify phase 04 lines ~1023 and ~1103.)
+OLD: `retire`: `lock`; not `active` -> refused; `retire` with the request id;
+NEW: `retire`: `lock`; not `active` -> refused in the same way; `retire` with the request id;
+
+=== F12 [O-14-15]
+FILE: docs/plan/phase-14.md
+WHY: O-14-15 | CONFIRMED | LOW | no line says that `retire` and `reject` write `closed_at` | item 3 states what `activate`, `retire` and `reject` set.
+OLD:    `NewHarnessCase` holds the id, `list_id`, `entry_key`, `expect`, `query_enc`, `query_hk`, `trial`, `change_request_id` and `created_by`.
+NEW:    `NewHarnessCase` holds the id, `list_id`, `entry_key`, `expect`, `query_enc`, `query_hk`, `trial`, `change_request_id` and `created_by`. `activate` sets `state = 'active'` and `activated_at = at`; `retire` sets `state = 'retired'`, `retired_by_request = cr` and `closed_at = at`; `reject` sets `state = 'rejected'` and `closed_at = at`. These four columns are the whole UPDATE grant of item 1.
+
+=== F13 [DR-422]
+FILE: docs/plan/phase-14.md
+WHY: DR-422 is the decision record that locks the design corrections of round 1. The row in docs/plan/research.md must say only what the phase files now say; each citing sentence in a phase block must name corrections that the block really carries.
+OLD: A bank adds its own known-answer cases through change control: a name, with identifiers when the bank has them, that must hit a named list entry (`hit`) or must not hit it (`no_hit`). This is the bank-side intake of N-44: a spelling the analysts want kept as a known hit, and a name that matched wrongly kept as a hard negative. The shipped corpus stays synthetic (N-38) and it alone decides the gate. The bank's cases run in every gate and oracle run and are reported beside it. They never block a list activation, because a list update is a legal duty (the 12-hour rule) and a case can go stale when the publisher changes an entry. A configuration change that would lose a known hit says so before it is approved (item 8). The bank-specific variant table (N-57) stays P2.
+NEW: A bank adds its own known-answer cases through change control: a name, with identifiers when the bank has them, that must hit a named list entry (`hit`) or must not hit it (`no_hit`). This is the bank-side intake of N-44: a spelling the analysts want kept as a known hit, and a name that matched wrongly kept as a hard negative. The shipped corpus stays synthetic (N-38) and it alone decides the gate. The bank's cases run in every gate and oracle run and are reported beside it. They never block a list activation, because a list update is a legal duty (the 12-hour rule) and a case can go stale when the publisher changes an entry. A configuration change that would lose a known hit says so before it is approved (item 8). The bank-specific variant table (N-57) stays P2. DR-422 locks the correction of the check round of 2026-10-11: the harness report carries one result per case (`results`, item 6).

@@ -1,0 +1,108 @@
+Replacements of round 1 of the owner-decision check, key 07b. 16 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-07-7]
+FILE: docs/plan/phase-07.md
+WHY: O-07-7 | CONFIRMED | MEDIUM | the mask sends U+063B to U+0640 (the tatweel among them) to U+06A9, which the entity-name class of patch P-01 refuses, so a valid name can gain an XSD-04 block | "letter in U+0621 to U+064A" becomes a random letter of U+0621 to U+063A or U+0641 to U+064A.
+OLD: | letter in U+0621 to U+063A or U+0641 to U+064A | a random letter of those two ranges |
+NEW: | letter in U+0621 to U+064A (the class `ء-ي` of patch `P-01`; the tatweel U+0640 is one of them) | a random letter of U+0621 to U+063A or U+0641 to U+064A, so a value the class accepts stays accepted |
+
+=== F2 [O-07-7]
+FILE: docs/plan/phase-07.md
+WHY: O-07-7 | CONFIRMED | MEDIUM | the mask sends U+063B to U+0640 (the tatweel among them) to U+06A9, which the entity-name class of patch P-01 refuses, so a valid name can gain an XSD-04 block | "letter in U+0621 to U+064A" becomes a random letter of U+0621 to U+063A or U+0641 to U+064A.
+OLD: a letter U+0695 becomes U+06A9; the three validated samples,
+NEW: a letter U+0695 becomes U+06A9; a tatweel U+0640 becomes a letter of U+0621 to U+063A or U+0641 to U+064A, and an entity name that holds one still passes `P-01`; the three validated samples,
+
+=== F3 [O-07-8]
+FILE: docs/plan/phase-07.md
+WHY: O-07-8 | CONFIRMED | MEDIUM | the base tipping-off review (section 3.8) still says nothing derived from an uploaded file holds a value | it gains the exception for the masked bank cases (codes, booleans, dates, the bank's own identifiers; nothing that identifies a person). Check the scope of the section 3.2 sentence (line ~572) when fixing.
+OLD:   of the run (DR-69); nothing derived from them holds a value, a name or the narrative. The run rows are `secret-str`,
+NEW:   of the run (DR-69); nothing derived from them holds a value, a name or the narrative. The one exception is the
+  masked file of a corpus case the bank adds (section 7.6): it keeps enumeration codes, booleans, dates, date-times
+  and the bank's own goAML identifiers, no route returns it, and nothing in it names a person. The run rows are `secret-str`,
+
+=== F4 [O-07-8]
+FILE: docs/plan/phase-07.md
+WHY: O-07-8 | CONFIRMED | MEDIUM | the base tipping-off review (section 3.8) still says nothing derived from an uploaded file holds a value | it gains the exception for the masked bank cases (codes, booleans, dates, the bank's own identifiers; nothing that identifies a person). Check the scope of the section 3.2 sentence (line ~572) when fixing.
+OLD: element names). Never a value from the file, never the libxml2 message, never the rejection text. The requester
+
+NEW: element names). Never a value from the file, never the libxml2 message, never the rejection text. (This is the rule
+for a check run. A corpus case the bank adds keeps a masked copy of its file; section 7.6 item 2 says what stays in
+it.) The requester
+
+
+=== F5 [L-5]
+FILE: docs/plan/phase-07.md
+WHY: L-5 | LOW | the tipping-off review said that nothing personal stays in a masked file; dates and date-times stay, a date of birth among them, and so do enumeration codes (nationality, gender), because the rules read them | the review of item 12 and the base review now say so plainly. No route returns the file; it is `secret-str` evidence. For the user report: this is what the mask keeps.
+OLD: What is kept is the masked file: no name, identifier, account number, address, telephone number, amount or narrative of the original is in it, and no route returns it to anyone.
+NEW: What is kept is the masked file: no name, identifier, account number, address, telephone number, amount or narrative of the original is in it, and no route returns it to anyone. Dates and date-times stay as they were, a date of birth among them, as do enumeration codes such as nationality and gender, because the rules read them; with every name and number beside them replaced they do not name a person, and the file is `secret-str` evidence that only the corpus runner opens.
+
+=== F6 [O-07-9]
+FILE: docs/plan/phase-07.md
+WHY: O-07-9 | CONFIRMED | LOW | Prepare accepts any `rule_code` of a rejection pattern as `office_code`; the column CHECK admits only `OFF-nn` | Prepare also requires the `OFF-nn` form (else 422 `rule_unknown` at `/office_code`).
+OLD: `office_code`, when given, is the `rule_code` of a rejection pattern of the active version (else 422 `rule_unknown` at `/office_code`);
+NEW: `office_code`, when given, has the form `OFF-nn` that the column CHECK admits and is the `rule_code` of a rejection pattern of the active version (else 422 `rule_unknown` at `/office_code`);
+
+=== F7 [O-07-10]
+FILE: docs/plan/phase-07.md
+WHY: O-07-10 | CONFIRMED | LOW | "the target refuses and the request ends `failed`": phase 04 rolls back an immediate approval and ends `failed` only on the scheduled path | say both. The same words in phase 14 section 7.19 item 5 (and any other owner block) are fixed with it. (Verify phase 04 lines ~1023 and ~1103.)
+OLD: not `proposed`, or the open count above the cap -> the target refuses and the request ends `failed`; `activate` (`activated_at` = the request's `activated_at`);
+NEW: not `proposed`, or the open count above the cap -> the target refuses (phase 04 section 3.2: an immediate approval is rolled back with the error, and a scheduled activation ends `failed`); `activate` (`activated_at` = the request's `activated_at`);
+
+=== F8 [O-07-10]
+FILE: docs/plan/phase-07.md
+WHY: O-07-10 | CONFIRMED | LOW | "the target refuses and the request ends `failed`": phase 04 rolls back an immediate approval and ends `failed` only on the scheduled path | say both. The same words in phase 14 section 7.19 item 5 (and any other owner block) are fixed with it. (Verify phase 04 lines ~1023 and ~1103.)
+OLD: `retire`: `lock`; not `active` -> refused; `retire` with the request id; audit `goaml_corpus_case.retired {case_id, change_request_id}`.
+NEW: `retire`: `lock`; not `active` -> refused in the same way; `retire` with the request id; audit `goaml_corpus_case.retired {case_id, change_request_id}`.
+
+=== F9 [O-07-11]
+FILE: docs/plan/phase-07.md
+WHY: O-07-11 | CONFIRMED | LOW | the crate listing of section 2 still names three job kinds, one change target and three handlers | add `goaml_case_intake`, `goaml_corpus_case` and "four".
+OLD: │   └── jobs/      # + kinds goaml_check, goaml_watch, goaml_corpus (akr-worker)
+NEW: │   └── jobs/      # + kinds goaml_check, goaml_watch, goaml_corpus, goaml_case_intake (akr-worker; the last in section 7.6)
+
+=== F10 [O-07-11]
+FILE: docs/plan/phase-07.md
+WHY: O-07-11 | CONFIRMED | LOW | the crate listing of section 2 still names three job kinds, one change target and three handlers | add `goaml_case_intake`, `goaml_corpus_case` and "four".
+OLD: ├── api/           # + router goaml; change target goaml_profile
+NEW: ├── api/           # + router goaml; change targets goaml_profile and goaml_corpus_case (section 7.6)
+
+=== F11 [O-07-11]
+FILE: docs/plan/phase-07.md
+WHY: O-07-11 | CONFIRMED | LOW | the crate listing of section 2 still names three job kinds, one change target and three handlers | add `goaml_case_intake`, `goaml_corpus_case` and "four".
+OLD: ├── worker/        # + the three job handlers, SandboxedXsdValidator, ProxySchemaFetcher
+NEW: ├── worker/        # + the four job handlers (the fourth in section 7.6), SandboxedXsdValidator, ProxySchemaFetcher
+
+=== F12 [O-07-11]
+FILE: docs/plan/phase-07.md
+WHY: O-07-11 | CONFIRMED | LOW | the crate listing of section 2 still names three job kinds, one change target and three handlers | add `goaml_case_intake`, `goaml_corpus_case` and "four".
+OLD: │   │              #   PackageChecks (zip), RejectionParser, the corpus runner
+NEW: │   │              #   PackageChecks (zip), RejectionParser, the corpus runner, CaseMasker (section 7.6)
+
+=== F13 [O-08-1]
+FILE: docs/plan/phase-07.md
+WHY: O-08-1 | CONFIRMED | MEDIUM (agent: HIGH) | 7.11 items 3 and 4 link the maker to the change request on G10, but G10 lists no A2 and phase 04 gives A2 no scope for `GET /change-requests/{id}`, so an A2 maker lands on X6; phase 07 section 7.6 item 7 says only "its maker withdraws". Nothing blocks building and no stated check fails, so MEDIUM | 7.11: the G10 link is rendered for a role G10 lists (M); an A2 maker sees the reference as text and follows the request in the inbox tab "Waiting on others" (X3). Phase 07 item 7: an unmet case is closed by the approver's reject or the maker's withdraw (the Closed hook serves both); an A2 maker has no withdraw screen in P0, the same as the SS maker of a good-guy rule (phase 14). // Linked change from O-08-1: item 7 sentence "its maker withdraws the request" becomes "the approver rejects the request or its maker withdraws it".
+OLD: cannot be approved: its maker withdraws the request and the case becomes `rejected`.
+NEW: cannot be approved: the approver rejects the request or its maker withdraws it, and the case becomes `rejected`.
+
+=== F14 [L-1]
+FILE: docs/plan/phase-07.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // L-1 in phase 07: base check of section 6 item 1 (`DELETE FROM rpt.goaml_profiles`) now names the owner role; the block's DELETE check names both roles.
+OLD: Negative checks: `DELETE FROM rpt.goaml_profiles` fails with
+   `profile versions are never deleted`;
+NEW: Negative checks: `DELETE FROM rpt.goaml_profiles` as the owner `akr_migrate` fails with
+   `profile versions are never deleted` (as `akr_app` it fails with permission denied, the last check of this item);
+
+=== F15 [L-1]
+FILE: docs/plan/phase-07.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // L-1 in phase 07: base check of section 6 item 1 (`DELETE FROM rpt.goaml_profiles`) now names the owner role; the block's DELETE check names both roles.
+OLD: `DELETE` fails with `goAML corpus cases are never deleted`; an UPDATE of a `rejected` row fails;
+NEW: a `DELETE` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `goAML corpus cases are never deleted`; as `akr_app` an UPDATE of the `state` of a `rejected` row fails with the guard's `is final` message;
+
+=== F16 [DR-422]
+FILE: docs/plan/phase-07.md
+WHY: DR-422 is the decision record that locks the design corrections of round 1. The row in docs/plan/research.md must say only what the phase files now say; each citing sentence in a phase block must name corrections that the block really carries.
+OLD: A bank adds its own cases to the regression corpus through change control (RP-06, RP-83: the FIU-answers corpus). A case is one goAML XML file and the result the checker must give for it. The preparer or the MLRO uploads the file; a worker job masks every name, number and text in it, checks that the masked file still gives the stated result, and keeps only the masked file. From then on every corpus run of that profile code runs the case, so a later amendment or a new Office schema that stops giving the result shows as a failed case before it can be promoted. The shipped corpus and its 63 cases do not change.
+NEW: A bank adds its own cases to the regression corpus through change control (RP-06, RP-83: the FIU-answers corpus). A case is one goAML XML file and the result the checker must give for it. The preparer or the MLRO uploads the file; a worker job masks every name, number and text in it, checks that the masked file still gives the stated result, and keeps only the masked file. From then on every corpus run of that profile code runs the case, so a later amendment or a new Office schema that stops giving the result shows as a failed case before it can be promoted. The shipped corpus and its 63 cases do not change. DR-422 locks the corrections of the check round of 2026-10-11: the intake is run again at profile activation, each deletion of an uploaded file is audited, and the mask keeps an Arabic letter inside the class of patch `P-01`.

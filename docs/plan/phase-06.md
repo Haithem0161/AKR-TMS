@@ -906,8 +906,8 @@ Until phase 08 the steward and the MLRO use Swagger UI and `akr-ctl`.
 ## 6. Verification
 
 1. `make migrate`: 0020-0022 apply; a second run is a no-op; the phase 00 schema checks pass for the five new tables
-   (classification and retention rows present). Negative checks: `DELETE FROM scn.cbi_catalogue_items` (any row, as
-   the owner role too) fails with `register rows are never deleted`; changing an item's `ref` or `text` fails;
+   (classification and retention rows present). Negative checks: `DELETE FROM scn.cbi_catalogue_items` (any row) fails, as
+   `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `register rows are never deleted`; changing an item's `ref` or `text` fails;
    changing a scenario's `code` or `pack` fails; `UPDATE scn.scenarios SET status = 'retired'` on a `cbi` scenario
    fails its CHECK; a `source` scope row with a declaration fails its CHECK; a second `queued` gap report run fails
    `uq_gap_report_runs_active`; a `completed` run with three pack ids fails its CHECK; an `admin.packs` row of kind

@@ -11,9 +11,9 @@ connection and no bank data beyond the uploaded files, which are checked and the
 **Dependencies:** Phase 04 (the change target for profile changes; phases 02 and 03 through it), Phase 08 (the
 reduced shell and the stepper for E1)
 **Macro-phase:** P0
-**Complexity:** M (9 routes; the XML safety, the rule catalogue and the profile loader carry the weight)
-**Binaries touched:** akr-api (router `goaml`; change target `goaml_profile`) | akr-worker (jobs `goaml_check`,
-`goaml_watch`, `goaml_corpus`; the helper executable `akr-xsdcheck` in the worker image) | `akr-ctl` (`goaml
+**Complexity:** M (12 routes: 9 of section 2 and 3 of section 7.6; the XML safety, the rule catalogue and the profile loader carry the weight)
+**Binaries touched:** akr-api (router `goaml`; change targets `goaml_profile` and `goaml_corpus_case`) | akr-worker (jobs `goaml_check`,
+`goaml_watch`, `goaml_corpus`, `goaml_case_intake`; the helper executable `akr-xsdcheck` in the worker image) | `akr-ctl` (`goaml
 import-xsd`, `goaml corpus`; `packs seed` installs the shipped profile). akr-ingestd and akr-assess unchanged
 **Requirements carried:** RP-01 (the profile registry: XSD, patches, lookups, rules, report types, limits and emit
 flags, versioned; the Iraqi profile `IQ-5.0.2` from the Office's XSD; clocks arrive in phase 21), RP-02 (lookups,
@@ -21,14 +21,14 @@ cardinalities, lengths and patterns read from the XSD, an unknown lookup a hard 
 the corpus run and promotion by change request; reports in flight pinned from phase 21), RP-04 (the pattern
 compatibility layer for the entity-name facet, the sanitiser warning and its open question), RP-05 (emit flags for the
 5.0, 5.1 and 5.2 elements and the deprecated pairs, default off; the checker warns when a file uses one), RP-06 (the
-regression corpus: the three validated samples and the 63 negative and edge cases; the FIU-answers corpus grows from
-phase 21), RP-07 (the normaliser's rules as checks on uploaded files; the normaliser itself writes XML in phase 21),
+regression corpus: the three validated samples and the 63 negative and edge cases; the bank's own rejection cases, the
+FIU-answers corpus, are added masked through change control, section 7.6), RP-07 (the normaliser's rules as checks on uploaded files; the normaliser itself writes XML in phase 21),
 RP-09 (the open-questions register per profile), RP-27 (validation layers L1 to L5 on uploaded XML; L0 needs the case
 snapshot of phase 21), RP-28 (the business-rule catalogue with IDs, severities, versions and tests; changes by
 change request), RP-29 (the quality score and the four-level grade, estimated; the monthly calibration sample is
 phase 21), RP-30 (the consistency checks that an uploaded file allows), RP-42 (the rejection-message parser, a stub
 with a pattern list in the profile), RP-82 (profile limits enforced on the uploaded files), RP-83 (the
-business-rejection-rule corpus per profile, seeded and grown by profile change)
+business-rejection-rule corpus per profile, seeded by release and grown by the bank's cases, section 7.6)
 - Gap pass 1 (coverage), partly implemented: RP-08 (several active profiles, one per code); L-12 (pre-submission identifier and shape rules).
 - Gap pass 1 (coverage), implemented here: VB-49 (the pre-submission goAML validator: schema and Office rules, failures block).
 
@@ -38,7 +38,7 @@ business-rejection-rule corpus per profile, seeded and grown by profile change)
 
 Three migrations, `0023_goaml_profiles_watch`, `0024_goaml_check` and `0025_goaml_settings`. Four tables, all in
 `rpt` (DATA-MODEL s.14, aligned in the same change: `goaml_profiles` becomes one row per profile version with the
-columns below). No table of an earlier phase changes. The shipped profile is not inserted by a migration: `akr-ctl
+columns below). A fifth table, `rpt.goaml_corpus_cases`, and two more settings are in section 7.6. No table of an earlier phase changes. The shipped profile is not inserted by a migration: `akr-ctl
 packs seed` installs it with the XSD stored as evidence (section 3.1), as phase 06 installs the CBI catalogue.
 
 ```sql
@@ -327,14 +327,14 @@ backend/
 ├── crates/
 │   ├── goaml/     # akr-goaml (new, pure library, no libxml2): ProfileLoader (XSD facts with roxmltree), PatchApplier,
 │   │              #   SchemaDiff, PreScreen (quick-xml), the rule catalogue, Scorer, ConsistencyChecks,
-│   │              #   PackageChecks (zip), RejectionParser, the corpus runner
+│   │              #   PackageChecks (zip), RejectionParser, the corpus runner, CaseMasker (section 7.6)
 │   ├── domain/    # + goaml (GoamlProfile, ProfileStatus, CheckRun, CheckFinding, WatchRun, value objects, ports)
-│   ├── db/        # + Pg repositories for the four tables
+│   ├── db/        # + Pg repositories for the four tables (and the fifth of section 7.6)
 │   ├── authz/     # + resource adapters GoamlProfile, GoamlCheckRun
-│   └── jobs/      # + kinds goaml_check, goaml_watch, goaml_corpus (akr-worker)
+│   └── jobs/      # + kinds goaml_check, goaml_watch, goaml_corpus, goaml_case_intake (akr-worker; the last in section 7.6)
 ├── tools/xsdcheck/ # akr-xsdcheck: the only binary that links libxml2 (section 3.2); shipped in the akr-worker image
-├── api/           # + router goaml; change target goaml_profile
-├── worker/        # + the three job handlers, SandboxedXsdValidator, ProxySchemaFetcher
+├── api/           # + router goaml; change targets goaml_profile and goaml_corpus_case (section 7.6)
+├── worker/        # + the four job handlers (the fourth in section 7.6), SandboxedXsdValidator, ProxySchemaFetcher
 └── ctl/           # + goaml import-xsd, goaml corpus; packs seed installs the profile
 ```
 
@@ -456,7 +456,7 @@ pub trait SchemaFetcher: Send + Sync {
 API.md lists `GET /goaml/profiles` and the watch runs under `report.prepare` only; they now take `config.author` too,
 because the configuration author proposes profile changes and must read what they change (aligned in the same change). The two profile reads also take `config.approve`, because the checker reads the version it decides (section 6); Cedar still limits them to A2, M, CFG and CHK.
 
-- **Router function:** `goaml::router() -> OpenApiRouter<AppState>` (9 routes), merged in `build_app` under the authz
+- **Router function:** `goaml::router() -> OpenApiRouter<AppState>` (9 routes; 12 with section 7.6), merged in `build_app` under the authz
   layer. `POST /goaml/check` and `POST /goaml/watch-runs` take `Idempotency-Key`; `PUT /goaml/profiles/{id}` takes
   `If-Match` with the version row's `version` as the change request's base. `POST /goaml/check` has its own body
   limit: `goaml.check_max_files` x `goaml.check_max_bytes` plus multipart overhead, streamed to the transient store
@@ -569,7 +569,9 @@ and purge period, TFR after a true match, the entity-name pattern on the server,
 
 **What is kept** (DR-69): per file its SHA-256, size and kind, and the findings: rule code, severity, element path
 with positions, line, column and `FindingParams` (lengths, counts, offsets, expected lookup lists from the profile,
-element names). Never a value from the file, never the libxml2 message, never the rejection text. The requester
+element names). Never a value from the file, never the libxml2 message, never the rejection text. (This is the rule
+for a check run. A corpus case the bank adds keeps a masked copy of its file; section 7.6 item 2 says what stays in
+it.) The requester
 already holds the file; the finding tells them where to look and what to change. A test (section 6) feeds files whose
 every text node is a unique marker string and asserts that no marker appears anywhere in the database, the logs, the
 audit trail or the job payloads.
@@ -614,9 +616,10 @@ positive and negative fixtures, and every corpus case names the codes it must pr
 | CONS-03 | an STR, SAR or TFR whose `reason` is shorter than N characters | warn | `min_chars` 400 |
 | CONS-04 | transactions not in chronological order by `date_transaction` | info | |
 
-The business-rejection-rule corpus (RP-83) is the corpus under `corpus/cases/` plus the cases a profile amendment
-adds (section 3.6): each case is a file, the rule codes it must produce and the Office message that revealed the rule,
-when one did. Phase 21 adds the bank's own anonymised rejection cases (the FIU-answers corpus).
+The business-rejection-rule corpus (RP-83) is the corpus under `corpus/cases/` plus the cases the bank adds
+(section 7.6): each case is a file, the rule codes it must produce and the Office message that revealed the rule,
+when one did (for a bank case, the code of the rejection pattern it belongs to). The bank's own masked rejection
+cases are the FIU-answers corpus; phase 21 adds none.
 
 ### 3.4 Quality score and estimated grade (`Scorer`; RP-29, DR-72)
 
@@ -671,11 +674,12 @@ changes; patches orphaned; and for amendments the rule, quality, limit, flag and
 on `GET /goaml/profiles/{id}` and in the change request's diff.
 
 **`goaml_corpus`** (akr-worker; payload `{profile_id}`; concurrency 1): run every corpus file through steps 4-9 of
-section 3.2 against the version (no transient store: the corpus is release data), compare with `cases.json` (outcome
+section 3.2 against the version (no transient store: the shipped corpus is release data), compare with `cases.json` (outcome
 and the exact set of block codes; warnings may differ and are listed), and `set_corpus_result {ran_at, passed,
 failed, cases: [{file, expected, got}]}`; audit `goaml_profile.corpus_ran {code, profile_version, passed, failed}`.
 `akr-ctl goaml corpus [--profile ID]` runs the same in the foreground with exit code 0 when all pass. CI runs it
-against the shipped profile on every change to `akr-goaml`.
+against the shipped profile on every change to `akr-goaml`. The cases the bank added run after the shipped files
+(section 7.6 item 8).
 
 **Change target `goaml_profile`** (phase 04 `ChangeTarget`, registered in akr-api and akr-worker; family
 `reporting`; `generic_create = false`; `emergency_allowed = false`; `reason_families = ["change"]`):
@@ -686,7 +690,7 @@ against the shipped profile on every change to `akr-goaml`.
 | `object_key` | `goaml_profile:<code>` (one open change per profile code) |
 | Base version | the active version's `profile_version` |
 | Prepare | `promote`: the target is a `candidate` of this code with `corpus_result` present (else 422 `corpus_not_run`); failed cases need `accept_corpus_failures` with a reason of at least 20 characters (else 422 `corpus_failed`); `amend`: the body validates against `goaml-profile.v1.json` and the rules' parameter schemas, regexes compile under the `regex` crate (no backtracking) and are at most 500 characters, limits within the hard caps (`max_file_bytes` 300 MiB, `max_transactions` 100,000); a new `candidate` version is inserted (`source = amendment`, `based_on` = the target) and `goaml_corpus` runs before the checker can decide (`required_evidence = [validation_run]`, generated from `corpus_result`). Class `material`; volume effect `neutral`, except that disabling a `block` rule or lowering it to `warn` or `info` sets `loosening` and requires an answered open question or a reason of at least 50 characters |
-| Activate | `GoamlProfileRepository::activate` (candidate -> `active`, previous active -> `retired`, `effective_from` = the request's `activated_at`); runs already queued keep their pinned version; audit `goaml_profile.activated {code, profile_version, from_version, change_request_id}` |
+| Activate | `GoamlProfileRepository::activate` (candidate -> `active`, previous active -> `retired`, `effective_from` = the request's `activated_at`); runs already queued keep their pinned version; audit `goaml_profile.activated {code, profile_version, from_version, change_request_id}`; then enqueue `goaml_case_intake {case_id}` for every `proposed` bank case of the code that has a stored file (`stored_proposed_for_code`, section 7.6 item 4), so its intake result is taken again under the new active version before anyone decides it |
 | Revert | not allowed (a new request promotes or amends again) |
 | Closed | an `amendment` candidate -> `rejected`; a watcher or import candidate stays `candidate` (it is the Office's file; the bank may promote it later) |
 
@@ -699,7 +703,7 @@ lines. Text no pattern matches gives one `OFF-99` info finding with the count of
 are generic goAML schema-message shapes (`OFF-01` invalid child element, `OFF-02` value fails a pattern or
 enumeration, `OFF-03` required element missing, `OFF-04` business rule with a named element), marked with open
 question `OQ-04`: the Office's own message wording is not known (RQ-08). The text is never stored: only the findings.
-Each real message the bank meets becomes a pattern through a profile amendment (and, from phase 21, a corpus case).
+Each real message the bank meets becomes a pattern through a profile amendment (and a corpus case, section 7.6).
 
 ### 3.8 Errors, audit events, Cedar actions
 
@@ -709,7 +713,8 @@ Each real message the bank meets becomes a pattern through a profile amendment (
 `E_VALIDATION` with reasons `too_many_files`, `file_too_large`, `type_not_allowed`, `rejection_needs_one_file`,
 `profile_not_usable`, `corpus_failed`, `corpus_not_run`, `rule_unknown`, `params_invalid`, `pattern_invalid`, `limit_out_of_bounds`,
 `loosening_needs_basis`. `GoamlError`, `CheckError`, `WatchError` and `XsdError` (`thiserror`) map in `api::error` or
-end the job.
+end the job. Section 7.6 adds the reasons, the audit kinds and the two Cedar actions of the bank's corpus cases
+(items 9 to 11).
 
 **Audit events emitted:**
 
@@ -783,7 +788,9 @@ profile change.
 
 **Tipping-off review.**
 - The uploaded files are the bank's suspicion reports. They exist only sealed in the transient store for the length
-  of the run (DR-69); nothing derived from them holds a value, a name or the narrative. The run rows are `secret-str`,
+  of the run (DR-69); nothing derived from them holds a value, a name or the narrative. The one exception is the
+  masked file of a corpus case the bank adds (section 7.6): it keeps enumeration codes, booleans, dates, date-times
+  and the bank's own goAML identifiers, no route returns it, and nothing in it names a person. The run rows are `secret-str`,
   readable by the requester and the MLRO only, masked for everyone else, and excluded from any count shown to other
   roles.
 - No result leaves AKR-TMS: nothing is sent to the Office or to anyone else; the result page is printed by the user.
@@ -792,7 +799,7 @@ profile change.
 - Audit details carry ids, hashes, counts and codes; the file names stay sealed in the run row.
 The answer for a person outside the requester and the MLRO: nothing, not even that a check ran.
 
-**Settings and configuration used:** the nine keys of migration 0025 (registry bounds: `goaml.check_max_files` 1-50;
+**Settings and configuration used:** the nine keys of migration 0025 and the two of section 7.6 (registry bounds: `goaml.check_max_files` 1-50;
 `goaml.check_max_bytes` 1 MiB to the profile's `max_file_bytes`; `goaml.watch_url` an `https` URL whose host is in
 `goaml.watch_hosts`; `goaml.watch_hosts` at most 10 host names; `goaml.watch_stale_days` 1-60;
 `schedule.goaml_watch` a cron at most hourly; `goaml.bank_identifiers` validated against its JSON schema, patterns
@@ -808,10 +815,15 @@ compiled with `regex`); the profile's `limits`; phase 02 `evidence.staging_ttl_h
     `goaml.watch_enabled` is true; manual through `POST /goaml/watch-runs`; concurrency 1; max attempts 2; network
     failures end the run `unreachable` without retry).
   - `goaml_corpus` (payload `{profile_id}`; enqueued by `packs seed`, by every new candidate (watcher, import,
-    amendment); coalesce key `goaml_corpus:<profile_id>`; concurrency 1; max attempts 2).
+    amendment) and by the activation or retirement of a bank case (section 7.6); coalesce key
+    `goaml_corpus:<profile_id>`; concurrency 1; max attempts 2).
+  - `goaml_case_intake` (payload `{case_id}`; enqueued when a bank case is proposed, and for every `proposed` case
+    with a stored file when a profile version of its code is activated (section 3.6);
+    coalesce key `goaml_case_intake:<case_id>`; concurrency 1; max attempts 3; section 7.6 item 6).
   - `maintenance_sweep` (phase 00) extended: transient `goaml` objects older than `evidence.staging_ttl_h` whose run is
     final or missing are deleted and the run flagged `transient_deleted` (audit `goaml_check.transient_deleted` with
-    `by: sweep`).
+    `by: sweep`; for an object whose owner is a bank corpus case, `goaml_corpus_case.transient_deleted`, section 7.6
+    item 6).
 - **Docker compose:**
   - The akr-worker image adds the `akr-xsdcheck` executable (built from `tools/xsdcheck`, statically linked against
     the pinned libxml2 2.13 release; the runtime image carries no other libxml2) and a seccomp profile file for it.
@@ -822,13 +834,14 @@ compiled with `regex`); the profile's `limits`; phase 02 `evidence.staging_ttl_h
     network is not created and the watcher reports `proxy_unreachable`. The proxy address reaches the worker as
     `AKR_EGRESS_PROXY` (rendered, not a setting: it is install-time infrastructure).
 - **AppState additions:** `api`: `goaml: Arc<GoamlQuery>` (profiles, check runs, findings, watch runs),
-  `goaml_check: Arc<CheckService>` (the request half), the change target `goaml_profile` in the target registry, the
-  multipart limits from the settings. `worker`: the three handlers, `ProfileLoader`, `PatchApplier`, `SchemaDiff`,
+  `goaml_check: Arc<CheckService>` (the request half), `goaml_cases: Arc<CorpusCaseService>` (section 7.6), the change
+  targets `goaml_profile` and `goaml_corpus_case` in the target registry, the multipart limits from the settings. `worker`: the three handlers, `ProfileLoader`, `PatchApplier`, `SchemaDiff`,
   `PreScreen`, `SandboxedXsdValidator` (path to `akr-xsdcheck`, seccomp profile, limits), `RuleCatalogue`, `Scorer`,
-  `RejectionParser`, `ProxySchemaFetcher`, `CorpusRunner`, the profile cache (by profile id, effective XSD path by
-  SHA-256), the change target `goaml_profile` (activation side). `ctl`: `goaml import-xsd`, `goaml corpus`, `packs
+  `RejectionParser`, `ProxySchemaFetcher`, `CorpusRunner`, `CaseMasker` and the fourth handler `goaml_case_intake`
+  (section 7.6), the profile cache (by profile id, effective XSD path by SHA-256), the change targets `goaml_profile`
+  and `goaml_corpus_case` (activation side). `ctl`: `goaml import-xsd`, `goaml corpus`, `packs
   seed` and `packs verify-data` extended.
-- **OpenAPI registration:** tag `goaml`, 9 operations, each with `x-akr-action`. `POST /goaml/check` documents
+- **OpenAPI registration:** tag `goaml`, 12 operations (the 9 of section 2 and the 3 of section 7.6), each with `x-akr-action`. `POST /goaml/check` documents
   `multipart/form-data` (`files[]` binary, `xml_text`, `rejection_text`, `profile_id`), `Idempotency-Key` and 202 with
   `Location`; `PUT /goaml/profiles/{id}` documents `If-Match` and 202 `ChangeRequestView` (phase 04); `POST
   /goaml/watch-runs` documents 202 and the 409 reasons. `GoamlProfileView` references `GoamlProfileV1` generated from
@@ -855,11 +868,11 @@ compiled with `regex`); the profile's `limits`; phase 02 `evidence.staging_ttl_h
   - Phase 02: `EvidenceStore::stage_transient(purpose, owner, n, stream)`, `open_transient(purpose, owner, n)` and
     `delete_transient(purpose, owner)` (sealed AKRE1 objects under `transient/<purpose>/` in `akr-quarantine`, no
     evidence row, s3guard policy for the prefix: stager credential writes, worker credential reads and deletes);
-    evidence owner kind `goaml_profile` (R9).
+    evidence owner kinds `goaml_profile` (R9) and `goaml_corpus_case` (R9, section 7.6).
   - Phase 03: Cedar file `A0_reporting.cedar`, entities `GoamlProfile` and `GoamlCheckRun` in `schema.cedarschema`,
     the cockpit line.
-  - Phase 04: change target `goaml_profile`; `ChangeKind` family `reporting`; the route map's class rule sends it to
-    `cr_material` with no new rule.
+  - Phase 04: change targets `goaml_profile` and `goaml_corpus_case` (section 7.6); `ChangeKind` family `reporting`;
+    the route map's class rules send them to `cr_material` or `cr_minor` with no new rule.
   - Phase 06: `packs seed` and `packs verify-data` extended to the goAML profile directories.
   - Planning docs aligned in the same change: API.md 3.13; DATA-MODEL s.14, s.21 and s.23; MODULES M13; ARCHITECTURE
     zone note; roadmap row 07.
@@ -869,7 +882,7 @@ compiled with `regex`); the profile's `limits`; phase 02 `evidence.staging_ttl_h
 Backend phase for screens; phase 08 builds them on this API. `make generate-api` regenerates the client with the
 hooks `usePostGoamlCheck`, `useGetGoamlCheckRuns`, `useGetGoamlCheckRunsId`, `useGetGoamlCheckRunsIdFindings`,
 `useGetGoamlProfiles`, `useGetGoamlProfilesId`, `usePutGoamlProfilesId`, `useGetGoamlWatchRuns`,
-`usePostGoamlWatchRuns`.
+`usePostGoamlWatchRuns`. Section 7.6 item 13 adds three hooks and the panel **Bank cases** of the profile page.
 
 Screen E1 (DESIGN-SYSTEM E1, route `/goaml-check`, STEPPER layout in the reduced shell) after phase 08:
 - **Step 1, files:** a drop zone and file picker (XML or ZIP, the limits shown from the settings) or a paste box for
@@ -895,9 +908,9 @@ Until phase 08 the MLRO uses Swagger UI and `akr-ctl goaml`.
 
 ## 6. Verification
 
-1. `make migrate`: 0023-0025 apply; a second run is a no-op; the phase 00 schema checks pass for the four new tables
-   (classification and retention rows present). Negative checks: `DELETE FROM rpt.goaml_profiles` fails with
-   `profile versions are never deleted`; changing `rules` on an `active` version fails; a second `active` version of
+1. `make migrate`: 0023-0025 apply; a second run is a no-op; the phase 00 schema checks pass for the five new tables
+   (the four of section 1 and `rpt.goaml_corpus_cases` of section 7.6; classification and retention rows present). Negative checks: `DELETE FROM rpt.goaml_profiles` as the owner `akr_migrate` fails with
+   `goAML profile versions are never deleted` (as `akr_app` it fails with permission denied; see the last check of this item); changing `rules` on an `active` version fails; a second `active` version of
    `IQ` fails `uq_goaml_profiles_active`; any status change from `retired` or `rejected` fails; a second `running`
    watch run fails its index; a finding whose `path` holds a quote, `=` or a space fails the path CHECK; `akr_app` has
    no DELETE on any `rpt.goaml_` table.
@@ -951,7 +964,7 @@ Until phase 08 the MLRO uses Swagger UI and `akr-ctl goaml`.
    - As M `POST /api/v1/goaml/watch-runs` while `goaml.watch_enabled` is false -> 409 `watch_disabled`; as A2 `GET
      /api/v1/goaml/watch-runs` -> 200 (empty).
    - As CHK `GET /api/v1/goaml/profiles` -> 200; as CHK `GET /api/v1/goaml/watch-runs` -> 403 `E_SCOPE`.
-6. Swagger UI lists 9 new operations (130 with phases 01 and 03 to 06), each with `x-akr-action`; `make generate-api`
+6. Swagger UI lists 12 new operations (the 9 of section 2 and the 3 of section 7.6; 133 with phases 01 and 03 to 06), each with `x-akr-action`; `make generate-api`
    twice gives zero diff.
 7. Audit: after the curl run `audit_log` holds `goaml_profile.seeded`, `goaml_profile.corpus_ran`,
    `goaml_check.requested`, `goaml_check.completed`, `goaml_check.transient_deleted`,
@@ -994,7 +1007,7 @@ Verification pass (2026-10-10), from tools/agent/verify/; lead-verified (tools/a
 
 ### 7.3 A corpus run that dies, and how the corpus grows (V-07-03-a, V-07-03-b, V-07-07-a, MEDIUM; DR-413)
 When `goaml_corpus` goes dead (phase 00, `job.dead`), `corpus_result` stays NULL. A promote is then refused with 422 `corpus_not_run`, and an amendment request cannot be decided because its `validation_run` evidence is missing: the maker withdraws it (the candidate becomes `rejected`, section 3.6 Closed) or an operator retries the job (phase 03 job administration).
-The corpus is release data (section 3.6): the files under `corpus/` and `cases.json`. A profile amendment adds rejection patterns, rule settings and limits; it adds no case file, and no table or route stores one. A rejection the bank meets becomes a corpus case when the bank gives the anonymised file, the codes it must produce and the Office message to the vendor, and the case ships in a later release, as the rule codes of section 7.2 do; `packs seed` then queues `goaml_corpus`. The header's RP-06 and RP-83 lines, the last paragraph of section 3.3 ("plus the cases a profile amendment adds", "Phase 21 adds the bank's own anonymised rejection cases") and section 3.7 ("and, from phase 21, a corpus case") read this way. Phase 21 adds no corpus.
+Replaced by section 7.6 (owner decision of 2026-10-10, DR-415): the bank adds its own cases through change control, and a case is kept masked in the bank's install. What stays from this paragraph: a profile amendment adds rejection patterns, rule settings and limits and no case file; a rejection that needs a rule the catalogue does not have still goes to the vendor, and the rule ships in a later release, as the rule codes of section 7.2 do; phase 21 adds no corpus. The text of this paragraph was: "The corpus is release data (section 3.6): the files under `corpus/` and `cases.json`. A profile amendment adds rejection patterns, rule settings and limits; it adds no case file, and no table or route stores one. A rejection the bank meets becomes a corpus case when the bank gives the anonymised file, the codes it must produce and the Office message to the vendor, and the case ships in a later release, as the rule codes of section 7.2 do; `packs seed` then queues `goaml_corpus`." The header's RP-06 and RP-83 lines, the last paragraph of section 3.3 and the last sentence of section 3.7 now point to section 7.6.
 
 ### 7.4 Rule parameter types (V-07-05-a, LOW; DR-413)
 The parameter schema of each rule (section 3.1 step 4) takes these JSON types for the Parameters column of section 3.3. `report_codes` (BR-03: STR, SAR, TFR), `placeholders` (BR-14: the five words quoted in that row), `currencies` (BR-18: IQD, USD) and `domestic` (BR-13, CTR-02: IQ) are arrays of strings. `days` (BR-08: 31; CONS-02: 7), `min_chars` (CONS-03: 400) and `threshold_usd` (BR-13: 10000) are integers. `tolerance` (CONS-01: 1) is a number. The shipped `profile.json` holds these values.
@@ -1002,10 +1015,233 @@ The parameter schema of each rule (section 3.1 step 4) takes these JSON types fo
 ### 7.5 BR-13 beside CTR-01 and CTR-02 (V-07-12-b, MEDIUM; DR-413)
 CTR-01 and CTR-02 block what DR-368 says is not a CTR. BR-13 keeps its warn for the amount: on a transaction for which CTR-01 or CTR-02 raised a finding, BR-13 raises none, so one fault gives one finding. A profile without the two CTR rules (before phase 21's release) keeps BR-13 as section 3.3 states it.
 
+Owner decisions (2026-10-10): the product owner overturned the lead decision that the corpus grows by release only (section 7.3, second paragraph); lead-written, checked in the owner-decision round (tools/agent/owner-verdict.md).
+
+### 7.6 Corpus cases the bank adds (owner decision 2; DR-415)
+A bank adds its own cases to the regression corpus through change control (RP-06, RP-83: the FIU-answers corpus). A case is one goAML XML file and the result the checker must give for it. The preparer or the MLRO uploads the file; a worker job masks every name, number and text in it, checks that the masked file still gives the stated result, and keeps only the masked file. From then on every corpus run of that profile code runs the case, so a later amendment or a new Office schema that stops giving the result shows as a failed case before it can be promoted. The shipped corpus and its 63 cases do not change. DR-422 locks the corrections of the check round of 2026-10-11: the intake is run again at profile activation, each deletion of an uploaded file by an intake run or by the sweep is audited, and the mask keeps an Arabic letter inside the class of patch `P-01`.
+
+1. **Table** (extends DATA-MODEL s.14; added to migration `0024_goaml_check.sql` as its second part; schema `rpt`, written by `akr_app`):
+
+```sql
+-- migration 0024_goaml_check.sql, part 2 (section 7.6)
+-- Corpus cases the bank adds (DR-415). The row holds the expectation and hashes; the masked file is an evidence object.
+CREATE TABLE IF NOT EXISTS rpt.goaml_corpus_cases (
+    id                  UUID PRIMARY KEY,
+    profile_code        TEXT NOT NULL CHECK (profile_code ~ '^[A-Z]{2}(-[A-Z0-9]{1,8})?$'),
+    case_key            TEXT NOT NULL CHECK (case_key ~ '^[a-z][a-z0-9-]{2,60}$'),
+    expect_outcome      TEXT NOT NULL CHECK (expect_outcome IN ('would_reject', 'graded')),
+    expect_rules        JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(expect_rules) = 'array'),   -- the exact set of block codes
+    office_code         TEXT CHECK (office_code IS NULL OR office_code ~ '^OFF-[0-9]{2,3}$'),   -- the rejection pattern it belongs to
+    evidence_id         UUID REFERENCES admin.evidence_objects(id) ON DELETE RESTRICT,           -- the masked file; NULL until intake
+    file_sha256         BYTEA CHECK (file_sha256 IS NULL OR octet_length(file_sha256) = 32),     -- of the masked file
+    file_size           INT CHECK (file_size IS NULL OR file_size > 0),
+    intake_result       JSONB CHECK (intake_result IS NULL OR jsonb_typeof(intake_result) = 'object'),
+    state               TEXT NOT NULL DEFAULT 'proposed' CHECK (state IN ('proposed', 'active', 'retired', 'rejected')),
+    change_request_id   UUID NOT NULL REFERENCES admin.change_requests(id) ON DELETE RESTRICT,
+    retired_by_request  UUID REFERENCES admin.change_requests(id) ON DELETE RESTRICT,
+    created_by          UUID NOT NULL REFERENCES admin.users(id) ON DELETE RESTRICT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    activated_at        TIMESTAMPTZ,
+    retired_at          TIMESTAMPTZ,
+    CHECK ((expect_outcome = 'graded') = (jsonb_array_length(expect_rules) = 0)),
+    CHECK ((evidence_id IS NULL) = (file_sha256 IS NULL)),
+    CHECK ((evidence_id IS NULL) = (file_size IS NULL)),
+    CHECK (state NOT IN ('active', 'retired') OR (evidence_id IS NOT NULL AND activated_at IS NOT NULL)),
+    CHECK ((state = 'retired') = (retired_at IS NOT NULL)),
+    CHECK ((state = 'retired') = (retired_by_request IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_goaml_corpus_cases_key ON rpt.goaml_corpus_cases (profile_code, case_key)
+    WHERE state IN ('proposed', 'active');
+CREATE INDEX IF NOT EXISTS idx_goaml_corpus_cases_code       ON rpt.goaml_corpus_cases (profile_code, state, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_goaml_corpus_cases_cr         ON rpt.goaml_corpus_cases (change_request_id);
+CREATE INDEX IF NOT EXISTS idx_goaml_corpus_cases_retired_cr ON rpt.goaml_corpus_cases (retired_by_request)
+    WHERE retired_by_request IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_goaml_corpus_cases_evidence   ON rpt.goaml_corpus_cases (evidence_id)
+    WHERE evidence_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_goaml_corpus_cases_created_by ON rpt.goaml_corpus_cases (created_by);
+
+-- Rows are never deleted; a retired or rejected case never changes; the file of an active case never changes.
+CREATE OR REPLACE FUNCTION rpt.goaml_corpus_cases_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'goAML corpus cases are never deleted' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF OLD.state IN ('retired', 'rejected') THEN
+        RAISE EXCEPTION 'goAML corpus case %: % is final', OLD.id, OLD.state USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF OLD.state = 'active' AND (NEW.evidence_id IS DISTINCT FROM OLD.evidence_id
+                                 OR NEW.file_sha256 IS DISTINCT FROM OLD.file_sha256
+                                 OR NEW.file_size IS DISTINCT FROM OLD.file_size) THEN
+        RAISE EXCEPTION 'goAML corpus case %: the file of an active case never changes', OLD.id
+            USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN NEW;
+END $$;
+DO $$ BEGIN
+    CREATE TRIGGER trg_goaml_corpus_cases_guard BEFORE UPDATE OR DELETE ON rpt.goaml_corpus_cases
+        FOR EACH ROW EXECUTE FUNCTION rpt.goaml_corpus_cases_guard();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+GRANT SELECT, INSERT ON rpt.goaml_corpus_cases TO akr_app;
+GRANT UPDATE (evidence_id, file_sha256, file_size, intake_result, state, retired_by_request, activated_at, retired_at)
+    ON rpt.goaml_corpus_cases TO akr_app;
+GRANT SELECT ON rpt.goaml_corpus_cases TO akr_readonly;
+
+INSERT INTO admin.column_classification (schema_name, table_name, column_name, classification)
+SELECT 'rpt', 'goaml_corpus_cases', c, 'internal'::admin.data_classification
+FROM unnest(ARRAY['id','profile_code','case_key','expect_outcome','expect_rules','office_code','evidence_id',
+                  'file_sha256','file_size','intake_result','state','change_request_id','retired_by_request',
+                  'created_by','created_at','activated_at','retired_at']) AS c
+ON CONFLICT (schema_name, table_name, column_name) DO NOTHING;
+
+INSERT INTO admin.retention_assignment (schema_name, table_name, retention_class, clock, clock_column, note) VALUES
+ ('rpt', 'goaml_corpus_cases', 'R9', 'retirement', NULL, 'The corpus result of a profile version cites the case')
+ON CONFLICT (schema_name, table_name) DO NOTHING;
+```
+
+   The expectation columns (`profile_code`, `case_key`, `expect_outcome`, `expect_rules`, `office_code`) are outside the UPDATE grant, so a case's expectation never changes: a different expectation is a new case. `intake_result` is `{ran_at, profile_version, outcome, rules: [block codes], met: bool, refusal?}`. Two settings join migration `0025_goaml_settings.sql` (eleven keys in all):
+
+```sql
+-- migration 0025_goaml_settings.sql, part 2 (section 7.6)
+INSERT INTO admin.settings (key, value, value_type, floor, governed, label) VALUES
+ ('goaml.corpus_case_max_bytes', '1048576', 'integer', NULL, FALSE,
+  '{"ar": "أقصى حجم لملف حالة اختبار يضيفها المصرف (بايت)", "en": "Maximum size of a bank corpus case file (bytes)"}'),
+ ('goaml.corpus_bank_cases_max', '200', 'integer', NULL, FALSE,
+  '{"ar": "أقصى عدد لحالات الاختبار التي يضيفها المصرف لكل ملف تعريف", "en": "Maximum bank corpus cases per profile code"}')
+ON CONFLICT (key) DO NOTHING;
+```
+
+   Registry bounds: `goaml.corpus_case_max_bytes` 1,024 to 8,388,608; `goaml.corpus_bank_cases_max` 1 to 2,000. This phase now creates five tables.
+
+2. **The mask** (`CaseMasker::mask(xml: &[u8], facts: &XsdFacts, own: &BankIdentifiers) -> Result<Vec<u8>, MaskError>`; pure apart from its random source `OsRng`; crate `akr-goaml`). It reads the file with `quick-xml` and writes the same events back. Element names, attribute names, namespaces and the order of elements do not change; comments are dropped; CDATA is written as plain text. For each text node and each attribute value (`xmlns` and `xsi:` attributes are kept as they are):
+   - The value is **kept** when the element's type in `XsdFacts` (section 3.1 step 2) is an enumeration and the value is one of its codes; when the type is `xs:boolean`, `xs:date` or `xs:dateTime` or restricts one of them; or when the trimmed value equals one of the bank's own identifiers in `goaml.bank_identifiers` (`rentity_id`, an entry of `rentity_branches`, of `swift` or of `institution_codes`; `BankIdentifiers` is that setting parsed).
+   - Every other value, and every value of an element the XSD does not know, is **masked** one character at a time:
+
+| Character | Becomes |
+|-|-|
+| ASCII letter | a random ASCII letter of the same case |
+| letter in U+0621 to U+064A (the class `ء-ي` of patch `P-01`; the tatweel U+0640 is one of them) | a random letter of U+0621 to U+063A or U+0641 to U+064A, so a value the class accepts stays accepted |
+| any other letter (general category L) | U+06A9 when it lies in an Arabic block (U+0600 to U+06FF, U+0750 to U+077F, U+08A0 to U+08FF, U+FB50 to U+FDFF, U+FE70 to U+FEFF), else U+00E9 |
+| decimal digit (general category Nd) | a random digit of the same ten-digit run; zero stays zero and a non-zero digit stays non-zero |
+| anything else (spaces, punctuation, signs, combining marks, control and format characters) | itself |
+
+   The mask keeps what the rules look at (length, letter class, digit script, zero or not zero, punctuation, codes and dates) and removes what identifies a person: no name, identifier, account number, address, telephone number, amount or narrative survives. What stays in a stored case is the structure, enumeration codes, booleans, dates and date-times, the bank's own goAML identifiers, the length and letter class of every other value, and which digits were zero. `MaskError` has one variant, `Unreadable` (the bytes do not parse as XML); the pre-screen of item 6 step 3 runs first, so the mask never parses a file the pre-screen refused.
+
+3. **Routes** (added to the `goaml` router, which now has 12 routes; base `/api/v1`; **CR** = answers 202 with a change request, phase 04):
+
+| Method | Path | Scope | Description |
+|-|-|-|-|
+| GET | /goaml/corpus-cases | report.prepare, config.author, config.approve | Corpus cases the bank added, newest first: `code?`, `state?`; the expectation, the intake result, size and hash, never the file (`goaml_corpus_case.read`) |
+| POST | /goaml/corpus-cases | report.prepare | Propose a case: one XML file, its key and the result it must give; `Idempotency-Key`; **CR** `goaml_corpus_case` (`goaml_corpus_case.propose`) |
+| POST | /goaml/corpus-cases/{id}/retire | report.prepare | Propose the retirement of an active case; `Idempotency-Key`; **CR** `goaml_corpus_case` (`goaml_corpus_case.propose`) |
+
+   No route returns a case file, masked or not.
+
+4. **Types.** Entity `GoamlCorpusCase` (fields mirror item 1). Value objects `CorpusCaseState` (`Proposed`, `Active`, `Retired`, `Rejected`), `ExpectOutcome` (`WouldReject`, `Graded`), `IntakeResult { ran_at, profile_version: i32, outcome: Option<FileOutcome>, rules: Vec<RuleCode>, met: bool, refusal: Option<IntakeRefusal> }`, `IntakeRefusal` (`UnsafeFile`, `NotMaskable`, `FileGone`, `ProfileUnavailable`, `ValidatorFailed`; with a refusal `met` is false and `outcome` is `None`), `StoredCaseFile { evidence_id, sha256, size }`. DTOs (`Deserialize, ToSchema`): `NewCorpusCase` (multipart: `file`, `profile_code?` default `IQ`, `case_key`, `expect_outcome`, `expect_rules` as a JSON array in a text part, `office_code?`, `reason_code`, `reason_text`), `RetireCorpusCase { reason_code, reason_text }`, `CorpusCaseFilter { code?, state? }`; `CorpusCaseView` (every column of item 1 except `evidence_id`). Both POST routes answer the phase 04 `ChangeRequestView` (202). Repository trait in the domain layer, `PgGoamlCorpusCaseRepository` in `db`:
+
+```rust
+#[async_trait]
+pub trait GoamlCorpusCaseRepository: Send + Sync {
+    async fn insert(&self, tx: &mut Tx, c: &NewCorpusCaseRow) -> Result<GoamlCorpusCase, RepoError>;   // uq key -> Conflict
+    async fn get(&self, conn: &mut PgConnection, id: Uuid) -> Result<Option<GoamlCorpusCase>, RepoError>;
+    async fn lock(&self, tx: &mut Tx, id: Uuid) -> Result<Option<GoamlCorpusCase>, RepoError>;          // FOR UPDATE
+    async fn list(&self, conn: &mut PgConnection, f: &CorpusCaseFilter, page: Keyset) -> Result<Page<GoamlCorpusCase>, RepoError>;
+    async fn active_for_code(&self, conn: &mut PgConnection, code: &str) -> Result<Vec<GoamlCorpusCase>, RepoError>;
+    async fn count_open(&self, conn: &mut PgConnection, code: &str) -> Result<i64, RepoError>;          // proposed + active
+    async fn stored_proposed_for_code(&self, tx: &mut Tx, code: &str) -> Result<Vec<Uuid>, RepoError>;  // proposed, evidence_id set
+    async fn set_intake(&self, tx: &mut Tx, id: Uuid, file: Option<&StoredCaseFile>, r: &IntakeResult) -> Result<(), RepoError>;
+    async fn activate(&self, tx: &mut Tx, id: Uuid, at: DateTime<Utc>) -> Result<(), RepoError>;       // proposed -> active
+    async fn retire(&self, tx: &mut Tx, id: Uuid, cr: Uuid, at: DateTime<Utc>) -> Result<(), RepoError>;   // active -> retired
+    async fn reject(&self, tx: &mut Tx, id: Uuid) -> Result<(), RepoError>;                            // proposed -> rejected
+}
+```
+
+   `NewCorpusCaseRow` holds the id, the five expectation columns, `change_request_id` and `created_by`. The list is keyset-paged by `(created_at DESC, id DESC)`. AppState gains `goaml_cases: Arc<CorpusCaseService>` (akr-api); the worker gains the handler of item 6 and `CaseMasker`.
+
+5. **`CorpusCaseService::propose_add(ctx, NewCorpusCase)`** (`POST /goaml/corpus-cases`):
+   1. Cedar `goaml_corpus_case.propose`; `Idempotency-Key` required.
+   2. Parts: `file` is exactly one part of declared type `application/xml` or `text/xml` (a ZIP -> 422 `type_not_allowed`) and at most `goaml.corpus_case_max_bytes` (else 422 `file_too_large`).
+   3. `case_id` = UUIDv7. The file streams through `EvidenceStore::stage_transient(purpose = "goaml", owner = case_id, n = 1, stream)`, as section 3.2 step 4 stages a checked file.
+   4. `ChangeRequestService::create` (phase 04 section 3.2; origin = this dedicated route, so `submit` runs in the same transaction) with `object_kind = goaml_corpus_case` and the body `{op: "add", case_id, profile_code, case_key, expect_outcome, expect_rules, office_code}`. The target of item 7 validates it, inserts the row and enqueues the intake.
+   5. A failure in step 4 deletes what step 3 wrote (`delete_transient("goaml", case_id)`).
+   6. 202 with the `ChangeRequestView`.
+
+   **`propose_retire(ctx, id, RetireCorpusCase)`** (`POST /goaml/corpus-cases/{id}/retire`): Cedar `goaml_corpus_case.propose`; `Idempotency-Key` required; an unknown id -> 404 `E_NOT_FOUND`; `ChangeRequestService::create` with the body `{op: "retire", case_id}`; 202 with the `ChangeRequestView`. **`list(ctx, filter, page)`** (`GET /goaml/corpus-cases`): Cedar `goaml_corpus_case.read`; the repository list as `CorpusCaseView` rows.
+
+6. **Job `goaml_case_intake`** (akr-worker; payload `{case_id}`; coalesce key `goaml_case_intake:<case_id>`; concurrency 1; max attempts 3; payload and job error text carry ids and codes only):
+   1. Load the case. When its state is not `proposed`: a case with no `intake_result` (its request was withdrawn or rejected before the first run, so the uploaded file is still staged) first has the staged file deleted with `delete_transient("goaml", case_id)` and the audit event `goaml_corpus_case.transient_deleted {case_id, by: "intake"}` written; then the job is done. A `proposed` case goes on with step 2.
+   2. `GoamlProfileRepository::active(profile_code)`; none -> record the refusal `profile_unavailable` (step 7) and end.
+   3. First run (`evidence_id` is NULL): `open_transient("goaml", case_id, 1)`; no object -> refusal `file_gone`. Antivirus as section 3.2 step 3 (stale signatures -> the job retries; `FOUND` or `Heuristics.Encrypted` -> refusal `unsafe_file`). Pre-screen as section 3.2 step 5: any `PRE-` or `PKG-` block -> refusal `not_maskable` (the shipped corpus holds those cases; a file the pre-screen refuses is never parsed). Then `CaseMasker::mask` -> the masked bytes (`Unreadable` -> refusal `not_maskable`).
+   4. Later run (`evidence_id` is set; the activation of a profile version of the code asks for it, section 3.6): `EvidenceStore::open(evidence_id)` gives the masked bytes.
+   5. `CheckService::validate_built(masked, &profile, layers)` (section 7.1) with every layer but `office`. A `XSD-99` finding -> the job retries; on the last attempt -> refusal `validator_failed`.
+   6. `met` = the outcome equals `expect_outcome` and the set of `block` codes equals `expect_rules` (warnings are not compared, as section 3.6).
+   7. One transaction: when `met` and no file is stored yet, `put_generated` the masked bytes (evidence kind `snapshot`, owner kind `goaml_corpus_case`, owner id = the case id, content type `application/xml`, no file name, retention R9, classification `secret-str`) and keep its id, SHA-256 and size; `set_intake` with the result; audit `goaml_corpus_case.intake_ran {case_id, profile_code, profile_version, met, refusal}`.
+   8. After the transaction of a first run, in every path: `delete_transient("goaml", case_id)`, then the audit event `goaml_corpus_case.transient_deleted {case_id, by: "intake"}`. An object left by a crash is deleted by `maintenance_sweep` after `evidence.staging_ttl_h`: its owner is not a run, which the sweep of section 3.2 step 13 treats as a missing run; when the owner id is the id of a corpus case the sweep writes `goaml_corpus_case.transient_deleted {case_id, by: "sweep"}` in place of `goaml_check.transient_deleted`.
+
+   The uploaded file therefore lives only sealed in the transient store, from the request to the end of the first intake run. When `met` is false nothing is stored. Evidence owner kind `goaml_corpus_case` (R9) joins the phase 02 registry.
+
+7. **Change target `goaml_corpus_case`** (phase 04 `ChangeTarget`, registered in akr-api and akr-worker beside `goaml_profile`; family `reporting`; `generic_create = false`; `emergency_allowed = false`; `reason_families = ["change"]`; no inventory kind):
+
+| Field | Value |
+|-|-|
+| Route | by class through the shipped route map, which gains no rule: `add` is `minor` (`cr_minor`, decided by CHK); `retire` is `material` (`cr_material`, the MLRO and CHK), because it removes a check every later profile version had to pass. Volume effect `neutral` for both |
+| `object_key` | `goaml_corpus_case:<case id>` (one open change per case) |
+| Base version | none (`current_version` returns `None`) |
+| Prepare | `add`: `case_key` matches its pattern and no `proposed` or `active` case of the code has it (else 422 `case_key_taken`); the code has an active profile version (else 422 `profile_not_usable`); `expect_outcome` and `expect_rules` agree: `graded` with no code, `would_reject` with at least one (else 422 `expectation_invalid`); every code of `expect_rules` has an entry in `messages.v1.json` and is not a `PRE-`, `PKG-`, `Q-` or `OFF-` code or `XSD-99` (else 422 `rule_unknown`); `office_code`, when given, has the form `OFF-nn` that the column CHECK admits and is the `rule_code` of a rejection pattern of the active version (else 422 `rule_unknown` at `/office_code`); `count_open(code)` is below `goaml.corpus_bank_cases_max` (else 422 `too_many_cases`). `retire`: the case is `active` (else 409 `E_NOT_ALLOWED_IN_STATE`, `case_not_active`). `required_evidence` is `[validation_run]` for `add`, generated from `intake_result` as section 3.6 generates it from `corpus_result`, and empty for `retire` |
+| `on_submitted` | `add`: insert the row `proposed` (the unique index refusing the key -> 422 `case_key_taken`) and enqueue `goaml_case_intake {case_id}`; audit `goaml_corpus_case.proposed {case_id, profile_code, case_key, expect_outcome, rules: n}`. `retire`: audit `goaml_corpus_case.retire_proposed {case_id}` |
+| `check_before_decision` | `add`: no `intake_result` -> issue `intake_not_run`; `met` false -> `intake_not_met`; `intake_result.profile_version` differs from the active version's -> issue `intake_stale`. This hook enqueues nothing: an issue refuses an approval (a rejection is not checked, phase 04 section 7.21), phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row. The intake is run again by the activation of the profile version (section 3.6, Activate), which commits, and the approver decides after that job. Each issue reaches the caller as 422 `E_VALIDATION` (phase 04 section 7.17). `retire`: none |
+| Activate | `add`: `lock` the row; not `proposed`, or the open count above the cap -> the target refuses (phase 04: an immediate approval is rolled back with the error, section 3.4; a scheduled activation ends `failed`, section 3.6); `activate` (`activated_at` = the request's `activated_at`); audit `goaml_corpus_case.activated {case_id, change_request_id}`. `retire`: `lock`; not `active` -> refused in the same way; `retire` with the request id; audit `goaml_corpus_case.retired {case_id, change_request_id}`. Both then enqueue `goaml_corpus {profile_id}` for the active version and every `candidate` version of the code, so their results show the present set |
+| Revert | not allowed (a retired case is proposed again as a new case; a wrong case is retired) |
+| Closed | `add`: `reject` (`proposed` -> `rejected`); audit `goaml_corpus_case.rejected {case_id, how}`. `retire`: nothing |
+| Diff | `add`: the key, the expectation, the Office code and, once the intake ran, the size, the SHA-256 and the intake result. `retire`: the case row. Never file content |
+
+   A case whose intake did not meet the expectation cannot be approved: the approver rejects the request (the check does not hold a rejection back, phase 04 section 7.21) or its maker withdraws it, and the case becomes `rejected`. To keep a case the active profile does not yet answer as the Office did, the bank first activates the profile amendment that makes the checker give that result (section 3.6), then proposes the case.
+
+8. **The corpus run** (section 3.6, job `goaml_corpus` and `akr-ctl goaml corpus`). After the shipped files the runner runs every `active` case of the version's code (`active_for_code`): it opens the masked file with `EvidenceStore::open`, runs it as it runs a shipped file and compares the outcome and the exact set of block codes with the case's expectation. `corpus_result.cases` gains one entry per case, `{file: "bank/<case_key>", case_id, expected, got}`, and `corpus_result` gains `bank_cases: n`; `passed` and `failed` count both kinds. A file that cannot be opened counts as failed with `got: {outcome: "unreadable"}`. The promotion rule of section 3.6 does not change: failed cases, shipped or the bank's, need `accept_corpus_failures` with its reason. CI runs the shipped corpus only.
+
+9. **Audit events** (seven more kinds in section 3.8, all on resource `goaml_corpus_case`): `goaml_corpus_case.proposed`, `goaml_corpus_case.retire_proposed`, `goaml_corpus_case.intake_ran`, `goaml_corpus_case.transient_deleted` (`{case_id, by}`, `by` is `intake` or `sweep`; the uploaded file is gone, as `goaml_check.transient_deleted` says for a check run), `goaml_corpus_case.activated`, `goaml_corpus_case.retired` and `goaml_corpus_case.rejected`. The failed proposal of item 5 step 5 writes no event: no case row exists, as for a failed check request (section 3.2 step 4). Payloads carry ids, codes, counts and hashes, never a value from a file and never a file name (none is kept). Reused: `change_request.*` (phase 04), `evidence.stored` (phase 02).
+
+10. **Cedar** (two more actions in `A0_reporting.cedar`; the `ChangeKind` family `reporting` gains the kind `goaml_corpus_case`; the scope gates of item 3 admit every role these policies admit):
+
+| Action | Resource | Who (shipped bundle) |
+|-|-|-|
+| `goaml_corpus_case.read` | System | A2, M, CFG, CHK |
+| `goaml_corpus_case.propose` | System | A2, M |
+
+```cedar
+@id("goaml.case_readers") @role("A2,M,CFG,CHK")
+permit (principal, action == Akr::Action::"goaml_corpus_case.read", resource)
+when { principal.roles.containsAny(["A2", "M", "CFG", "CHK"]) };
+
+@id("goaml.case_proposers") @role("A2,M")
+permit (principal, action == Akr::Action::"goaml_corpus_case.propose", resource)
+when { principal.roles.containsAny(["A2", "M"]) };
+```
+
+   Attributes evaluated: `principal.roles`, `delegated_roles`. The maker reads their own request as a member of its `parties` (section 3.8, `change_request.read`). Bundle tests: A1, KYC, L, OPS, DS and VS reach neither action; CFG and CHK cannot propose; the maker of a case cannot decide its request (phase 04 four-eyes).
+
+11. **Errors.** No new code. `case_key_taken`, `expectation_invalid` and `too_many_cases` join the reasons of 422 `E_VALIDATION` in section 3.8 (`file_too_large`, `type_not_allowed`, `rule_unknown` and `profile_not_usable` are reused), as do the three issues of `check_before_decision` (`intake_not_run`, `intake_not_met`, `intake_stale`); `case_not_active` joins the reasons of 409 `E_NOT_ALLOWED_IN_STATE`.
+
+12. **Tipping-off review.** The uploaded file can be a report the Office rejected. It exists only sealed in the transient store until the first intake run ends, as a checked file does (DR-69). What is kept is the masked file: no name, identifier, account number, address, telephone number, amount or narrative of the original is in it, and no route returns it to anyone. Dates and date-times stay as they were, a date of birth among them, as do enumeration codes such as nationality and gender, because the rules read them; with every name and number beside them replaced they do not name a person, and the file is `secret-str` evidence that only the corpus runner and the intake job (item 6 step 4) open. The case row, the change request and the corpus result hold a key, codes, a size and a hash. The key is typed by the maker and read by the approver. The form asks for a short code for the rule and says that it must not be a name (item 13), and the approver rejects a request whose key names a person; the system does not screen the key. A person outside the reporting roles sees nothing; a configuration author or checker sees that the bank keeps a test file that must give certain rule codes, and nothing about a customer, a report or a case.
+
+13. **Frontend.** The client gains the hooks `useGetGoamlCorpusCases`, `usePostGoamlCorpusCases` and `usePostGoamlCorpusCasesIdRetire`. The profile page of section 5 gains the panel **Bank cases** (phase 08 section 7.11 builds it): the cases of the profile code with key, expected result, state and last intake result in words ("Meets the expectation", "Does not meet the expectation", "Could not be checked: unsafe file"); for A2 and M the action "Add a case" (one XML file, a key with the hint "A short code for the rule. Never a name.", the expected outcome, the expected block codes picked from the profile's rules, an optional Office message code, a reason) with the notice "The file is masked before it is kept: names, numbers and text are replaced. The original is deleted.", and "Retire" on an active case. The corpus result of a version lists bank cases beside the shipped ones, marked "Bank".
+
+14. **Verification** (added to section 6).
+   - Migration: `rpt.goaml_corpus_cases` exists with 17 classification rows and its retention row. A `DELETE` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `goAML corpus cases are never deleted`; as `akr_app` an UPDATE of the `state` of a `rejected` row fails with the guard's `is final` message; an insert with `expect_outcome = 'graded'` and one rule fails its CHECK; a second `proposed` row with the same code and key fails `uq_goaml_corpus_cases_key`; as `akr_app`, `UPDATE rpt.goaml_corpus_cases SET expect_rules = '[]'` fails with permission denied.
+   - `cargo test -p akr-goaml mask`: a file whose every text node is a unique 16-letter marker comes out with no marker in it, the same element sequence and the same value lengths; a valid `transmode_code` and a `date_transaction` are unchanged; the bank's SWIFT code from `goaml.bank_identifiers` is unchanged; `1050.00` keeps its zeros and its length; an Eastern Arabic digit stays an Eastern Arabic digit; a letter U+0695 becomes U+06A9; a tatweel U+0640 becomes a letter of U+0621 to U+063A or U+0641 to U+064A, and an entity name that holds one still passes `P-01`; the three validated samples, masked, still pass with no block finding; a case file with an unknown `transmode_code`, masked, still gives `XSD-03`.
+   - Intake: a file that meets its expectation -> an evidence object of owner kind `goaml_corpus_case`, `met: true`, and no object under `transient/goaml/<case_id>/`; a wrong expectation -> `met: false`, no evidence object; a file with a `<!DOCTYPE` -> refusal `not_maskable`; an EICAR file -> refusal `unsafe_file`; a case whose request is withdrawn before the job ran -> after the job no object under `transient/goaml/<case_id>/` and one `goaml_corpus_case.transient_deleted` event.
+   - Change target: a decision before the intake ran -> 422 `intake_not_run`; a profile activation enqueues one `goaml_case_intake` job for the `proposed` case; a decision before that job ran -> 422 `intake_stale` and no new job row; after it ran, approval succeeds; the maker deciding their own request -> refused (four-eyes).
+   - Corpus: after activation the active version's `corpus_result` holds the entry `bank/<case_key>` and `bank_cases: 1`; after retirement a new run holds none.
+   - Curl (added to `tests/curl/phase07_goaml.sh`): as A2 `POST /api/v1/goaml/corpus-cases` with a masked-safe fixture, `case_key=entity-name-digits`, `expect_outcome=would_reject`, `expect_rules=["XSD-04"]` and `Idempotency-Key: cc-0001` -> 202 `ChangeRequestView` on `cr_minor`; the same key and body -> the stored 202 with `x-idempotent-replay: true`; after the intake job has completed (the script polls `GET /api/v1/goaml/corpus-cases` as A2 until `intake_result` is set), as CHK approve -> the case `active`; as CFG `GET /api/v1/goaml/corpus-cases` -> 200 with the case and no file field; as CFG the POST -> 403 `E_SCOPE`; as DS the GET -> 403 `E_FORBIDDEN` (DS holds `config.author`, which the route accepts, and Cedar denies); as SS the GET -> 403 `E_SCOPE`; as A2 a second case with the same key -> 422 `case_key_taken`; as M `POST /api/v1/goaml/corpus-cases/<id>/retire` -> 202 on `cr_material`; a retire of a `rejected` case -> 409 `case_not_active`.
+   - Swagger UI lists 12 operations under `goaml`. Audit: `goaml_corpus_case.proposed`, `.intake_ran`, `.transient_deleted`, `.activated`, `.retire_proposed` appear, and no audit detail holds a value from the fixture file.
+
 ## What This Phase Does NOT Touch
 
-- No report builder, report packages, filing workflow, deadline clocks, normaliser writing XML, L0 snapshot checks,
-  FIU-answers corpus or monthly calibration sample (phase 21): this phase checks files the bank already produced.
+- No report builder, report packages, filing workflow, deadline clocks, normaliser writing XML, L0 snapshot checks
+  or monthly calibration sample (phase 21): this phase checks files the bank already produced. The bank's own corpus
+  cases are in section 7.6; no route returns a case file.
+- No rule the catalogue does not have: a bank case pins a result the checker already gives, and a new rule still
+  ships in a release (sections 7.2 and 7.6).
 - No CTR production or threshold job (phase 21); `BR-13` only checks the shape of an uploaded CTR.
 - No code maps from CBS codes to goAML lookups (phases 10 and 21); lookups are read from the XSD only.
 - No notifications (phase 22): a new candidate shows on the screens, the cockpit and an alert rule.

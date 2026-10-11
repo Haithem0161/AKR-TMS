@@ -1,0 +1,105 @@
+Replacements of round 1 of the owner-decision check, key 10. 16 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-10-7a]
+FILE: docs/plan/phase-10.md
+WHY: O-10-7 | CONFIRMED | MEDIUM | the column is NOT NULL; an `expr` that gives null, or a writer that inserts every catalogue column, would be refused by PostgreSQL | item 5: the writer writes `typed` when the mapped row has no value (absent or null); it does not rely on the column default.
+OLD: Grants, indexes and the retention row are unchanged.
+NEW: Indexes and the retention row are unchanged; one column grant is added (item 5).
+
+=== F2 [O-10-7b]
+FILE: docs/plan/phase-10.md
+WHY: O-10-7 | CONFIRMED | MEDIUM | the column is NOT NULL; an `expr` that gives null, or a writer that inserts every catalogue column, would be refused by PostgreSQL | item 5: the writer writes `typed` when the mapped row has no value (absent or null); it does not rely on the column default.
+OLD: A mapping that leaves it out writes `typed` (the column default), which is what phase 08 showed
+NEW: A mapping that leaves it out writes `typed` (item 5), which is what phase 08 showed
+
+=== F3 [O-10-1/6/7]
+FILE: docs/plan/phase-10.md
+WHY: O-10-1 | CONFIRMED | MEDIUM (agent: HIGH) | 7.26 item 5 says a change of `capture_source` changes the `row_hash`. The hash is the hash of the landed source row (phase 11 section 3.2 step 2), so a mapping edit that changes only the literal changes no stored name. No stated test fails (the tests are first writes) | item 5: a stored name changes when the bank's column behind the value changes; a mapping edit alone reaches stored names only when the rows are mapped again (the mapping replay of phase 11 section 3.8). Item 7 reworded: the value is set by the mapping, which changes only through its change path. // O-10-6 | CONFIRMED | LOW | item 5 cites DSL.md B.5 for the replacement by `typed`; B.5 only says the row loads, and a failing value would then hit the column CHECK | item 5 states the replacement as this block's rule, done in the mapped row before the write. // O-10-7 | CONFIRMED | MEDIUM | the column is NOT NULL; an `expr` that gives null, or a writer that inserts every catalogue column, would be refused by PostgreSQL | item 5: the writer writes `typed` when the mapped row has no value (absent or null); it does not rely on the column default.
+OLD: 5. **Writer** (section 3.7): the compiler adds the validation rule `enum(capture_source, [card, passport, typed, generated])` with `on_fail: dq_issue` to every `party_name` mapping that supplies the field. A row whose value fails it is written with `typed` and counted as a data-quality issue, as DSL.md B.5 says for `dq_issue`. A change of `capture_source` changes the `row_hash`, so the row is replaced as any changed child row is (step 6).
+NEW: 5. **Executor and writer** (section 3.6 step 4 and section 3.7). The compiler adds the validation rule `enum(capture_source, [card, passport, typed, generated])` with `on_fail: dq_issue` to every `party_name` mapping that supplies the field. This block's rule for a value that fails it: the executor puts `typed` in the mapped row and counts the data-quality issue. (DSL.md B.5 alone says only that the row loads and the count rises; the failing value would then meet the column CHECK.) A mapped row with no value for the field, because the mapping leaves it out or its `expr` gives null, is written with `typed`: the writer always supplies the column and does not rely on the column default. `row_hash` is the hash of the landed source row (phase 11 section 3.2 step 2), so a mapping version that changes only this value leaves the hash as it is and step 3 writes nothing. The label is therefore tested on the mapped value: when the hash is equal and the stored `capture_source` of the current row differs from the mapped one, the writer calls `CanonRepository::set_capture_source(tx, id, capture_source)`, which sets that one column; when the hash differs, the row is replaced as step 6 says and the new row carries the mapped value. `CurrentRow` (section 7.17) holds `capture_source` for `canon.party_name`. `CanonRepository` gains `async fn set_capture_source(&self, tx: &mut Tx, id: Uuid, capture_source: &str) -> Result<u64, RepoError>;`, and migration `0030` (section 1.2) gains `GRANT UPDATE (capture_source) ON canon.party_name TO akr_ingest;`. A name already stored takes a new label when its row is mapped again: at the next load of its source row, or in the apply of a mapping replay (phase 11 section 3.8).
+
+=== F4 [O-10-1b]
+FILE: docs/plan/phase-10.md
+WHY: O-10-1 | CONFIRMED | MEDIUM (agent: HIGH) | 7.26 item 5 says a change of `capture_source` changes the `row_hash`. The hash is the hash of the landed source row (phase 11 section 3.2 step 2), so a mapping edit that changes only the literal changes no stored name. No stated test fails (the tests are first writes) | item 5: a stored name changes when the bank's column behind the value changes; a mapping edit alone reaches stored names only when the rows are mapped again (the mapping replay of phase 11 section 3.8). Item 7 reworded: the value is set by the mapping, which changes only through its change path.
+OLD: No new route, event or action: the column travels with the name rows through the mapping change path (`mapping.*` events and the `mapping` change target of section 3.9).
+NEW: No new route, event or action: the value is set by the mapping, and a mapping changes only through its change path (`mapping.*` events and the `mapping` change target of section 3.9).
+
+=== F5 [O-10-7c]
+FILE: docs/plan/phase-10.md
+WHY: O-10-7 | CONFIRMED | MEDIUM | the column is NOT NULL; an `expr` that gives null, or a writer that inserts every catalogue column, would be refused by PostgreSQL | item 5: the writer writes `typed` when the mapped row has no value (absent or null); it does not rely on the column default.
+OLD: the literal `'scan'` fails `validate` with `E_VALIDATION` at `/fields/capture_source`; `akr-ctl canon verify-catalogue` passes with the new column.
+NEW: the literal `'scan'` fails `validate` with `E_VALIDATION` at `/fields/capture_source`; a row whose `expr` gives null writes `typed`; a row whose `expr` reads `scan` from a source column writes `typed` and counts one data-quality issue; a stored name with `typed`, mapped again from the same landed row by a version that gives `passport`, has `passport` afterwards and no second row; `akr-ctl canon verify-catalogue` passes with the new column.
+
+=== F6 [O-10-7d]
+FILE: docs/plan/phase-10.md
+WHY: O-10-7 | CONFIRMED | MEDIUM | the column is NOT NULL; an `expr` that gives null, or a writer that inserts every catalogue column, would be refused by PostgreSQL | item 5: the writer writes `typed` when the mapped row has no value (absent or null); it does not rely on the column default.
+OLD: GRANT UPDATE (superseded_at) ON canon.party_name, canon.party_identifier, canon.party_contact TO akr_ingest;
+
+NEW: GRANT UPDATE (superseded_at) ON canon.party_name, canon.party_identifier, canon.party_contact TO akr_ingest;
+GRANT UPDATE (capture_source) ON canon.party_name TO akr_ingest;   -- the label of a name, section 7.26 item 5
+
+
+=== F7 [O-10-3a]
+FILE: docs/plan/phase-10.md
+WHY: O-10-3 | CONFIRMED | MEDIUM | the writer tests the stored `paid_on` and `granted_on`, but `CurrentRow` (section 7.17) does not carry them | 7.27 states the fields `CurrentRow` holds for the two entities; 7.17 points to it. // O-10-3 final design: `CurrentRow` holds `paid_on` and `paid_amount` for an instalment and `granted_on` for a facility (not `seq`, `due_on`, `amount`, `currency`): the pay rule depends only on the two payment columns.
+OLD: and for `canon.account_hold` also `end_at`. `CanonRow` (taken by `insert_rows`)
+NEW: and for `canon.account_hold` also `end_at`; sections 7.26 and 7.27 add `capture_source` for `canon.party_name`, `granted_on` for `canon.facility`, and `paid_on` and `paid_amount` for `canon.facility_instalments`. `CanonRow` (taken by `insert_rows`)
+
+=== F8 [O-10-2]
+FILE: docs/plan/phase-10.md
+WHY: O-10-2 | CONFIRMED | LOW (agent: HIGH) | the agent read "the writer addresses a table by its enum value" as: the table must be named `canon.facility_instalment`. The catalogue entry of a pack entity names its table (phase 26 section 3.2 item 2: "table, columns, classification, nullability"), as it does for `islamic_deal` -> `canon.islamic_deals` in verified text, so nothing fails; but 7.27 did not say it | 7.27 item 1 says that the catalogue entry names the table `canon.facility_instalments`.
+OLD: and registers the mapping family `<source>.facility_instalment`. In the dependency order
+NEW: and registers the mapping family `<source>.facility_instalment`. The catalogue entry of the entity names its table, `canon.facility_instalments` (an entry holds the table, the columns, the classification and the nullability: phase 26 section 3.2 item 2), as the entry of `islamic_deal` names `canon.islamic_deals`. In the dependency order
+
+=== F9 [O-10-5a]
+FILE: docs/plan/phase-10.md
+WHY: O-10-5 | CONFIRMED | MEDIUM | 7.27 (and verified 7.20) say phase 11 records a `parent_missing` conflict, but the reason list of phase 11 section 3.2 step 5 and the mapping of phase 12 section 3.3 step 1 do not name it | phase 11 step 5 gains the reason `parent_missing`; phase 12 maps it to the issue kind `unresolved_pointer` (medium). Two small base corrections outside the ten changed phases; both go into round 2.
+OLD: a `RowConflict` of kind `parent_missing` is returned, and phase 11 records it as section 7.20 says.
+NEW: a `RowConflict` of kind `parent_missing` is returned, and phase 11 records it as section 7.20 says (reason `parent_missing`, phase 11 section 3.2 step 5).
+
+=== F10 [O-10-3/4, O-26-3]
+FILE: docs/plan/phase-10.md
+WHY: O-10-3 | CONFIRMED | MEDIUM | the writer tests the stored `paid_on` and `granted_on`, but `CurrentRow` (section 7.17) does not carry them | 7.27 states the fields `CurrentRow` holds for the two entities; 7.17 points to it. // O-10-3 final design: `CurrentRow` holds `paid_on` and `paid_amount` for an instalment and `granted_on` for a facility (not `seq`, `due_on`, `amount`, `currency`): the pay rule depends only on the two payment columns. // O-10-4 | CONFIRMED | same defect as O-26-1 | see O-26-1 | see O-26-1. // O-26-3 | CONFIRMED | MEDIUM | `paid_amount` has no catalogue flag, and a part payment that carries it with a null `paid_on` violates `CHECK (paid_amount IS NULL OR paid_on IS NOT NULL)` | the CHECK is dropped: `paid_amount` is the amount paid so far, optional, neither `required` nor `monitored`. The writer rule (phase 10 section 7.27 item 3) is restated: an instalment may change in `paid_on` and `paid_amount` while its stored `paid_on` is null; any other change, or a change after it is paid, is a `RowConflict`.
+OLD: 3. **Fact rule** (section 3.7 steps 3 and 5). `facility_instalment` is a fact. Its insert target is `uq_facility_instalments_source`. One exception to the fact rule, like the end of a hold (section 7.19): when the stored `paid_on` is null and the mapped `paid_on` is set, the writer calls `CanonRepository::pay_instalment(tx, id, paid_on, paid_amount, row_hash)`, which sets the three columns; no conflict is returned. Any other difference is a `RowConflict`.
+NEW: 3. **Fact rule** (section 3.7 steps 3 and 5). `facility_instalment` is a fact. Its insert target is `uq_facility_instalments_source`, the only unique constraint of the table beside the primary key, so a second source key for an instalment number the facility already holds is inserted like any new row. One exception to the fact rule, like the end of a hold (section 7.19): an instalment is open while its stored `paid_on` is null. For an open instalment whose mapped `paid_on` or `paid_amount` differs from the stored value (`IS DISTINCT FROM`), the writer calls `CanonRepository::pay_instalment(tx, id, paid_on, paid_amount, row_hash)`, which sets the three columns where `paid_on IS NULL`; `paid_on` stays null for a part payment. No conflict is returned, and the row counts as written for this batch: a difference in `seq`, `due_on`, `amount` or `currency` that arrives in the same version is not written and not reported. The test is on the mapped values, not on the hash, so it also runs when the hash is equal (the landed row is the same and the mapping changed, as in the apply of phase 11 section 3.8). In every other case step 3 stands: a different hash on a paid instalment, or on an open one whose two payment columns did not move, is the `RowConflict` of a fact. `CurrentRow` holds `paid_on` and `paid_amount` for this entity.
+
+=== F11 [O-10-3b]
+FILE: docs/plan/phase-10.md
+WHY: O-10-3 | CONFIRMED | MEDIUM | the writer tests the stored `paid_on` and `granted_on`, but `CurrentRow` (section 7.17) does not carry them | 7.27 states the fields `CurrentRow` holds for the two entities; 7.17 points to it. // O-10-3 final design: `CurrentRow` holds `paid_on` and `paid_amount` for an instalment and `granted_on` for a facility (not `seq`, `due_on`, `amount`, `currency`): the pay rule depends only on the two payment columns.
+OLD: 4. **`granted_on` of a facility.** `facility` stays a dimension. One exception to the dimension rule of step 3: when the stored `granted_on` is null and the mapped one is set, the writer calls `CanonRepository::set_granted_on(tx, id, granted_on, row_hash)`, which sets the two columns; no conflict is returned. Any other difference is a `RowConflict` as before. The grants for both updates are in phase 26's migration `0083`.
+NEW: 4. **`granted_on` of a facility.** `facility` stays a dimension. One exception to the dimension rule of step 3: when the stored `granted_on` is null and the mapped one is set, the writer calls `CanonRepository::set_granted_on(tx, id, granted_on, row_hash)`, which sets the two columns where `granted_on IS NULL`. No conflict is returned, and the row counts as written for this batch: a difference in another column that arrives in the same version is not written and not reported. As in item 3 the test is on the mapped value, not on the hash, so a mapping version that adds the field reaches the facilities already stored when they are mapped again. In every other case step 3 stands, and a stored `granted_on` is never changed. `CurrentRow` holds `granted_on` for `canon.facility`. The grants for both updates are in phase 26's migration `0083`.
+
+=== F12 [O-26-3b]
+FILE: docs/plan/phase-10.md
+WHY: O-26-3 | CONFIRMED | MEDIUM | `paid_amount` has no catalogue flag, and a part payment that carries it with a null `paid_on` violates `CHECK (paid_amount IS NULL OR paid_on IS NOT NULL)` | the CHECK is dropped: `paid_amount` is the amount paid so far, optional, neither `required` nor `monitored`. The writer rule (phase 10 section 7.27 item 3) is restated: an instalment may change in `paid_on` and `paid_amount` while its stored `paid_on` is null; any other change, or a change after it is paid, is a `RowConflict`.
+OLD: `async fn pay_instalment(&self, tx: &mut Tx, id: Uuid, paid_on: NaiveDate, paid_amount: Option<Decimal>, row_hash: &[u8]) -> Result<u64, RepoError>;`
+NEW: `async fn pay_instalment(&self, tx: &mut Tx, id: Uuid, paid_on: Option<NaiveDate>, paid_amount: Option<Decimal>, row_hash: &[u8]) -> Result<u64, RepoError>;`
+
+=== F13 [O-10-3c]
+FILE: docs/plan/phase-10.md
+WHY: O-10-3 | CONFIRMED | MEDIUM | the writer tests the stored `paid_on` and `granted_on`, but `CurrentRow` (section 7.17) does not carry them | 7.27 states the fields `CurrentRow` holds for the two entities; 7.17 points to it. // O-10-3 final design: `CurrentRow` holds `paid_on` and `paid_amount` for an instalment and `granted_on` for a facility (not `seq`, `due_on`, `amount`, `currency`): the pay rule depends only on the two payment columns.
+OLD: a second version with `paid_on` set updates the row and returns no conflict; a second version with a different `amount` returns a `RowConflict`; a facility row that arrives again with `granted_on` set updates only `granted_on` and `row_hash`.
+NEW: a second version with `paid_on` set updates the row and returns no conflict; a second version with only `paid_amount` set (a part payment) updates `paid_amount` and leaves `paid_on` null; a second version of an open instalment with only a different `amount` returns a `RowConflict`, and so does any second version of a paid instalment; the same landed row mapped by a version that now gives `paid_on` updates the row; a second source key for an instalment number the facility already holds is inserted; a facility row that arrives again with `granted_on` set updates only `granted_on` and `row_hash`, and a later version with another `granted_on` leaves the stored date and returns the dimension `RowConflict`.
+
+=== F14 [DOC-10]
+FILE: docs/DATA-MODEL.md
+WHY: System document in step with phase 10 section 7.26 item 5: migration 0030 grants `akr_ingest` UPDATE (capture_source) on canon.party_name, and DATA-MODEL.md listed the columns `akr_ingest` may update without it.
+OLD: `superseded_at` of the three party child tables,
+`loaded_last_at` of `party_contact`, and
+NEW: `superseded_at` of the three party child tables,
+`capture_source` of `party_name` (DR-420; phase 10 section 7.26), `loaded_last_at` of `party_contact`, and
+
+=== F15 [DR-422]
+FILE: docs/plan/phase-10.md
+WHY: DR-422 is the decision record that locks the design corrections of round 1. The row in docs/plan/research.md must say only what the phase files now say; each citing sentence in a phase block must name corrections that the block really carries.
+OLD: The owner's decision: the four source labels of DESIGN-SYSTEM 7.6 (card, passport, typed, generated) are kept, and the mapping says which one applies to each name.
+NEW: The owner's decision: the four source labels of DESIGN-SYSTEM 7.6 (card, passport, typed, generated) are kept, and the mapping says which one applies to each name. DR-422 locks the correction of the check round of 2026-10-11: the label is compared as a mapped value, also when the hash of the landed row is equal (item 5).
+
+=== F16 [DR-422]
+FILE: docs/plan/phase-10.md
+WHY: DR-422 is the decision record that locks the design corrections of round 1. The row in docs/plan/research.md must say only what the phase files now say; each citing sentence in a phase block must name corrections that the block really carries.
+OLD: Phase 26 section 7.13 adds the table `canon.facility_instalments` and the column `canon.facility.granted_on` (migration `0083`), so that a schedule table gives the repayment event SCN-ISL-07 needs. This phase's parts:
+NEW: Phase 26 section 7.13 adds the table `canon.facility_instalments` and the column `canon.facility.granted_on` (migration `0083`), so that a schedule table gives the repayment event SCN-ISL-07 needs. This phase's parts: DR-422 locks the corrections of the check round of 2026-10-11: the payment columns and the grant date are compared as mapped values, and the index on `(facility_id, seq)` is not unique.

@@ -1,0 +1,81 @@
+Replacements of round 1 of the owner-decision check, key 08. 12 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-08-4]
+FILE: docs/plan/phase-08.md
+WHY: O-08-4 | CONFIRMED | LOW | the 7.9 paragraph kept the whole old text after "The text of the verification pass was:", old label rule included | keep only what stands (which row is the original, which the transliteration, no second line without a Latin row).
+OLD: the rest stands. The text of the verification pass was: The `Name` component shows what the source gives. The original is the party's `canon.party_name` row in Arabic or Kurdish script; the transliteration beneath it is the row of the same party and `name_type` with `script = 'lat'`, when the source supplied one, and its source label is the word `typed`: a Latin name held in a CBS column was keyed by staff, and no mapped field says that it was read from a card or a passport (`source_field` is a bare column name, phase 10). A party with no Latin row shows no second line. The product generates no Latin form and reads no document, so the labels `card`, `passport` and `generated` of DESIGN-SYSTEM 7.6 are not used in this plan; phase 14's back-transliteration serves matching only.
+NEW: what follows stands. The `Name` component shows what the source gives. The original is the party's `canon.party_name` row in Arabic or Kurdish script; the transliteration beneath it is the row of the same party and `name_type` with `script = 'lat'`, when the source supplied one. A party with no Latin row shows no second line. The product generates no Latin form and reads no document.
+
+=== F2 [O-08-5]
+FILE: docs/plan/phase-08.md
+WHY: O-08-5 | CONFIRMED | LOW | "the muted small style of DESIGN-SYSTEM 7.6": 7.6 says only "smaller" and defines no muted style | "smaller, as DESIGN-SYSTEM 7.6 says, in the secondary text colour (`--color-stone`)".
+OLD: The source label is shown after the Latin line, in the muted small style of DESIGN-SYSTEM 7.6, as a word
+NEW: The source label is shown after the Latin line, smaller, as DESIGN-SYSTEM 7.6 says, and in the secondary text colour (`--color-stone`), as a word
+
+=== F3 [O-08-6]
+FILE: docs/plan/phase-08.md
+WHY: O-08-6 | CONFIRMED | LOW | "Phase 14's back-transliteration ... is never shown under a name" reads as a claim about phase 14, which does not say it | state it as the rule of this component: `Name` shows only a Latin row the source gave and never a back-transliteration.
+OLD: Phase 14's back-transliteration serves matching only and is never shown under a name.
+NEW: `Name` shows only a Latin row that the source gave; a back-transliteration made for matching (phase 14) is never passed to it.
+
+=== F4 [O-08-7a]
+FILE: docs/plan/phase-08.md
+WHY: O-08-7 | CONFIRMED | LOW | the add form does not send `profile_code` | item 3 sends the profile code the register is filtered to (`IQ` when no filter is set); item 1 says the same.
+OLD: read with `getGoamlCorpusCases` for the profile code shown.
+NEW: read with `getGoamlCorpusCases` for the profile code of the version list (`IQ` unless the bank keeps a second profile code).
+
+=== F5 [O-08-3a]
+FILE: docs/plan/phase-08.md
+WHY: O-08-3 | CONFIRMED | MEDIUM | the two expected-outcome words have no key and no Arabic in item 5, while every other stored value has | add `corpus_case.expect.would_reject` and `corpus_case.expect.graded` to the table; items 2 and 3 name the keys.
+OLD: the expected result in words ("Would be rejected" with its rule codes, or "Accepted")
+NEW: the expected result in words (`corpus_case.expect.would_reject` with its rule codes, or `corpus_case.expect.graded`)
+
+=== F6 [O-08-8]
+FILE: docs/plan/phase-08.md
+WHY: O-08-8 | CONFIRMED | LOW | `FileDrop` checks size before upload, but no response carries `goaml.corpus_case_max_bytes` | item 3: the client checks the type only; the size is the server's 422 `file_too_large`, shown at the file field.
+NOTE: a later entry of the same round changed part of this NEW text again. Skip check 1 for the exact text; check the text as it stands in the file now.
+OLD: A form: `FileDrop` limited to one XML file; the key (lower-case letters, digits and hyphens, 3 to 61 characters);
+NEW: A form: `FileDrop` limited to one XML file (the client checks the type only; no response gives the size limit, so a file that is too large is the server's 422 `file_too_large`, shown at the file field); the key (it starts with a lower-case letter, then lower-case letters, digits or hyphens; 3 to 61 characters in all);
+
+=== F7 [O-08-3b]
+FILE: docs/plan/phase-08.md
+WHY: O-08-3 | CONFIRMED | MEDIUM | the two expected-outcome words have no key and no Arabic in item 5, while every other stored value has | add `corpus_case.expect.would_reject` and `corpus_case.expect.graded` to the table; items 2 and 3 name the keys.
+OLD: the expected outcome (two choices, "Would be rejected" and "Accepted"); the expected block codes, a multi-select over the rule codes of the active version, enabled only with "Would be rejected";
+NEW: the expected outcome (two choices, with the words of `corpus_case.expect.would_reject` and `corpus_case.expect.graded`); the expected block codes, a multi-select over the rule codes of the active version, enabled only with the first choice;
+
+=== F8 [O-08-1a]
+FILE: docs/plan/phase-08.md
+WHY: O-08-1 | CONFIRMED | MEDIUM (agent: HIGH) | 7.11 items 3 and 4 link the maker to the change request on G10, but G10 lists no A2 and phase 04 gives A2 no scope for `GET /change-requests/{id}`, so an A2 maker lands on X6; phase 07 section 7.6 item 7 says only "its maker withdraws". Nothing blocks building and no stated check fails, so MEDIUM | 7.11: the G10 link is rendered for a role G10 lists (M); an A2 maker sees the reference as text and follows the request in the inbox tab "Waiting on others" (X3). Phase 07 item 7: an unmet case is closed by the approver's reject or the maker's withdraw (the Closed hook serves both); an A2 maker has no withdraw screen in P0, the same as the SS maker of a good-guy rule (phase 14). // Linked change from O-08-1: item 7 sentence "its maker withdraws the request" becomes "the approver rejects the request or its maker withdraws it".
+OLD: Submit sends `postGoamlCorpusCases` (multipart) with a generated `Idempotency-Key`; on 202 the page links to the change request on G10.
+NEW: Submit sends `postGoamlCorpusCases` (multipart) with a generated `Idempotency-Key` and with `profile_code` = the profile code of item 1. On 202 the page shows the reference of the change request: as a link to G10 for M, whom G10 lists, and as text for A2, whom G10 does not list and who follows the request in the inbox tab "Waiting on others" (X3). An A2 maker therefore has no withdraw screen in this version; an unwanted proposal is closed by the approver's reject (phase 07 section 7.6 item 7).
+
+=== F9 [O-08-1b]
+FILE: docs/plan/phase-08.md
+WHY: O-08-1 | CONFIRMED | MEDIUM (agent: HIGH) | 7.11 items 3 and 4 link the maker to the change request on G10, but G10 lists no A2 and phase 04 gives A2 no scope for `GET /change-requests/{id}`, so an A2 maker lands on X6; phase 07 section 7.6 item 7 says only "its maker withdraws". Nothing blocks building and no stated check fails, so MEDIUM | 7.11: the G10 link is rendered for a role G10 lists (M); an A2 maker sees the reference as text and follows the request in the inbox tab "Waiting on others" (X3). Phase 07 item 7: an unmet case is closed by the approver's reject or the maker's withdraw (the Closed hook serves both); an A2 maker has no withdraw screen in P0, the same as the SS maker of a good-guy rule (phase 14). // Linked change from O-08-1: item 7 sentence "its maker withdraws the request" becomes "the approver rejects the request or its maker withdraws it".
+OLD: then `postGoamlCorpusCasesIdRetire`; on 202 the link to the change request.
+NEW: then `postGoamlCorpusCasesIdRetire`; on 202 the reference of the change request, shown as in item 3.
+
+=== F10 [O-08-3c]
+FILE: docs/plan/phase-08.md
+WHY: O-08-3 | CONFIRMED | MEDIUM | the two expected-outcome words have no key and no Arabic in item 5, while every other stored value has | add `corpus_case.expect.would_reject` and `corpus_case.expect.graded` to the table; items 2 and 3 name the keys.
+OLD: | `corpus_case.state.rejected` | مرفوضة | Rejected |
+
+NEW: | `corpus_case.state.rejected` | مرفوضة | Rejected |
+| `corpus_case.expect.would_reject` | سيُرفض | Would be rejected |
+| `corpus_case.expect.graded` | مقبول | Accepted |
+
+
+=== F11 [O-08-3d]
+FILE: docs/plan/phase-08.md
+WHY: O-08-3 | CONFIRMED | MEDIUM | the two expected-outcome words have no key and no Arabic in item 5, while every other stored value has | add `corpus_case.expect.would_reject` and `corpus_case.expect.graded` to the table; items 2 and 3 name the keys.
+OLD: the form with "Accepted" chosen disables the block-code select;
+NEW: the form with the choice `corpus_case.expect.graded` ("Accepted") disables the block-code select;
+
+=== F12 [O-07-6]
+FILE: docs/plan/phase-08.md
+WHY: O-07-6 | CONFIRMED | LOW (agent: MEDIUM) | "a key that names a person is refused at approval, as any reason text is" reads as a system step; none exists | the form asks for a code, not a name; the approver rejects a key that names a person; the system does not screen the key. // O-07-6 addition | phase 08 section 7.11 item 3 gains the same hint at the key field.
+OLD: the key (it starts with a lower-case letter, then lower-case letters, digits or hyphens; 3 to 61 characters in all);
+NEW: the key (it starts with a lower-case letter, then lower-case letters, digits or hyphens; 3 to 61 characters in all; under the field the hint "A short code for the rule. Never a name." in the user's language, phase 07 section 7.6 item 13);

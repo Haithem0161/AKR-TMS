@@ -1928,7 +1928,8 @@ reopens it. Money, percentages and dates follow the product formats of phase 08;
 1. `make migrate`: 0050 to 0053 apply; a second run is a no-op. The seed partitions `kyc.ratings_<yyyy>_<mm>` for the
    current month and three ahead exist. `SELECT kyc.create_partition('overrides', 2030, 1)` fails (only the allow-listed
    `ratings` gets partitions).
-2. Negative database checks, as `akr_app`: `UPDATE kyc.ratings SET level = 2` fails with `append-only`; `DELETE FROM kyc.ratings`
+2. Negative database checks, as `akr_app`: `UPDATE kyc.ratings SET level = 2` fails with permission denied (no UPDATE grant; as the owner
+   `akr_migrate` it fails with `append-only`); `DELETE FROM kyc.ratings`
    fails; `UPDATE kyc.rating_models SET document = '{}'` on a live row fails with `immutable`; a live version moved to
    draft fails; a second `live` row for RM-IQ fails `uq_rating_models_live`; an `overrides` row of direction `down` without
    `change_request_id` fails its CHECK; `approved_by = proposed_by` fails; a `rating_feed` update of `cbi_level` fails; a

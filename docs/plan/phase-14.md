@@ -4,7 +4,7 @@
 
 **Dependencies:** Phase 09 (reference data, the business clock, reason-code families `decision`, `closure` and `exclusion`), Phase 11 (production ingestion, `data_as_of` and freshness). Through them phases 00 to 05 and 10 are used: the timers and jobs harness, StepUpService, the evidence store, Cedar and masking, change requests, the `SourceReader` port and the canonical party tables.
 **Macro-phase:** P1
-**Complexity:** XL (25 routes, three change-request targets, a normaliser with a SQL twin, a scorer and four-eyes rules carry the weight)
+**Complexity:** XL (27 routes: 25 of section 2.8 and 2 of section 7.19; four change-request targets, three of section 3.10 and `harness_case` of section 7.19; a normaliser with a SQL twin, a scorer and four-eyes rules carry the weight)
 **Binaries touched:** akr-api (routers `lists`, `screening`; the index registry) | akr-worker (jobs `list_fetch`, `list_parse`, `harness_run`, `list_activate`, `screening_lookback`, `screening_daily_base`, `screening_onboarding`, `screening_payment`, `screening_adhoc`, `pair_memory_sweep`, `list_stale_sweep`, timer kind `screening_alert_clock`) | akr-ingestd (job `ingest_bank_list` only, the bank's own blacklist from the CBS through `SourceReader`; the one CBS-facing piece of this phase). akr-ctl gains `lists verify` only. akr-assess unchanged (phase 29 uses the same index).
 **Requirements carried:** N-01 to N-59 (MODULES M9 owner; grouped in section 3.1 to 3.9 by what they govern), M-12, M-24, SP-98, RP-54, UX-44, C-63, L-41, S-32, TS-19, TS-36 (as MODULES M9 lists them; this phase carries them through the screens, the four-eyes rules and the audit events named in section 3)
 - Gap pass 1 (coverage), implemented here: L-36 (no amount, materiality or exposure threshold on any screening; freeze lists excluded from good-guy rules and bulk decisions); T-27 (Arabic-aware keys for comparison and blocking; no record merge, and a differing national ID gives a decision code); UX-58 (the screening hit screen of mockup 03), W-09 (weak-alias classes, patronymic alignment and the side-by-side hit screen); F-13 (customers, owners and payment parties screened against the UN, national and optional lists, refreshed within 12 hours, look-back on every list change, decisions with coded reasons), U-02 (a parse failure fails the version with an incident and the last good version stays), U-03 (alias quality classes, birth dates with precision, documents by type, name chains, original-script keys), U-09 (per-version fetch and load records, diff counts, look-back runs and alert outcomes); VA-11 (Arabic name matching with a score and coded reasons); VC-03 (the 12-hour freshness alarm and the one-hour re-screen measure, section 7+), VC-04 (versions staged, compared with the active version and gated before activation), VC-10 (fuzzy Arabic-to-Arabic token comparison with alignment), VC-11 (identifier adjustments only when comparable, no credit for a default date, versioned), VC-12 (the name-frequency evidence floor from the bank base), VC-24 (pair memory and good-guy rules with approver, expiry and the QA sample; good-guy rules never on freeze lists (DR-102), and pair memory on a freeze-list entry is allowed, four-eyes approved and always in the weekly QA sample (sections 3.7 and 7.3)), VC-31 (every closed alert a labelled pair; thresholds change only by change request); VC-06 (the look-back of parties and unlinked counterparties on every list change, and changed parties against every active list, section 7+).
@@ -652,8 +652,8 @@ backend/
 │                            #   the parity corpus loader; depends on unicode-normalization only; used by domain,
 │                            #   db tests, ingestd and worker. Added to the phase 00 workspace members in the same change.
 ├── crates/domain/src/screening/   # ListRegistry values, ScreeningIndex, Scorer, SubjectFingerprints, DoubtPolicy,
-│                                  #   AlertDedupe, FreezeTrigger port, the three change targets (pure logic, ports only)
-├── crates/db/src/screening/       # Pg repositories for the eleven tables of section 1
+│                                  #   AlertDedupe, FreezeTrigger port, the four change targets (pure logic, ports only)
+├── crates/db/src/screening/       # Pg repositories for the ten tables of section 1 and alert.harness_cases (section 7.19)
 ├── crates/authz/src/resources/    # resource adapters ScreeningAlert, PairMemory, ListVersion, GoodGuyRule, ListRegistry
 ├── crates/jobs/                   # kinds of section 4 (enqueue takes &mut Tx)
 ├── api/src/routes/lists.rs, api/src/routes/screening.rs   # routers `lists`, `screening`
@@ -803,7 +803,7 @@ pub trait SubjectSource: Send + Sync {
 
 ### 2.6 Services (named once; their methods are in section 3)
 
-`ListService` (versions, upload, activation, diff), `ListFetchService` (worker), `BankListService` (ingestd), `ScreeningIndexRegistry` (one `ArcSwap` per process holding the active index per list version), `ScreeningService` (runs, forward and reverse), `AlertService` (claim, decide, bulk decide), `PairMemoryService`, `GoodGuyService`, `KnownAnswerHarness`, `ListSettingTarget`, `ScreeningPolicyTarget`, `GoodGuyTarget` (the three change targets, section 3.10), `RecordingFreezeTrigger`, `SubjectFingerprinter`.
+`ListService` (versions, upload, activation, diff), `ListFetchService` (worker), `BankListService` (ingestd), `ScreeningIndexRegistry` (one `ArcSwap` per process holding the active index per list version), `ScreeningService` (runs, forward and reverse), `AlertService` (claim, decide, bulk decide), `PairMemoryService`, `GoodGuyService`, `KnownAnswerHarness`, `ListSettingTarget`, `ScreeningPolicyTarget`, `GoodGuyTarget` (the three change targets of section 3.10; `HarnessCaseService` and the fourth target `HarnessCaseTarget` are in section 7.19), `RecordingFreezeTrigger`, `SubjectFingerprinter`.
 
 ### 2.7 utoipa schemas
 
@@ -841,7 +841,7 @@ Scopes come from API.md section 2. Markers as API.md section 1: **SU** step-up, 
 | GET | `/screening/harness-runs` | `screening.work, config.author, config.approve, audit.read, assessor.read` | Known-answer runs per list version (`screening.harness.read`) |
 | POST | `/screening/harness-runs` | `screening.work` | Run the harness (gate, oracle or canary); 202 (`screening.harness.run`) |
 
-The route count is 25. The table adds seven rows to API.md 3.9 (`GET /lists/{id}`, `POST /lists/{id}/versions/{v}/activate`, `POST /lists/{id}/fetches`, `PUT /lists/{id}/settings`, `POST /screening/runs`, `POST /screening/alerts/bulk-decision`, `POST /screening/pair-memory/{id}/approve`); the lead aligns API.md 3.9 in the same change (Proposed decisions).
+The route count is 25 (27 with the two routes of section 7.19). The table adds seven rows to API.md 3.9 (`GET /lists/{id}`, `POST /lists/{id}/versions/{v}/activate`, `POST /lists/{id}/fetches`, `PUT /lists/{id}/settings`, `POST /screening/runs`, `POST /screening/alerts/bulk-decision`, `POST /screening/pair-memory/{id}/approve`); the lead aligns API.md 3.9 in the same change (Proposed decisions).
 
 ### 2.9 Router
 
@@ -1054,7 +1054,7 @@ Coverage of N-01 to N-59 by section: N-01 to N-11, N-13 to N-17, N-46, N-47 and 
 - **Corpus**: `backend/packs/screening/known-answers.v1.jsonl`, synthetic and invented (never a real designated person; research 22 section 12.6, N-38). Three classes: `clean` (identical forms), `variant` (orthographic, reordered, truncated at 35 characters, one typo, four tokens), `hard_negative` (a family or tribe name alone, common names, near misses). Plus **self canaries**: up to `screening.harness_gate.self_canary_sample` entries of the candidate version, queried with their own names and identifiers.
 - **Gate** (`kind = gate`, `harness_run` job, payload `{version_id}`): pass when `recall_clean ≥ 0.995` (N-39), `recall_variant ≥ 0.95` for cases with identifiers present, `hard_negative_alerts ≤ 0`, every self canary hits its own entry, and the names-crate golden test passes. Pass sets the version `validated`; fail sets `failed` with `harness_failed` and the failing case ids in `failures` (never names). Each run stores `corpus_sha256`, `config_version` and the report.
 - **Below-the-line sampling** (N-41): each week one in twenty `BelowLine` candidates is written to the S3 report by ids; look-back over the replica is `POST /screening/lookbacks`.
-- **Feedback** (N-44, carried in part): every decided alert is a labelled pair as stored: its `alert.screening_decisions` rows, with outcome and reason codes, joined to the alert (ids, codes and scores only; no second store). A threshold review reads these tables; no route or report of this phase is added for it. The corpus stays synthetic (N-38), so no real pair enters it: it grows by release only, and a bank-side intake accepted by the MLRO and the bank-specific variant table (N-57) are P2.
+- **Feedback** (N-44): every decided alert is a labelled pair as stored: its `alert.screening_decisions` rows, with outcome and reason codes, joined to the alert (ids, codes and scores only; no second store). A threshold review reads these tables; no route or report of this phase is added for it. The shipped corpus stays synthetic (N-38), so no real pair enters it. A bank adds its own known-answer cases, accepted by the MLRO through change control, in section 7.19 (owner decision of 2026-10-10, DR-415; this sentence replaced "it grows by release only, and a bank-side intake accepted by the MLRO and the bank-specific variant table (N-57) are P2"). The bank-specific variant table (N-57) stays P2.
 - **Report** (all kinds): recall at each alert budget by variant class, the alert volume at each budget, the OFAC-emulation oracle difference (N-40, `kind = oracle`), the list lag (publication to activation), the release-to-release comparison with the previous run. Oracle runs never gate.
 - **Start-up self-test** (N-52): the names golden file and the SQL twin canary (one key of each form) run at process start.
 - **Snapshot canary** (`kind = canary`, N-52): on every index swap, five self canaries are queried; a miss keeps the previous index in that process, writes `list.index_canary_failed`, and raises the metric `akr_index_canary_failed`.
@@ -1064,7 +1064,7 @@ Coverage of N-01 to N-59 by section: N-01 to N-11, N-13 to N-17, N-46, N-47 and 
 
 ### 3.10 Governed configuration and change targets (N-31, N-33)
 
-Settings are listed in section 1.5 and section 4.3. A governed key changes only through a change request (phase 04 `ChangeTargetRegistry`, DR-53). The three targets of this phase, each with reason family `change` (codes `CHG_*`; sanctions-driven changes take `CHG_SANCTIONS_LIST`):
+Settings are listed in section 1.5 and section 4.3. A governed key changes only through a change request (phase 04 `ChangeTargetRegistry`, DR-53). A fourth target, `harness_case`, is in section 7.19. The three targets of this section, each with reason family `change` (codes `CHG_*`; sanctions-driven changes take `CHG_SANCTIONS_LIST`):
 
 | Target (`object_kind`) | Object key | Covers | Base class (route map DR-54) |
 |-|-|-|-|
@@ -1222,11 +1222,11 @@ Every handler re-reads its owner before it acts (phase 00 rule). `harness_run` a
 
 - **Timers**: `screening_alert_clock` (owner `screening_alert`), scheduled at alert creation, cancelled on a decision or a supersession.
 - **Outbox**: no topic is produced by this phase. It consumes `canon.touched` (phase 11) through a `TopicHandler` (phase 00 registry).
-- **OpenAPI**: tags `lists` (8 operations) and `screening` (17); 25 in all, each with `x-akr-action` (the Cedar action of section 2.8), `x-akr-stepup` where SU applies, `x-akr-idempotency` (required on every POST, PUT and DELETE). `X-StepUp-Assertion` and `X-Access-Purpose` are documented headers. `GET /screening/alerts`, `GET /screening/alerts/{id}` and the pair routes document `Cache-Control: no-store`. The upload documents `multipart/form-data`. `ScreeningAlertView` and `PairMemoryView` reference the `affordances` schema.
+- **OpenAPI**: tags `lists` (8 operations) and `screening` (19: the 17 of section 2.8 and the 2 of section 7.19); 27 in all, each with `x-akr-action` (the Cedar action of section 2.8), `x-akr-stepup` where SU applies, `x-akr-idempotency` (required on every POST, PUT and DELETE). `X-StepUp-Assertion` and `X-Access-Purpose` are documented headers. `GET /screening/alerts`, `GET /screening/alerts/{id}` and the pair routes document `Cache-Control: no-store`. The upload documents `multipart/form-data`. `ScreeningAlertView` and `PairMemoryView` reference the `affordances` schema.
 
 ### 4.3 Settings and their registry (copy of section 1.5; the floor is NULL throughout)
 
-Governed: `screening.list_max_age_h`, `screening.feed_auto_activate`, `screening.max_count_drop_pct`, `screening.pair_memory_max_months`, `screening.good_guy_max_days`, `screening.doubt_policy`, `screening.priority_map`, `screening.harness_gate`. Ungoverned: `screening.review_clock_hours`, `screening.feed_max_bytes`, `screening.search_per_min`, `screening.lookback_chunk`, and the four `schedule.*` keys. List thresholds and refresh are columns of `ref.lists`, changed by change request.
+Governed: `screening.list_max_age_h`, `screening.feed_auto_activate`, `screening.max_count_drop_pct`, `screening.pair_memory_max_months`, `screening.good_guy_max_days`, `screening.doubt_policy`, `screening.priority_map`, `screening.harness_gate`. Ungoverned: `screening.review_clock_hours`, `screening.feed_max_bytes`, `screening.search_per_min`, `screening.lookback_chunk`, `screening.harness_cases_max` (section 7.19), and the four `schedule.*` keys. List thresholds and refresh are columns of `ref.lists`, changed by change request.
 
 ### 4.4 Metrics, readiness, zones, licences and AppState
 
@@ -1243,7 +1243,7 @@ Governed: `screening.list_max_age_h`, `screening.feed_auto_activate`, `screening
 - **Phase 00**: the `canon.touched` topic handler; the settings and schedule keys of section 1.5.
 - **Phase 01**: no new step-up class (`approval` for upload and activation; `decision` for alert decisions, bulk decisions and pair approval).
 - **Phase 03**: masked kinds `screening_alert` and `pair_memory`; Cedar file `84_screening.cedar` and the entities of section 3.11 in `schema.cedarschema`.
-- **Phase 04**: three change targets (`list_setting`, `screening_policy`, `good_guy_rule`); the route map is unchanged.
+- **Phase 04**: four change targets (`list_setting`, `screening_policy`, `good_guy_rule`, and `harness_case` of section 7.19); the route map is unchanged.
 - **Phase 09**: the reason family `decision` gains eight codes `DEC_SCR_*` (name differs, identifier differs, birth date differs, family name only, confirmed designation, potential needs review, insufficient data, other) in `backend/packs/reference/reason-codes.v1.json`; they stay inactive until the phase 09 family change request activates them.
 - **Phase 11**: emits `canon.touched {batch_id, source_id, source_table, entity_kinds, business_date}` in the mapping transaction (phase 11 section 3.3, added at this review).
 - **API.md 3.9**: seven rows added (section 2.8); **roadmap.md** row 14 is set to "XL, P1, depends on 09 and 11".
@@ -1267,8 +1267,8 @@ Screens of DESIGN-SYSTEM.md section 8.1, full shell (P1). Routes and layout patt
 
 ## 6. Verification
 
-1. `make migrate`: 0045 to 0049 apply; a second run is a no-op; `SELECT code, enabled FROM ref.lists ORDER BY code` returns six rows (`bank`, `eu`, `iq_national`, `ofac_sdn`, `uk`, `un`) with `iq_national` and `un` enabled; the phase 00 schema checks pass for the ten new tables (classification and retention rows present).
-2. Negative DDL as `akr_app`: `DELETE FROM ref.list_versions` fails with `list versions are never deleted`; `UPDATE ref.list_entries` fails with permission denied; `INSERT INTO ref.list_entries` for an `active` version fails with `entries are written only while their list version is loading`; `UPDATE alert.screening_decisions` fails with `screening_decisions is append-only`; a good-guy row with `list_codes ["un"]` fails its CHECK; a pair row with `approved_by = proposed_by` fails; a freeze `true` decision with an empty `prior_decider_ids` fails; `UPDATE alert.screening_alerts SET state = 'open'` on a `true` row fails with `a true alert is terminal`.
+1. `make migrate`: 0045 to 0049 apply; a second run is a no-op; `SELECT code, enabled FROM ref.lists ORDER BY code` returns six rows (`bank`, `eu`, `iq_national`, `ofac_sdn`, `uk`, `un`) with `iq_national` and `un` enabled; the phase 00 schema checks pass for the eleven new tables, `alert.harness_cases` of section 7.19 among them (classification and retention rows present).
+2. Negative DDL as `akr_app`: `DELETE FROM ref.list_versions` fails with permission denied (no role has a DELETE grant), and as the owner `akr_migrate` with `list versions are never deleted`; `UPDATE ref.list_entries` fails with permission denied; `INSERT INTO ref.list_entries` for an `active` version fails with `entries are written only while their list version is loading`; `UPDATE alert.screening_decisions` fails with permission denied (no UPDATE grant), and as `akr_migrate` with `screening_decisions is append-only`; a good-guy row with `list_codes ["un"]` fails its CHECK; a pair row with `approved_by = proposed_by` fails; a freeze `true` decision with an empty `prior_decider_ids` fails; `UPDATE alert.screening_alerts SET state = 'open'` on a `true` row fails with `a true alert is terminal`.
 3. Parity: `cargo test -p names parity` runs `parity-corpus.v1.jsonl` (at least 300 cases) and the idempotence check; `cargo test -p db names_sql_parity` runs every case through `ref.name_key_k1` and `ref.name_key_block_k1` on PostgreSQL 17 under `C.UTF-8`; zero differences. `vitest` runs `i18n/fold.parity` over the same file. The three answers must agree on every case.
 4. `cargo check`; `cargo sqlx prepare`; `cargo clippy --all-targets -- -D warnings`; `cargo deny check`. `cargo tree -p worker -i sources` shows no phase 05 `SourceReader` dependency; only `ingestd` depends on it.
 5. `cargo test`, including: each rule of 3.4 in isolation (a family or tribe name with one common given name never alerts; a kunya alone never alerts; a weak alias caps at 0.6; birth year one year apart −0.02 and three years −0.20; a default date earns no credit; a document of the same type and number raises the score to 0.95; a thin query is `NeedsMoreData`, never `Clear`; a truncated subject leaves the list side unmatched weight at 0); the same input gives a byte-identical result twice; a candidate cap sets `truncated`; the gate fails when a self canary is removed from a candidate version (`harness_failed`); activation of a `loading` version is refused (409); a count drop without acknowledgement fails (`count_drop`); a feed failure leaves the last good version active; a second `screening_daily_base` run over the same subjects inserts no alert.
@@ -1287,7 +1287,7 @@ Screens of DESIGN-SYSTEM.md section 8.1, full shell (P1). Routes and layout patt
 7. Duplicates and drift: two `screening_daily_base` runs over the phase 05 sample: the second inserts zero alerts; `SELECT fingerprint FROM alert.screening_alerts GROUP BY 1 HAVING count(*) > 1` is empty; `akr_pair_memory_drift` is 0.
 8. Audit: after the curl run `audit_log` holds `list.version_uploaded`, `list.validated`, `list.activated`, `screening.alert_created`, `screening.alert_decided`, `screening.freeze_trigger_recorded`, `screening.searched`, `pair.proposed`, `pair.approved`, `pair.invalidated`, `good_guy_rule.activated` and the `authz.denied` rows of the 403s; the search audit payload holds `query_hk` and no query text (a grep for the query string finds nothing); `akr-ctl audit verify` passes.
 9. No CBS read outside `ingest_bank_list`: the phase 05 statement journal shows no statement during the search and decision steps; the phase 05 conformance suite is unaffected.
-10. `make generate-api` twice gives zero diff; Swagger lists 25 operations with `x-akr-action`; phases 00 to 12 tests still pass.
+10. `make generate-api` twice gives zero diff; Swagger lists 27 operations with `x-akr-action` (the 25 of section 2.8 and the 2 of section 7.19); phases 00 to 12 tests still pass.
 11. Latency (N-50): the inline benchmark on a synthetic 150,000-name list gives p50 under 5 ms and p99 under 25 ms (`cargo bench -p domain screening`).
 
 ## 7+. Gap Additions
@@ -1430,7 +1430,7 @@ Section 3.2 `list_parse`: every failure (steps 1, 2, 4 and 5, and the gate of se
 - `VersionFilter` and `PairFilter` are empty in this phase: `GET /lists/{id}/versions` and `GET /screening/pair-memory` take the keyset page only. The masking predicate of section 3.15 applies in SQL to the pair list.
 - `AlertFilter { view: AlertView }`; `AlertView` is `Open`, `Potential`, `NeedsMoreData` or `Mine`, the four saved views of S2 (query parameter `view`, default `open`).
 - `HarnessFilter { list_version_id: Option<Uuid> }` (query parameter `list_version_id`).
-- `IdentifierInput` is the raw form of `Identifiers` (section 2.1), hashed on receipt and never stored: `{ birth: Vec<{ year, month?, day? }>, documents: Vec<{ doc_type, number }>, nationality: Vec<IsoCountry>, gender?, mother_chain?, family_no? }`.
+- `IdentifierInput` is the raw form of `Identifiers` (section 2.1), hashed on receipt and never stored, except inside the sealed query of a known-answer case (section 7.19 item 3): `{ birth: Vec<{ year, month?, day? }>, documents: Vec<{ doc_type, number }>, nationality: Vec<IsoCountry>, gender?, mother_chain?, family_no? }`.
 - The `components` of `ScoreResult` are `MatchComponents { name_score: f32, identifier_adjustment: f32, risk_modifier: f32, threshold: f32, threshold_source: ThresholdSource }` (section 3.4 rules 4, 6 and 8); `ThresholdSource` is `NameOnly` or `WithIdentifiers`. The name `ScoreComponents` is left to phase 17, whose type of that name has other fields.
 - `FeedError` is `Transport { status: Option<u16>, reason: String }` (writes `list.feed_failed`, section 3.2 step 2), `NotAllowed` (host or path outside the allow-list of `source_ref`) or `TooLarge` (body above `screening.feed_max_bytes`).
 - `BankListRow` is one mapped row of the bank's list: `entry_key` and the identifying fields of `list_parse` step 6, each from the bank column that the approved mapping document names.
@@ -1443,6 +1443,167 @@ This phase registers its one sensitive operation, `POST /api/v1/screening/search
 - `stale_at`: when the list is stale and the key is absent, the sweep writes `list.stale` and sets the key to the current time; when the list is fresh and the key is present, it removes the key. One event is written per transition to stale.
 - `rescreen_late_version`: when the active version meets the test of section 7.10 step 3 and the key does not hold its id, the sweep writes `list.rescreen_late` and sets the key to that version id.
 The gauges are set from the computed state at every sweep and need no mark.
+
+Owner decisions (2026-10-10): the product owner overturned the lead decision that the known-answer corpus grows by release only (section 3.9, Feedback); lead-written, checked in the owner-decision round (tools/agent/owner-verdict.md).
+
+### 7.19 Known-answer cases the bank adds (owner decision 2; DR-415)
+A bank adds its own known-answer cases through change control: a name, with identifiers when the bank has them, that must hit a named list entry (`hit`) or must not hit it (`no_hit`). This is the bank-side intake of N-44: a spelling the analysts want kept as a known hit, and a name that matched wrongly kept as a hard negative. The shipped corpus stays synthetic (N-38) and it alone decides the gate. The bank's cases run in every gate and oracle run and are reported beside it. They never block a list activation, because a list update is a legal duty (the 12-hour rule) and a case can go stale when the publisher changes an entry. A configuration change that would lose a known hit says so before it is approved (item 8). The bank-specific variant table (N-57) stays P2. DR-422 locks the correction of the check round of 2026-10-11: the harness report carries one result per case (`results`, item 6).
+
+1. **Table** (extends DATA-MODEL s.9; the table and its guard join migration `0046_alert_screening_runs_alerts.sql` as its second part, the grants join `0048_screening_grants_guards.sql`, and the classification, retention and setting rows join `0049_screening_settings_classification.sql`):
+
+```sql
+-- migration 0046_alert_screening_runs_alerts.sql, part 2 (section 7.19)
+-- Known-answer cases the bank adds (DR-415). No party id and no alert id: a case is a name and a list entry key.
+CREATE TABLE IF NOT EXISTS alert.harness_cases (
+    id                  UUID PRIMARY KEY,
+    list_id             UUID NOT NULL REFERENCES ref.lists(id) ON DELETE RESTRICT,
+    entry_key           TEXT NOT NULL CHECK (length(entry_key) BETWEEN 1 AND 120),
+    expect              TEXT NOT NULL CHECK (expect IN ('hit', 'no_hit')),
+    query_enc           BYTEA NOT NULL,                       -- sealed JSON {name, identifiers?} (personal, field encryption; AAD = id)
+    query_hk            BYTEA NOT NULL CHECK (octet_length(query_hk) = 32),      -- keyed hash of the normalised tokens (section 3.12)
+    trial               JSONB NOT NULL CHECK (jsonb_typeof(trial) = 'object'),   -- {list_version_id, outcome, met, ran_at}
+    state               TEXT NOT NULL DEFAULT 'proposed' CHECK (state IN ('proposed', 'active', 'retired', 'rejected')),
+    change_request_id   UUID NOT NULL REFERENCES admin.change_requests(id) ON DELETE RESTRICT,
+    retired_by_request  UUID REFERENCES admin.change_requests(id) ON DELETE RESTRICT,
+    created_by          UUID NOT NULL REFERENCES admin.users(id) ON DELETE RESTRICT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    activated_at        TIMESTAMPTZ,
+    closed_at           TIMESTAMPTZ,
+    CHECK (state NOT IN ('active', 'retired') OR activated_at IS NOT NULL),
+    CHECK ((state IN ('retired', 'rejected')) = (closed_at IS NOT NULL)),
+    CHECK ((state = 'retired') = (retired_by_request IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_harness_cases_open ON alert.harness_cases (list_id, entry_key, query_hk)
+    WHERE state IN ('proposed', 'active');
+CREATE INDEX IF NOT EXISTS idx_harness_cases_list       ON alert.harness_cases (list_id, state, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_harness_cases_cr         ON alert.harness_cases (change_request_id);
+CREATE INDEX IF NOT EXISTS idx_harness_cases_retired_cr ON alert.harness_cases (retired_by_request)
+    WHERE retired_by_request IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_harness_cases_created_by ON alert.harness_cases (created_by);
+
+-- Rows are never deleted; a retired or rejected case never changes.
+CREATE OR REPLACE FUNCTION alert.harness_cases_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'known-answer cases are never deleted' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF OLD.state IN ('retired', 'rejected') THEN
+        RAISE EXCEPTION 'known-answer case %: % is final', OLD.id, OLD.state USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN NEW;
+END $$;
+DO $$ BEGIN
+    CREATE TRIGGER trg_harness_cases_guard BEFORE UPDATE OR DELETE ON alert.harness_cases
+        FOR EACH ROW EXECUTE FUNCTION alert.harness_cases_guard();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- migration 0048_screening_grants_guards.sql, part 2 (section 7.19)
+GRANT SELECT, INSERT ON alert.harness_cases TO akr_app;
+GRANT UPDATE (state, retired_by_request, activated_at, closed_at) ON alert.harness_cases TO akr_app;
+
+-- migration 0049_screening_settings_classification.sql, part 2 (section 7.19)
+INSERT INTO admin.column_classification (schema_name, table_name, column_name, classification)
+SELECT 'alert', 'harness_cases', c, v.cls::admin.data_classification
+FROM (VALUES
+  ('internal', ARRAY['id', 'list_id', 'entry_key', 'expect', 'trial', 'state', 'change_request_id',
+                     'retired_by_request', 'created_by', 'created_at', 'activated_at', 'closed_at']),
+  ('personal', ARRAY['query_enc', 'query_hk'])
+) AS v(cls, cols)
+CROSS JOIN LATERAL unnest(v.cols) AS c
+ON CONFLICT DO NOTHING;
+UPDATE admin.column_classification SET encrypted = TRUE
+ WHERE (schema_name, table_name, column_name) = ('alert', 'harness_cases', 'query_enc');
+UPDATE admin.column_classification SET keyed_hash = TRUE
+ WHERE (schema_name, table_name, column_name) = ('alert', 'harness_cases', 'query_hk');
+
+INSERT INTO admin.retention_assignment (schema_name, table_name, retention_class, clock, clock_column, note) VALUES
+ ('alert', 'harness_cases', 'R7', 'closure', 'closed_at', 'Closed known-answer cases; open rows stay')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO admin.settings (key, value, value_type, floor, governed, label) VALUES
+ ('screening.harness_cases_max', '500', 'integer', NULL, FALSE,
+  '{"ar": "أقصى عدد لحالات الاختبار التي يضيفها المصرف لكل قائمة", "en": "Maximum bank known-answer cases per list"}')
+ON CONFLICT (key) DO NOTHING;
+```
+
+   The columns outside the UPDATE grant never change: a different name or expectation is a new case. `akr_readonly` gets no grant, as for `alert.screening_alerts`, `alert.screening_decisions`, `alert.pair_memory` and `alert.good_guy_rules`. `screening.harness_cases_max` is ungoverned, with registry bounds 1 to 5,000. `trial.outcome` is the scorer outcome of section 3.4 rule 9 in snake case (`hit`, `below_line`, `needs_more_data`, `clear`). A trial is never `absent`: item 4 step 3 refuses a key that the active version does not hold, and `absent` is a result of a later harness run only (item 6).
+
+2. **Routes** (added to the `screening` router of section 2.9; the route count of this phase is now 27):
+
+| Method | Path | Scope | Description (cedar action) |
+|-|-|-|-|
+| GET | `/screening/harness-cases` | `screening.work` | The bank's known-answer cases: `list_code?`, `state?`; the name and identifiers unsealed (`screening.harness_case.read`) |
+| POST | `/screening/harness-cases` | `screening.work` | Propose a case, or the retirement of one; **CR** `harness_case`; `Idempotency-Key`; 202 (`screening.harness_case.propose`) |
+
+   One POST takes two bodies, as `POST /screening/good-guys` does (section 3.8): `HarnessCaseProposal`, or `HarnessCaseRetire`, which the route tells apart by its `action` field.
+
+3. **Types.** Entity `HarnessCase` (fields mirror item 1). Value objects `CaseExpect` (`Hit`, `NoHit`), `HarnessCaseState` (`Proposed`, `Active`, `Retired`, `Rejected`), `CaseTrial { list_version_id: Uuid, outcome: String, met: bool, ran_at: DateTime<Utc> }`, `CaseQuery { name: String, identifiers: Option<IdentifierInput> }` (the sealed JSON of `query_enc`). DTOs: `HarnessCaseProposal { list_code: ListCode, entry_key: String (1 to 120 characters), expect: CaseExpect, name: String (1 to 200 characters), identifiers: Option<IdentifierInput>, reason_code: String, reason_text: String }`; `HarnessCaseRetire { action: "retire", case_id: Uuid, reason_code: String, reason_text: String }`; `HarnessCaseFilter { list_code: Option<ListCode>, state: Option<HarnessCaseState> }`; `HarnessCaseView` (the columns of item 1 without `query_enc` and `query_hk`, with `list_code`, `name` and `identifiers`; documented with `Cache-Control: no-store`). `IdentifierInput` is hashed on receipt and never stored everywhere else (section 7.16); a case is the one place that keeps it, sealed inside `query_enc`, because the harness must run the same query again. Repository trait in the domain layer, `PgHarnessCaseRepository` in `db`:
+
+```rust
+#[async_trait]
+pub trait HarnessCaseRepository: Send + Sync {
+    async fn insert(&self, tx: &mut Tx, c: &NewHarnessCase) -> Result<HarnessCase, RepoError>;        // uq open -> Conflict
+    async fn lock(&self, tx: &mut Tx, id: Uuid) -> Result<Option<HarnessCase>, RepoError>;            // FOR UPDATE
+    async fn get(&self, conn: &mut PgConnection, id: Uuid) -> Result<Option<HarnessCase>, RepoError>;
+    async fn list(&self, conn: &mut PgConnection, f: &HarnessCaseFilter, page: Keyset) -> Result<Page<HarnessCase>, RepoError>;
+    async fn active_for_list(&self, conn: &mut PgConnection, list_id: Uuid) -> Result<Vec<HarnessCase>, RepoError>;
+    async fn count_open(&self, conn: &mut PgConnection, list_id: Uuid) -> Result<i64, RepoError>;     // proposed + active
+    async fn activate(&self, tx: &mut Tx, id: Uuid, at: DateTime<Utc>) -> Result<(), RepoError>;      // proposed -> active
+    async fn retire(&self, tx: &mut Tx, id: Uuid, cr: Uuid, at: DateTime<Utc>) -> Result<(), RepoError>;   // active -> retired
+    async fn reject(&self, tx: &mut Tx, id: Uuid, at: DateTime<Utc>) -> Result<(), RepoError>;        // proposed -> rejected
+}
+```
+
+   `NewHarnessCase` holds the id, `list_id`, `entry_key`, `expect`, `query_enc`, `query_hk`, `trial`, `change_request_id` and `created_by`. `activate` sets `state = 'active'` and `activated_at = at`; `retire` sets `state = 'retired'`, `retired_by_request = cr` and `closed_at = at`; `reject` sets `state = 'rejected'` and `closed_at = at`. These four columns are the whole UPDATE grant of item 1. The list is keyset-paged by `(created_at DESC, id DESC)`. Services gain `HarnessCaseService` and the fourth change target `HarnessCaseTarget`; AppState `api` gains `harness_cases: Arc<HarnessCaseService>`.
+
+4. **`HarnessCaseService::propose(ctx, body)`** (`POST /screening/harness-cases`):
+   1. Cedar `screening.harness_case.propose`; `Idempotency-Key` required.
+   2. A `HarnessCaseRetire` body: the case exists (else 404 `E_NOT_FOUND`); go to step 7 with `{op: "retire", case_id}`.
+   3. A `HarnessCaseProposal` body: the list of `list_code` is enabled and has an active version (else 422 `unknown_list_code`); that version holds an entry with `entry_key` (else 422 `entry_not_found`); `count_open(list)` is below `screening.harness_cases_max` (else 422 `too_many_cases`).
+   4. Normalise `name` with the names crate (section 3.1), as section 3.12 step 3 does for a search, and hash the identifiers into `Identifiers` on receipt (section 7.16). A thin query is refused (422 `thin_query`): it can never be assessed, so it can never be a known answer. `query_hk` is the keyed hash of the normalised tokens, computed as the `query_hk` of section 3.12 step 5; an open case with the same list, entry key and `query_hk` -> 422 `case_exists`.
+   5. Trial: score the query against that entry in the active version's index under the live configuration (`ScreeningIndexRegistry`, section 3.3; `Scorer`, section 3.4). `met` is true when `expect` is `hit` and the outcome is `Hit`, or when `expect` is `no_hit` and the outcome is not `Hit`. An unmet case is accepted: a known miss and a name that still alerts are what the report is for.
+   6. `case_id` = UUIDv7; seal `CaseQuery` as `query_enc` (AAD = `case_id`).
+   7. `ChangeRequestService::create` (phase 04 section 3.2; origin = this dedicated route, so `submit` runs in the same transaction) with `object_kind = harness_case` and, for a proposal, the body `{op: "add", case_id, list_code, entry_key, expect, trial, query_enc, query_hk}`. `query_enc` travels as base64 ciphertext that no reader of the request can open, and the diff of item 5 leaves it and the entry key out.
+   8. 202 with the `ChangeRequestView`.
+
+   **`list(ctx, filter, page)`** (`GET /screening/harness-cases`): Cedar `screening.harness_case.read`; the repository list, each row unsealed into a `HarnessCaseView`.
+
+5. **Change target `harness_case`** (a fourth target; the table of section 3.10 keeps its three rows; reason family `change`; `generic_create = false`; `emergency_allowed = false`; no inventory kind):
+
+| Field | Value |
+|-|-|
+| Route | class `material` for a proposal and for a retirement, so the shipped route map sends both to `cr_material`: the MLRO accepts the pair and CHK the change. Volume effect `neutral`: a case changes no match and no alert. The route map gains no rule |
+| `object_key` | `harness_case:<case id>` (one open change per case) |
+| Base version | none (`current_version` returns `None`) |
+| Prepare | `add`: the list, entry, cap and duplicate checks of item 4 steps 3 and 4 again on the body (the duplicate check by `query_hk`; the name is not in the body). `retire`: the case is `active` (else 409 `E_NOT_ALLOWED_IN_STATE`). `required_evidence` is empty |
+| `on_submitted` | `add`: insert the row `proposed` (the unique index refusing it -> 422 `case_exists`); audit `harness_case.proposed {case_id, list_code, expect, met}`. `retire`: audit `harness_case.retire_proposed {case_id}` |
+| `check_before_decision` | none |
+| Activate | `add`: `lock`; not `proposed` -> the target refuses (phase 04: an immediate approval is rolled back with the error, section 3.4; a scheduled activation ends `failed`, section 3.6); `activate`; audit `harness_case.activated {case_id, change_request_id}`. `retire`: `lock`; not `active` -> refused in the same way; `retire` with the request id; audit `harness_case.retired {case_id, change_request_id}` |
+| Revert | not allowed |
+| Closed | `add`: `reject` (`proposed` -> `rejected`); audit `harness_case.rejected {case_id, how}`. `retire`: nothing |
+| Diff | `add`: the list code, the expectation and the trial (outcome and `met`). `retire`: the case id, the list code and the expectation. Never the name, the identifiers or the entry key |
+
+   The MLRO reads the name on S3 before deciding (item 11); CHK decides on what the diff shows.
+
+6. **Harness runs** (section 3.9; job `harness_run`). A `gate` or `oracle` run of a version of list L also runs the `active` cases of L (`active_for_list`): for each case it unseals the query, finds the entry with the case's `entry_key` in that version and scores the pair under the run's configuration. The results go into `report.bank_cases = {cases, met, unmet, absent, results: [{case_id, result}]}`: `results` has one element per case the run took, and `result` is `met`, `unmet` or `absent`; `absent` counts cases whose entry the version does not hold (a delisting), and an absent case is neither met nor unmet. Bank cases are outside `cases`, `passed`, `recall_clean`, `recall_variant`, `hard_negative_alerts`, `failures` and `passed_gate`: the gate of section 3.9 reads the shipped corpus and the self canaries only, and `corpus_sha256` stays the shipped file's hash. `canary` runs do not run them. The metric `akr_harness_bank_cases{list, result}` (gauge; `met`, `unmet`, `absent`) joins section 4.4.
+
+7. **Feedback** (N-44; replaces the last sentence of the Feedback item of section 3.9). Every decided alert stays a labelled pair as stored. A bank adds a pair to its known answers through this section: the person looking at a decided alert on S1 proposes the name and the entry key the screen already shows (item 11), and the API stores no link to the alert or to the party.
+
+8. **Governed changes** (section 3.10, `prepare` of `list_setting` and `screening_policy`). The dry run also scores the active `hit` cases of each list the change touches, under the old and the new configuration. A `list_setting` change touches the list of its object key; a `screening_policy` change touches every enabled list. A case met under the old and unmet under the new is a lost known hit: `impact.known_hits_lost` lists the case ids, the request carries the warning `known_hit_lost` (phase 04: a warning must be accepted at submit), and the base class is at least `material`. `impact.no_hit_cases = {alerting_old, alerting_new}` counts the `no_hit` cases that alert under each configuration, for the approver's reading only.
+
+9. **Audit events** (five more kinds in section 3.13, all on resource `harness_case`): `harness_case.proposed`, `harness_case.retire_proposed`, `harness_case.activated`, `harness_case.retired`, `harness_case.rejected`. Payloads carry ids, the list code, the expectation and the trial outcome, never the name, the identifiers or the entry key. `harness.run_completed` gains the counts of `report.bank_cases`.
+
+10. **Cedar** (`84_screening.cedar`). Two actions, `screening.harness_case.read` and `screening.harness_case.propose`, join the action lists of the permits `screening.work.ss` and `screening.work.m` and of no other permit: SS and M read and propose; CFG, CHK, CH, IA and AS reach neither. Both have an `x-akr-action` entry. Bundle tests: CFG, CHK, CH, IA and AS are refused both actions; the maker of a case cannot decide its request (phase 04 four-eyes).
+
+11. **Errors and masking.** No variant is added to section 3.14: `entry_not_found`, `thin_query`, `too_many_cases` and `case_exists` join the `errors[]` codes of `Validation(codes)`, and `unknown_list_code` is reused. No masked kind is added: the cases have no route by id, and the list route passes only SS and M at the scope gate and in Cedar, so every other caller gets 403 `E_SCOPE`, which says nothing about a subject. **Frontend**: S3 gains the tab **Bank cases**, rendered for SS and M only (`useGetScreeningHarnessCases`, `usePostScreeningHarnessCases`): the cases of the list with the name through the Name component, the entry key, the expectation in words ("Must match", "Must not match"), the state and the result in words ("As expected", "Not as expected", "Entry no longer on the list"); "Add a case" (list, entry key, name, optional identifiers, expectation, reason; the reason field carries the hint to write no name in it) and "Retire". The result of a case is its element of `report.bank_cases.results` in the newest `gate` or `oracle` run of the list's active version, joined by case id (`useGetScreeningHarnessRuns`, which S3 already calls); a case that no such run holds yet shows its trial result (`trial.met`). On S1, a decided alert offers "Propose as a known-answer case", which opens the same form filled with the subject name and the entry key the screen already shows, `Must not match` after `incorrect` and `Must match` after `true`. For every S3 reader the harness result of a version gains one line, "Bank cases: n as expected, n not as expected, n entry no longer on the list", from `report.bank_cases`.
+
+12. **Tipping-off review.** A case holds a name. A `no_hit` case is usually a customer's name that matched wrongly; a `hit` case is a spelling of a listed party, which can be typed from any source, so it does not say that the bank had a true match. The name and the identifiers are sealed and one route returns them, to SS and M only. A case holds no party id, no alert id and no account, so nothing ties it to a customer or to an alert. The change request as its approvers read it (the diff of item 5) and the audit events hold the list code, the expectation and the trial result. The stored body of the request also holds the entry key, the sealed query and its keyed hash (item 4 step 7): the diff leaves all three out, and no reader of the request can open the sealed query. `reason_text` is plain text that the approvers read, so the form asks the maker to write no name in it (item 11). The harness report, which CFG, CHK, CH, IA and AS read on S3, holds counts and, for each case id, one of three results. A person outside screening learns that the bank keeps a number of test names for a list, and nothing about a customer, an alert or a decision. This section sends no notification.
+
+13. **Verification** (added to section 6).
+   - Migration: `alert.harness_cases` exists with 14 classification rows (`query_enc` encrypted, `query_hk` keyed hash) and its retention row; a `DELETE` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `known-answer cases are never deleted`; as `akr_app` an UPDATE of the `state` of a `rejected` row fails with the guard's `is final` message; a second open row with the same list, entry key and `query_hk` fails `uq_harness_cases_open`; as `akr_app`, `UPDATE alert.harness_cases SET expect = 'hit'` fails with permission denied; `akr_readonly` cannot select the table.
+   - `cargo test`: a `hit` case on a synthetic entry is `met` and counted in `report.bank_cases.met`; the same case after the entry leaves the version is `absent`; a gate run with one unmet bank case still passes (`passed_gate` true) and `failures` does not name the case; `cases` and `recall_clean` are equal with and without bank cases; a `list_setting` change that raises a threshold above a known hit's score carries `known_hit_lost`, lists the case in `impact.known_hits_lost` and is `material`; no audit detail, job payload or log line holds the name of a case (marker test with a unique name).
+   - Curl (added to the phase suite, after its Lists step has activated the fixture version of `iq_national`): as SS `POST /api/v1/screening/harness-cases` with `list_code: "iq_national"`, the `entry_key` and the name of one entry of that fixture version, `expect: "hit"` and `Idempotency-Key: hc-0001` -> 202 `ChangeRequestView` on `cr_material`; the same key and body -> the stored 202 with `x-idempotent-replay: true`; the same body with a new key -> 422 with `case_exists`; an unknown entry key -> 422 with `entry_not_found`; a one-token common name -> 422 with `thin_query`; as M and as CHK approve -> the case `active`; as SS `GET /api/v1/screening/harness-cases` -> 200 with the name; as CFG and as IA the GET -> 403 `E_SCOPE`; as SS the retire body for the case -> 202, and for a `rejected` case -> 409 `E_NOT_ALLOWED_IN_STATE`.
+   - Swagger UI lists 27 operations for this phase. Audit: `harness_case.proposed`, `harness_case.activated` and `harness_case.retire_proposed` appear, and none holds a name or an entry key.
 
 ## Decisions
 
@@ -1461,6 +1622,13 @@ this phase) and DR-102 (suppression memory: pair memory is pair-keyed, four-eyes
 matching-major change and expiry, with a drift count that must be zero; good-guy rules are `material` change targets
 (volume effect `decrease`), name patterns only, never on a freeze list, with a capped expiry; bulk `incorrect` only on
 identical evidence and never on a freeze list).
+
+Owner decision (2026-10-10), DR-415 (bank corpus cases; with phase 07 section 7.6): a bank adds its own known-answer
+cases through change control (section 7.19): a name that must hit, or must not hit, a named list entry, kept sealed
+with no link to a party or an alert, proposed by SS or M and approved on `cr_material`. The cases run in every gate and
+oracle run and are reported; they never decide the gate, because a list update is a legal duty; a governed change that
+would lose a known hit carries a warning and is at least `material`. The shipped corpus stays synthetic (N-38); the
+bank-specific variant table (N-57) stays P2.
 
 Lead corrections at review (2026-10-09): column grants added for `ref.lists.feed_format` and `source_ref` (the
 `list_setting` activation writes them), `list_versions.expected_count` for akr_app and `diff_summary` for akr_ingest;

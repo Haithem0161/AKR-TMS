@@ -1,0 +1,95 @@
+Replacements of round 1 of the owner-decision check, key 25. 15 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-25-1]
+FILE: docs/plan/phase-25.md
+WHY: O-25-1 | CONFIRMED | HIGH | the last CHECK of `admin.siem_dead_letters` is false for every open row: `(resolution = 'marked')` is NULL while `resolution` is NULL, and NULL IS NOT DISTINCT FROM FALSE is false. The dead-letter insert runs in the cursor transaction, so one bad line would stop the stream | both copies: `CHECK (((resolution = 'marked') IS TRUE) = (resolution_code IS NOT NULL))`.
+OLD: CHECK ((resolution = 'marked') IS NOT DISTINCT FROM (resolution_code IS NOT NULL))
+NEW: CHECK (((resolution = 'marked') IS TRUE) = (resolution_code IS NOT NULL))   -- a code on a marked row only; an open row has neither
+
+=== F2 [O-25-2]
+FILE: docs/plan/phase-25.md
+WHY: O-25-2 | CONFIRMED | MEDIUM | the route-count bullet of section 2 still says the phase is L | XL.
+OLD: The size of the phase is L. The owned `GET /api/v1/admin/releases` row
+NEW: The size of the phase is XL (25 routes or more; section 7.24 item 2). The owned `GET /api/v1/admin/releases` row
+
+=== F3 [O-25-3]
+FILE: docs/plan/phase-25.md
+WHY: O-25-3 | CONFIRMED | MEDIUM | the forwarder test "the events written meanwhile are not sent" fails for an event written after the last off-run (the cursor stands at that run) | item 6.1 says that such an event is sent; the test writes its events before an off-run. // O-25-3 final wording | item 6.1 now says: an event recorded before an off-run is never sent; one recorded after the last off-run (at most 10 seconds before the switch back) is sent. The test writes two events, lets one off-run pass, switches on, and expects them not sent, while a later event is sent.
+OLD: (insert or update, `forwarded_total` unchanged) and end the pass. Nothing read while the export was off is sent later.
+NEW: (insert or update, `forwarded_total` unchanged) and end the pass. An access event recorded before an off-run is never sent. The cursor moves only when a run executes, so an event recorded after the last off-run (at most one run interval, 10 seconds, before the setting is `true` again) is sent by the first run that finds the setting `true`.
+
+=== F4 [O-25-3]
+FILE: docs/plan/phase-25.md
+WHY: O-25-3 | CONFIRMED | MEDIUM | the forwarder test "the events written meanwhile are not sent" fails for an event written after the last off-run (the cursor stands at that run) | item 6.1 says that such an event is sent; the test writes its events before an off-run. // O-25-3 final wording | item 6.1 now says: an event recorded before an off-run is never sent; one recorded after the last off-run (at most 10 seconds before the switch back) is sent. The test writes two events, lets one off-run pass, switches on, and expects them not sent, while a later event is sent.
+OLD: with the setting `false` no access line is sent and, after it is set back to `true`, the events written meanwhile are not sent.
+NEW: with the setting `false` no access line is sent; the test writes two access events, lets one more run pass with the setting `false`, sets it back to `true`, and the two events are not sent, while an event written after that off-run is sent.
+
+=== F5 [O-25-4]
+FILE: docs/plan/phase-25.md
+WHY: O-25-4 | CONFIRMED | MEDIUM | the trailer says `schema.cedarschema` receives the declarations of section 3.12 only; 7.24 item 3 adds three more | "of section 3.12 and of section 7.24 item 3 only".
+OLD: `schema.cedarschema` receives the action declarations of section 3.12 only (the appended-declarations pattern
+NEW: `schema.cedarschema` receives the action declarations of section 3.12 and of section 7.24 item 3 only (the appended-declarations pattern
+
+=== F6 [O-25-5]
+FILE: docs/API.md
+WHY: O-25-5 | CONFIRMED | MEDIUM | docs/API.md calls the access lines "allowed reads of sensitive routes"; item 1 exports every access event (allow, deny, conflict) | API.md row reworded; the same words are searched for in phase 25. // O-25-5 addition | the same words stood in docs/MODULES.md and docs/DATA-MODEL.md ("allowed reads of sensitive routes are exported too"); both now say every access event (allow, deny, conflict). Phase 25 line "The owner's decision: allowed reads go to the bank's SIEM too" is the decision as the owner made it and stays; item 1 says what is exported.
+OLD: access lines (allowed reads of sensitive routes) after a cursor
+NEW: access lines (every access event: allow, deny and conflict) after a cursor
+
+=== F7 [O-25-5]
+FILE: docs/MODULES.md
+WHY: O-25-5 | CONFIRMED | MEDIUM | docs/API.md calls the access lines "allowed reads of sensitive routes"; item 1 exports every access event (allow, deny, conflict) | API.md row reworded; the same words are searched for in phase 25. // O-25-5 addition | the same words stood in docs/MODULES.md and docs/DATA-MODEL.md ("allowed reads of sensitive routes are exported too"); both now say every access event (allow, deny, conflict). Phase 25 line "The owner's decision: allowed reads go to the bank's SIEM too" is the decision as the owner made it and stays; item 1 says what is exported.
+OLD: Owner decisions of 2026-10-10: allowed reads of sensitive routes are exported too, through SECURITY DEFINER
+NEW: Owner decisions of 2026-10-10: record reads are exported too (every access event: allow, deny and conflict), through SECURITY DEFINER
+
+=== F8 [O-25-5]
+FILE: docs/DATA-MODEL.md
+WHY: O-25-5 | CONFIRMED | MEDIUM | docs/API.md calls the access lines "allowed reads of sensitive routes"; item 1 exports every access event (allow, deny, conflict) | API.md row reworded; the same words are searched for in phase 25. // O-25-5 addition | the same words stood in docs/MODULES.md and docs/DATA-MODEL.md ("allowed reads of sensitive routes are exported too"); both now say every access event (allow, deny, conflict). Phase 25 line "The owner's decision: allowed reads go to the bank's SIEM too" is the decision as the owner made it and stays; item 1 says what is exported.
+OLD: Owner decisions of 2026-10-10: allowed reads of sensitive routes are exported too (DR-414). They are read from
+NEW: Owner decisions of 2026-10-10: record reads are exported too, as every access event with the decision allow, deny
+or conflict (DR-414). They are read from
+
+=== F9 [O-25-6]
+FILE: docs/plan/phase-25.md
+WHY: O-25-6 | CONFIRMED | LOW | `on_behalf_of` is nullable in `audit.access_event` but has no `Option` in `SiemAccessLine` | `on_behalf_of: Option<Uuid>`.
+OLD: actor_id, actor_role, on_behalf_of, resource_type, resource_id: Option<Uuid>, subject_party: Option<Uuid>, protected: bool,
+NEW: actor_id, actor_role, on_behalf_of: Option<Uuid>, resource_type, resource_id: Option<Uuid>, subject_party: Option<Uuid>, protected: bool,
+
+=== F10 [L-7]
+FILE: docs/plan/phase-25.md
+WHY: L-7 | LOW | base struct `SiemLine` (section 2) had `actor_id` and `on_behalf_of` with no `Option`; both columns of `audit.audit_log` are nullable (phase 02) | `actor_id: Option<Uuid>, on_behalf_of: Option<Uuid>`. In `SiemAccessLine` only `on_behalf_of` is optional (`access_event.actor_id` is NOT NULL).
+OLD: `SiemLine { occurred_at, audit_id, action, severity: SiemSeverity, actor_id, on_behalf_of, resource_type, resource_id: Option<Uuid>,
+NEW: `SiemLine { occurred_at, audit_id, action, severity: SiemSeverity, actor_id: Option<Uuid>, on_behalf_of: Option<Uuid>, resource_type, resource_id: Option<Uuid>,
+
+=== F11 [O-25-7]
+FILE: docs/plan/phase-25.md
+WHY: O-25-7 | CONFIRMED | LOW | resolve step 1 names the missing `If-Match` with no status | "(428 `E_PRECONDITION_REQUIRED`)".
+OLD: 1. Cedar `siem_dead_letter.resolve`. `If-Match` is required. `resolution_code` is one of
+NEW: 1. Cedar `siem_dead_letter.resolve`. `If-Match` is required (428 `E_PRECONDITION_REQUIRED`). `resolution_code` is one of
+
+=== F12 [O-25-8]
+FILE: docs/plan/phase-25.md
+WHY: O-25-8 | CONFIRMED | LOW | "the three kinds that the forwarder's own work produces": one of the three is written by the request | "the three kinds of the resend work".
+OLD: The three kinds that the forwarder's own work produces are not exported,
+NEW: The three kinds of the resend work (the request writes the first, the forwarder the other two) are not exported,
+
+=== F13 [O-25-9]
+FILE: docs/plan/phase-25.md
+WHY: O-25-9 | CONFIRMED | LOW | the tipping-off list of item 11 leaves out the access id, the decision and the on-behalf-of id | the three are added to the list.
+OLD: An access line of a protected row carries the time, the actor, the role, the verb, the resource kind, the purpose code, the client address and three flags.
+NEW: An access line of a protected row carries the time, the access id, the decision, the actor, the role, the on-behalf-of id (a staff id, when the read used a delegated role), the verb, the resource kind, the purpose code, the client address and three flags. The access id is the id of the access event and opens nothing in the SIEM.
+
+=== F14 [DR-422]
+FILE: docs/plan/phase-25.md
+WHY: DR-422 is the decision record that locks the design corrections of round 1. The row in docs/plan/research.md must say only what the phase files now say; each citing sentence in a phase block must name corrections that the block really carries.
+OLD: The owner's decision: allowed reads go to the bank's SIEM too, so the behaviour rules of research 30 section 9.3 ship in this version. This block replaces item 3 of section 7.13 and extends its item 1. Where it differs from sections 3.5, 3.10 and 4.4, it wins.
+NEW: The owner's decision: allowed reads go to the bank's SIEM too, so the behaviour rules of research 30 section 9.3 ship in this version. This block replaces item 3 of section 7.13 and extends its item 1. Where it differs from sections 3.5, 3.10 and 4.4, it wins. DR-422 locks the correction of the check round of 2026-10-11 to item 6 (which events the off switch holds back).
+
+=== F15 [DR-422]
+FILE: docs/plan/phase-25.md
+WHY: DR-422 is the decision record that locks the design corrections of round 1. The row in docs/plan/research.md must say only what the phase files now say; each citing sentence in a phase block must name corrections that the block really carries.
+OLD: The owner's decision: an operator can resend a dead letter or mark it resolved, and each act is audited. This block replaces the second item of section 7.16, the `siem_dead_letters` row of section 3.10 and the table DDL of section 1.3.
+NEW: The owner's decision: an operator can resend a dead letter or mark it resolved, and each act is audited. This block replaces the second item of section 7.16, the `siem_dead_letters` row of section 3.10 and the table DDL of section 1.3. DR-422 locks the correction of the check round of 2026-10-11 to the last CHECK of the table.

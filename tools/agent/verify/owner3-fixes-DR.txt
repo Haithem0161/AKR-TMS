@@ -1,0 +1,25 @@
+Replacements of round 2 of the owner-decision check, key DR. 3 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [P-DR-1]
+FILE: docs/plan/research.md
+WHY: P-DR-1 | CONFIRMED | MEDIUM (agent: HIGH) | claim (4) of the row says "each deletion of an uploaded file writes `goaml_corpus_case.transient_deleted`". Phase 07 section 7.6 item 5 step 5 deletes the staged file of a failed proposal and item 9 says that deletion writes no event (no case row exists). A DR wins over block text, so the two cannot both stand | the row says "each deletion of an uploaded file by an intake run or by the sweep ...; a failed proposal has no case row and writes no event". The citing sentence of block 7.6 is brought in step (P-07b-6).
+OLD: each deletion of an uploaded file writes `goaml_corpus_case.transient_deleted`;
+NEW: each deletion of an uploaded file by an intake run or by the sweep writes `goaml_corpus_case.transient_deleted` (a failed proposal has no case row and writes no event);
+
+=== F2 [P-26-4]
+FILE: docs/plan/research.md
+WHY: P-26-4 | CONFIRMED | LOW | the citing sentence of block 7.13 says DR-422 locks "what the grader does with the optional inputs"; the DR-422 row does not hold that rule. The rule was a HIGH correction of round 1 (O-26-2), so it belongs in the row | group (1) of the row gains it.
+OLD: `paid_amount` may be set while `paid_on` is null. (2)
+NEW: `paid_amount` may be set while `paid_on` is null; the four optional inputs of SCN-ISL-07 (`facility.granted_on` and the three `facility_instalment` fields) do not change the readiness grade, and while they are not published the facility legs are not evaluable. (2)
+
+=== F3 [DR-423]
+FILE: docs/plan/research.md
+WHY: DR-423 is the decision record that locks the two design rules of round 2: phase 13 section 7.18 (a recompute resets the feature rows it no longer produces) and phase 04 section 7.21 (a rejection of a change request is not held by the subject check). The row must say only what those two sections say.
+OLD: and the replay enqueue under the plain coalesce key (phase 13 Open doubts) |
+
+NEW: and the replay enqueue under the plain coalesce key (phase 13 Open doubts) |
+| DR-423 | 2026-10-11 | Design corrections of round 2 of the check on the owner decisions (every verdict is in tools/agent/owner-verdict.md, under Round 2). (1) Feature values, phase 13 section 7.18: the write of a month-end resets, in the same statement, every stored row of the pair (feature, month-end) that holds a value and that its SELECT no longer produces: `value` NULL, status `no_history` (`beyond_window` for the kind `days_since`), `basis.reason = no_activity`. No row is deleted and no grant changes, and a reader takes a row without a value as an absent row. (2) Change requests, phase 04 section 7.21: the subject check is not run for a rejection of a change request (`WorkflowSubject::holds_reject`, default `true`, `false` for the change subject), so a request that can no longer be approved is closed by its approver's reject as well as by its maker's withdraw. Every other subject keeps its check for a rejection | Found by the lead and by a round-2 agent. Without (1) a voided source tag, or a replay that cancels a customer's only posting of a month, left the old feature value in place, and a stated test of phase 13 section 7.17 failed. Without (2) the approver's rejection of a corpus case whose intake was not met (phase 07 section 7.6, DR-415) was refused by the same check that stops its approval, and an A2 maker has no withdraw screen (phase 08 section 7.11) |
+

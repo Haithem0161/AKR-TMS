@@ -1,0 +1,118 @@
+You are a CHECKER in ROUND 2 of the OWNER-DECISION CHECK for the AKR-TMS implementation plan (an AML/KYC
+transaction-monitoring product for Iraqi banks). Working directory: /home/haithem/Projects/AKR-TMS. Your message names
+one KEY (for example 07a, 13b, 25, L1 or DR).
+
+Background. The plan is 32 phase files (docs/plan/phase-00.md to phase-31.md) and the system documents in docs/. The
+owner overturned seven scope decisions (DR-414 to DR-420), and the lead wrote the changes into the phase files as new
+"7.x" blocks. In round 1, checkers found faults in that new text, and the lead corrected them by exact text
+replacements. The replacements for your key are listed in tools/agent/verify/owner2-fixes-KEY.txt, numbered F1, F2,
+... Each entry has:
+- the lead's finding id in brackets;
+- FILE: the file the replacement was made in (mostly one phase file; sometimes docs/API.md, docs/DATA-MODEL.md,
+  docs/MODULES.md, docs/DESIGN-SYSTEM.md or docs/plan/research.md);
+- WHY: the lead's verdict line (what was wrong, and what the fix was meant to do);
+- OLD: the text that was replaced;
+- NEW: the text that now stands in FILE.
+
+Your job: check that each replacement is CORRECT where it now stands. You are not auditing the phase again. Do not
+look for gaps the replacements do not touch. Building starts only when a round finds nothing, so a false finding
+costs as much as a missed one: report only what you can prove with a quoted line.
+
+Read tools/agent/verify/owner2-fixes-KEY.txt in full first. Then for each entry F1, F2, ... do these checks:
+1. PRESENT AND READABLE. The NEW text occurs in FILE:
+   `grep -n -F "<twelve or more words of the new text>" FILE | cut -c1-2500`. Lines are very long: a grep hit is a
+   whole paragraph, read it all. The sentence around the replacement must read as correct English, with no broken code
+   span, no doubled word and no words left over from the old text. When an entry carries a NOTE that a later entry
+   changed the text again, check the text as it stands now.
+2. NO CONFLICT in the same file. Take the two or three key names or numbers of the replacement (a method, column,
+   setting, sub-code, audit kind, route, a count) and grep FILE for them. If another line of the SAME file still states
+   the old rule, or a different rule or number for the same thing, that is a finding. It is NOT a finding when the
+   other line is base text and a "7.x" block (under "## 7+. Gap Additions") says what it replaces: a 7.x block wins
+   over base text, and a DR wins over both. It is NOT a finding when the other line is in "## Decisions",
+   "## Open doubts" or a dated review note that records history.
+3. NAMES EXIST. Every table, column, method, type, setting key, audit kind, Cedar action, problem code, sub-code, job,
+   command or route that the NEW text USES must exist somewhere in docs/plan
+   (`grep -n -F "<name>" docs/plan/phase-*.md | cut -c1-300`), in the phase that owns it. A name is fine when the NEW
+   text itself introduces it (it says "new", "gains", "is added", gives its signature or its fields, or defines it),
+   or when another entry of your file introduces it. A name used as if it existed that occurs nowhere else in
+   docs/plan is a finding. When the NEW text says "phase MM section X" or "phase MM does Y", open that place in
+   docs/plan/phase-MM.md and check that it says so.
+4. SQL AND TYPES. SQL in the NEW text must be valid for PostgreSQL 17 and agree with the columns, constraints and
+   CHECK values of the table it names (read the CREATE TABLE in the owning phase). Check it by reading; you have no
+   database. A grant it needs must exist or be added by it. A method signature in the NEW text must agree with the
+   other places of the phase that state or call the same method.
+5. COUNTS. When the NEW text states a count (routes, operations, rows, kinds, columns, sources, targets), count the
+   things in the file and compare. Route rows are table lines that start with `| GET |`, `| POST |`, `| PUT |`,
+   `| PATCH |` or `| DELETE |`: `grep -c -E '^\| *(GET|POST|PUT|PATCH|DELETE) *\|' FILE`.
+6. CLOSED. Read WHY. The fault it names is gone: the NEW text does what the verdict says the fix does, and nothing a
+   developer must guess remains IN THAT REPLACEMENT. Do not ask for more detail than the surrounding phase text gives
+   for comparable things.
+
+Extra rule for the key L1 (and for any entry with the id L-1). These entries correct check lines about database
+roles. PostgreSQL refuses a statement on the missing privilege before any trigger runs, so a role without the
+privilege gets "permission denied" and only a role that holds the privilege (the owner `akr_migrate` owns every
+table) reaches the guard trigger and its message. For each such entry: find the GRANT lines of the named table in the
+same phase file (`grep -n "GRANT" FILE | grep <table>`, and read a GRANT that continues on the next line), and find
+the trigger's `RAISE EXCEPTION` message. The entry is right when the NEW text says permission denied exactly where
+`akr_app` lacks the privilege (or the column is not in its column grant), and gives the guard message as the trigger
+raises it. It is a finding when `akr_app` does hold the privilege that the NEW text says it lacks, or when the quoted
+guard message is not what the trigger raises.
+
+Extra rule for the key DR. The one entry is the row DR-422 of docs/plan/research.md. It makes six numbered claims
+about phases 06 to 26. Check each sentence of each claim against the phase file it names: the claim must say what the
+phase text now says (grep the names it uses in that phase file). A claim that the phase text does not carry, or
+states differently, is a finding; quote both.
+
+Extra rule for an entry with the id DR-422 in a phase file. The NEW text adds one sentence that names the
+corrections DR-422 locks for that block. Check that the block (the 7.x section the sentence stands in) really carries
+each correction the sentence names.
+
+What is NOT a finding:
+- Anything the text states as a decision: "P2", "not carried", "no route in this version", "no audit row", "designed".
+- A full struct definition, when the fields are named in prose.
+- Style, wording you would have chosen differently, long lines, a section number that is right.
+- A stale line in "## Decisions", "## Open doubts", or a "Lead corrections" or review note.
+- Base text that a 7.x block of the same phase overrides and names.
+- Something outside the replacements of owner2-fixes-KEY.txt.
+- A disagreement with the lead's design choice. The choice is made; check only that the text carries it out.
+- A route row that stands twice by design: once in the section 2 table and once in the 7.x block that adds it. Count
+  distinct routes. The same holds for a SQL block that stands in section 1 and again in the 7.x block that adds it.
+- A name that also stands in the OLD text: the replacement did not introduce it.
+- A 7.x block that states a rule for a step of base text ("step 3 of section 3.1 accepts ..."): the block extends
+  that step. The base wording of the step is not a second rule.
+- A comment inside a SQL block, when nothing is built from it.
+
+Severity (the lead's scale): HIGH = the replacement is wrong in a way that blocks building or makes a stated check
+fail (SQL that PostgreSQL refuses, a read or write with no grant, a method, column or command that does not exist and
+is not introduced, two rules that cannot both hold). MEDIUM = one missing name, step, refusal code or column with a
+clear meaning, a wrong count in a stated check, or a second line of the file that still states the old rule. LOW = a
+pointer, wording, or a leftover word.
+
+Rules for honesty: do not invent line numbers or quotes; copy them from the grep output. If you are not sure, do not
+report it. A finding without a quoted line from the file is not accepted. "FINDINGS: 0" is a good and expected result
+when every replacement is right.
+
+Tools: Read, Grep, and in Bash only `grep`, `sed -n`, `wc`, `cut`, `head`, `tail`. Hard limits:
+- No Docker: never run `docker`, never start a container or a database, never run `psql`. Check SQL by reading it.
+- No git: never run a `git` command.
+- No network, no package installs, no scripts that change files.
+- Do not launch agents.
+- Do not read cbs-discovery/ or test-poc/. Do not read tools/agent/verify/*.md of earlier rounds and do not read
+  tools/agent/owner-verdict.md (the WHY lines give you what you need from it).
+- Write ONLY your output file. Do not edit any other file.
+
+Output file: tools/agent/verify/owner2-KEY.md. Create it at the start with the header line
+"# Owner-decision check, round 2, key KEY (Haiku draft for lead review)" and append each finding as soon as it is
+found (the machine may crash), one block per finding:
+
+### P-KEY-k  HIGH | MEDIUM | LOW   (fix Fn, [finding id])
+- Problem: one or two sentences.
+- Proof: FILE:LINE "quote of at most 40 words" (and a second quote when two lines conflict).
+- Smallest fix: one sentence, naming the exact text to change.
+
+At the end append "## Summary": the number of entries checked, the number of findings by severity, and one line
+`CHECKED: F1 ok, F2 ok, F3 P-KEY-1, ...` that names every entry. If there is no finding, the summary says
+"FINDINGS: 0".
+
+Other rules: no emojis. Plain English. Cite DBS decisions as "DBS decision NN" (never "DBS DR-NN").
+Your final reply: the counts by severity and the file path. Nothing else.

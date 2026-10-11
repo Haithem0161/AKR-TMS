@@ -400,7 +400,7 @@ the end side: subject summary, step and form fields, the timeline slice, and onl
 (claim, release, approve, reject with comment, sign, submit form, review), each disabled with its reason word when
 the affordance says why not. Deciding actions open the `StepUpDialog` with the class from the contract; 409
 `E_CLAIMED` and `E_STALE_ASSIGNEE` are explained in words, and 403 `E_SELF_APPROVAL` is explained in words ("Someone else claimed this task", "You
-proposed this change, so another approver must decide it"). For a change-request task the panel links to G10 detail.
+proposed this change, so another approver must decide it"). For a change-request task the panel links to G10 detail for a role that G10 lists (the screen table above) and shows the reference of the request as text for any other role (an A2 maker of a corpus case, section 7.11 item 3).
 Rows the API masks never appear; the counts are the API's (post-filter).
 
 **G10 Change requests.** List (`getChangeRequests`, keyset; filters kind, class, status, mine, awaiting me,
@@ -469,7 +469,7 @@ other language one control away; `PrintPage` gives one A4 page per file. Earlier
 list). E1p: versions, version detail (patches, rules with severity and parameters, limits, emit flags, open
 questions, the diff from base as `DiffView`, the corpus result), "Propose change" for CFG (`putGoamlProfilesId` with
 `op` promote or amend, built with `SchemaForm` over the profile schema; 202 with the change request), the watcher runs
-and "Check now" for M and CFG, hidden with the reason shown while the watcher is off.
+and "Check now" for M and CFG, hidden with the reason shown while the watcher is off. The panel **Bank cases** of E1p is in section 7.11.
 
 ### 3.9 Spikes (time-boxed; results recorded as decisions before P1 builds on them)
 
@@ -690,7 +690,55 @@ capacity-wording flag of DESIGN-SYSTEM section 7.17.
 The CH rail entry `board pack` of DESIGN-SYSTEM 8.2 is the R4 screen (`/packs`, the board pack and evidence pack builder of DESIGN-SYSTEM 8.1). It takes `RailGroup` `reports`, the group of the R series; the closed union of section 7.2 gains no value.
 
 ### 7.9 The transliteration under a name (V-08-11-a, MEDIUM; DR-413)
-The `Name` component shows what the source gives. The original is the party's `canon.party_name` row in Arabic or Kurdish script; the transliteration beneath it is the row of the same party and `name_type` with `script = 'lat'`, when the source supplied one, and its source label is the word `typed`: a Latin name held in a CBS column was keyed by staff, and no mapped field says that it was read from a card or a passport (`source_field` is a bare column name, phase 10). A party with no Latin row shows no second line. The product generates no Latin form and reads no document, so the labels `card`, `passport` and `generated` of DESIGN-SYSTEM 7.6 are not used in this plan; phase 14's back-transliteration serves matching only.
+The label rule of this block is replaced by section 7.10 (owner decision of 2026-10-10: the four labels are kept and the bank's mapping sets the source of each name); what follows stands. The `Name` component shows what the source gives. The original is the party's `canon.party_name` row in Arabic or Kurdish script; the transliteration beneath it is the row of the same party and `name_type` with `script = 'lat'`, when the source supplied one. A party with no Latin row shows no second line. The product generates no Latin form and reads no document.
+
+Owner decisions (2026-10-10): the product owner overturned the lead decision of section 7.9; lead-written, checked in the owner-decision round (tools/agent/owner-verdict.md).
+
+### 7.10 The four source labels of a Latin name (owner decision 9; DR-420)
+The owner's decision: the labels `card`, `passport`, `typed` and `generated` of DESIGN-SYSTEM 7.6 are all used. This block replaces the label rule of section 7.9; the rest of section 7.9 stands (which row is the original, which is the transliteration, and no second line when the party has no Latin row).
+
+1. **Data.** Each name row that the API returns carries `capture_source` (phase 10 section 7.26): `card`, `passport`, `typed` or `generated`. The bank's mapping sets it; a name with no stated source is `typed`.
+2. **Component.** `Name` takes `latin?: { text: string; source: 'card' | 'passport' | 'typed' | 'generated' }`. The source label is shown after the Latin line, smaller, as DESIGN-SYSTEM 7.6 says, and in the secondary text colour (`--color-stone`), as a word and never as an icon or a colour alone. The label is shown for the Latin line only; the original line has none.
+3. **Words** (`src/i18n/locales/{ar,en}/enums.json`, keys `name_source.<value>`):
+
+| Key | Arabic | English |
+|-|-|-|
+| `name_source.card` | من البطاقة الوطنية | from the national card |
+| `name_source.passport` | من جواز السفر | from the passport |
+| `name_source.typed` | أُدخل يدوياً | typed |
+| `name_source.generated` | مولَّد آلياً | generated |
+
+4. **What does not change.** The product still generates no Latin form and reads no document: `generated` is shown only when the bank's mapping says that a program of the bank produced the name. `Name` shows only a Latin row that the source gave; a back-transliteration made for matching (phase 14) is never passed to it.
+5. **Tests** (added to the `Name` row of section 3.7): the component renders each of the four labels in both languages from a fixture; a fixture with no `latin` renders one line; the mixed-script order probe of section 3.7 passes with a label present.
+
+### 7.11 The panel Bank cases on E1p (owner decision 2; DR-415)
+Phase 07 section 7.6 lets the bank add its own cases to the goAML regression corpus. E1p shows them and takes the proposals. This block adds one panel to a screen this phase already builds; it adds no screen, no route and no rail entry.
+
+1. **Where.** E1p (`/goaml-check/profiles`) gains the panel **Bank cases** under the version list, read with `getGoamlCorpusCases` for the profile code of the version list (`IQ` unless the bank keeps a second profile code). A2, M, CFG and CHK see it (the roles of E1p). The actions of items 3 and 4 are rendered for A2 and M only; CFG and CHK read.
+2. **List.** A `DataTable`: the key, the expected result in words (`corpus_case.expect.would_reject` with its rule codes, or `corpus_case.expect.graded`), the state word, the last intake result in words, and the date added; a state filter. There is no file column and no download: the API returns no file.
+3. **Add a case** (A2, M). A form: `FileDrop` limited to one XML file (the client checks the type only; no response open to A2 or M gives the size limit, so a file that is too large is the server's 422 `file_too_large`, shown at the file field); the key (it starts with a lower-case letter, then lower-case letters, digits or hyphens; 3 to 61 characters in all; under the field the hint "A short code for the rule. Never a name." in the user's language, phase 07 section 7.6 item 13); the expected outcome (two choices, with the words of `corpus_case.expect.would_reject` and `corpus_case.expect.graded`); the expected block codes, a multi-select over the rule codes of the active version, enabled only with the first choice; an optional Office message code, a select over the active version's rejection patterns; and the reason code and reason text of the propose form. Above the submit button stands the notice "The file is masked before it is kept: names, numbers and text are replaced. The original is deleted." in the user's language. Submit sends `postGoamlCorpusCases` (multipart) with a generated `Idempotency-Key` and with `profile_code` = the profile code of item 1. On 202 the page shows the reference of the change request: as a link to G10 for M, whom G10 lists, and as text for A2, whom G10 does not list and who follows the request in the inbox tab "Waiting on others" (X3). An A2 maker therefore has no withdraw screen in this version; an unwanted proposal is closed by the approver's reject (phase 07 section 7.6 item 7). A 422 shows the field message for `file_too_large`, `type_not_allowed`, `case_key_taken`, `expectation_invalid`, `rule_unknown` or `too_many_cases`.
+4. **Retire** (A2, M), on an `active` row: a confirm dialog with the reason code and text, then `postGoamlCorpusCasesIdRetire`; on 202 the reference of the change request, shown as in item 3.
+5. **Words** (`src/i18n/locales/{ar,en}/enums.json`):
+
+| Key | Arabic | English |
+|-|-|-|
+| `corpus_case.state.proposed` | مقترحة | Proposed |
+| `corpus_case.state.active` | فعّالة | Active |
+| `corpus_case.state.retired` | مُنهاة | Retired |
+| `corpus_case.state.rejected` | مرفوضة | Rejected |
+| `corpus_case.expect.would_reject` | سيُرفض | Would be rejected |
+| `corpus_case.expect.graded` | مقبول | Accepted |
+| `corpus_case.intake.pending` | بانتظار الفحص | Waiting for the check |
+| `corpus_case.intake.met` | تطابق النتيجة المتوقعة | Meets the expectation |
+| `corpus_case.intake.not_met` | لا تطابق النتيجة المتوقعة | Does not meet the expectation |
+| `corpus_case.intake.unsafe_file` | تعذّر الفحص: ملف غير آمن | Could not be checked: unsafe file |
+| `corpus_case.intake.not_maskable` | تعذّر الفحص: لا يمكن حجب بيانات الملف | Could not be checked: the file cannot be masked |
+| `corpus_case.intake.file_gone` | تعذّر الفحص: الملف لم يعد موجوداً | Could not be checked: the file is gone |
+| `corpus_case.intake.profile_unavailable` | تعذّر الفحص: لا يوجد ملف تعريف فعّال | Could not be checked: no active profile |
+| `corpus_case.intake.validator_failed` | تعذّر الفحص: فشل المدقق | Could not be checked: the validator failed |
+
+6. **Corpus result.** In the version detail, the corpus result lists the bank's cases after the shipped ones, each marked with the word "Bank" (`corpus_case.origin.bank`: من المصرف, Bank), and shows the count from `bank_cases`.
+7. **Tests** (added to the E1 rows of section 6): as A2 the panel shows "Add a case" and a proposed case appears with "Waiting for the check"; as CFG the panel lists the cases and renders neither "Add a case" nor "Retire"; the form with the choice `corpus_case.expect.graded` ("Accepted") disables the block-code select; the panel passes axe in both directions and the keyboard-only pass reaches every control.
 
 ## What This Phase Does NOT Touch
 

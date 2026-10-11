@@ -1,0 +1,210 @@
+diff --git a/docs/plan/phase-19.md b/docs/plan/phase-19.md
+index e852f65..74e23d9 100644
+--- a/docs/plan/phase-19.md
++++ b/docs/plan/phase-19.md
+@@ -7 +7 @@
+-**Complexity:** XL (32 product routes: 19 rows of API.md 3.12 owned here and 13 added rows; the RFI release workflow, the hibernation gate inside alert intake, the network edge builder and the QA draw with its independence rules carry the weight)
++**Complexity:** XL (35 product routes: 19 rows of API.md 3.12 owned here and 16 added rows, three of them from section 7.21; the RFI release workflow, the hibernation gate inside alert intake, the network edge builder and the QA draw with its independence rules carry the weight)
+@@ -10 +10 @@
+-- Implemented here: M-10 (network cases: a parent with a subgraph snapshot and one child per visible subject; the parent is closed by a person once its children have outcomes, Decisions DR-154), M-11 (flat-line detector only: a scenario whose daily count is unchanged for `qa.flat_line_days` business days raises an alarm; the other data-latency clocks are phase 17), M-16 (the daily forced sample of low-score alerts, `qa.forced_low_score_daily`), M-22 (breach actions at 50, 100 and 150 percent of the touch window for alerts and of the due time for work items, section 3.10), M-35 (watch registry with envelope, triggers, expiry and the review at expiry), M-37 (authority-response workflow: register entry, draft from system facts, MLRO approval, disclosure-register fields), M-39 (hibernation only inside a case by a person, default 90 and maximum 180 days, stored envelope, hit ledger and regret metric, the scenario keeps running and logging, MLRO-only for suspicion-tier parties), M-40 (bulk reopen by the MLRO after a critical QA finding; reopen-rate reports are phase 21), M-42 (RFI object with six kinds and versioned templates, free text scanned for forbidden words), M-43 (branch RFIs to the liaison officer only and escalated to the MLRO desk; relationship managers only when the flag allows), M-44 (correspondent RFI desk: log, the pre-fill switch `rfi.pre_fill` only (the pre-fill itself is P2, section 7+), deadline clock, four-eyes release, tipping-off flag, missed-by-monitoring signal), M-45 (answers as claims with source, corroboration and expiry; the P0 and P1 closure gate of section 3.3), M-46 (RFI KPIs in the `kpis` block of `GET /rfis`), M-47 (sampling service: strata, random and targeted modes, sample-size calculator, immutable sample register), M-48 (QA workspace with the rubric of research 28 section 10.3, findings, coaching items, reviewer rates with Wilson intervals, bulk reopen on a critical finding), M-49 (QA independence: reviewer differs from the closer, MLRO decisions sampled by CH or IA, time-boxed per-case read grants with logging), M-50 (calibration kit: golden items and agreement; the gating of queue access by training is Open doubts 14), M-53 (alarm service: touch and work-item breach, conflict declared, chain broken, flat line, critical QA finding; supervisor task with notified and acknowledged times), M-67 (MLRO and CISO alerts of a declared conflict; the conflict check itself is phase 17), T-21 (entity graph: typed edges from canonical links, link weights, the supernode rule of section 3.7)
++- Implemented here: M-10 (network cases: a parent with a subgraph snapshot and one child per visible subject; the parent is closed by a person once its children have outcomes, Decisions DR-154), M-11 (flat-line detector only: a scenario whose daily count is unchanged for `qa.flat_line_days` business days raises an alarm; the other data-latency clocks are phase 17), M-16 (the daily forced sample of low-score alerts, `qa.forced_low_score_daily`), M-22 (breach actions at 50, 100 and 150 percent of the touch window for alerts and of the due time for work items, section 3.10), M-35 (watch registry with envelope, triggers, expiry and the review at expiry), M-37 (authority-response workflow: register entry, draft from system facts, MLRO approval, disclosure-register fields), M-39 (hibernation only inside a case by a person, default 90 and maximum 180 days, stored envelope, hit ledger and regret metric, the scenario keeps running and logging, MLRO-only for suspicion-tier parties), M-40 (bulk reopen by the MLRO after a critical QA finding; reopen-rate reports are phase 21), M-42 (RFI object with six kinds and versioned templates, free text scanned for forbidden words), M-43 (branch RFIs to the liaison officer only and escalated to the MLRO desk; relationship managers only when the flag allows), M-44 (correspondent RFI desk: log, the pre-fill of an incoming correspondent RFI from the product's records through the admin-managed map of section 7.21 (owner decision of 2026-10-10, DR-417), deadline clock, four-eyes release, tipping-off flag, missed-by-monitoring signal), M-45 (answers as claims with source, corroboration and expiry; the P0 and P1 closure gate of section 3.3), M-46 (RFI KPIs in the `kpis` block of `GET /rfis`), M-47 (sampling service: strata, random and targeted modes, sample-size calculator, immutable sample register), M-48 (QA workspace with the rubric of research 28 section 10.3, findings, coaching items, reviewer rates with Wilson intervals, bulk reopen on a critical finding), M-49 (QA independence: reviewer differs from the closer, MLRO decisions sampled by CH or IA, time-boxed per-case read grants with logging), M-50 (calibration kit: golden items and agreement; the gating of queue access by training is Open doubts 14), M-53 (alarm service: touch and work-item breach, conflict declared, chain broken, flat line, critical QA finding; supervisor task with notified and acknowledged times), M-67 (MLRO and CISO alerts of a declared conflict; the conflict check itself is phase 17), T-21 (entity graph: typed edges from canonical links, link weights, the supernode rule of section 3.7)
+@@ -13 +13 @@
+-- Route IDs: API.md 3.12 rows of this phase (19 owned rows, section 2) and 13 added rows marked "phase 19, added" in API.md section 3.12 by this phase
++- Route IDs: API.md 3.12 rows of this phase (19 owned rows, section 2) and 16 added rows marked "phase 19, added" in API.md section 3.12 by this phase (13 of section 2 and the three of section 7.21)
+@@ -22 +22 @@
+-Two migrations, `0064_casework_followup_records` and `0065_casework_followup_guards_grants`, numbered after phase 18's `0063` (the roadmap chain has no other user of 0064 or 0065; `grep` of docs/plan confirms). The schema `casework` exists (phase 00); no new schema. Fourteen tables are created here: `casework.authority_requests`, `casework.rfis`, `casework.rfi_questions`, `casework.rfi_answers`, `casework.internal_reports`, `casework.watches`, `casework.hibernations`, `casework.hibernation_hits`, `casework.alarms`, `casework.network_snapshots`, `casework.network_edges`, `casework.qa_samples`, `casework.qa_reviews`, `casework.qa_findings`. One row is added to the closed case-family list (`network`, the parent of a network case). One phase 18 constraint is widened: the closed `reason` list of `casework.case_acl` gains `qa_review`, the time-boxed read grant of a QA reviewer (section 3.8; lead review). No other existing table is altered: the phase 17 and phase 18 tables are read and written through the grants of section 1.2, and the extensions of their services are section 4.5.
++Two migrations, `0064_casework_followup_records` and `0065_casework_followup_guards_grants`, numbered after phase 18's `0063` (the roadmap chain has no other user of 0064 or 0065; `grep` of docs/plan confirms). The schema `casework` exists (phase 00); no new schema. Fourteen tables are created here, and a fifteenth, `casework.rfi_prefill_map`, by section 7.21: `casework.authority_requests`, `casework.rfis`, `casework.rfi_questions`, `casework.rfi_answers`, `casework.internal_reports`, `casework.watches`, `casework.hibernations`, `casework.hibernation_hits`, `casework.alarms`, `casework.network_snapshots`, `casework.network_edges`, `casework.qa_samples`, `casework.qa_reviews`, `casework.qa_findings`. One row is added to the closed case-family list (`network`, the parent of a network case). One phase 18 constraint is widened: the closed `reason` list of `casework.case_acl` gains `qa_review`, the time-boxed read grant of a QA reviewer (section 3.8; lead review). No other existing table is altered: the phase 17 and phase 18 tables are read and written through the grants of section 1.2, and the extensions of their services are section 4.5.
+@@ -1053 +1053 @@ Crate placement follows phase 18: the domain in `domain::casework` (akr-core, no
+-Count: 32 product routes (19 owned rows of API.md 3.12, 13 added rows; the thirteenth is the reopen-candidates route of section 7.14, added after DR-157 counted thirty-one). No dev route. The route `POST /cases/{id}/rfis` of API.md 3.12 is drafting only; the release is `POST /rfis/{id}/release`.
++Count: 32 product routes (19 owned rows of API.md 3.12, 13 added rows; the thirteenth is the reopen-candidates route of section 7.14, added after DR-157 counted thirty-one). Section 7.21 adds three more (the pre-fill read and the two map routes), so the phase has 35. No dev route. The route `POST /cases/{id}/rfis` of API.md 3.12 is drafting only; the release is `POST /rfis/{id}/release`.
+@@ -1701 +1701 @@ Every handler re-reads its owner first (phase 00 rule). Nothing in this phase is
+-3. **Phase 09**: no new clock or decision type: `rfi.response` (pack), `rfi.release` (authority matrix, scope `rfi.desk`) and the reason-code family `closure` (alarm closure) are used as they are. The pack document gains the RFI templates (the six kinds and the template `authority_response.v1`) and its purpose-code list; the switch `rfi.pre_fill` is `false` in the seed. The pack is a document of the bank's configuration (M-75), not a code change.
++3. **Phase 09**: no new clock or decision type: `rfi.response` (pack), `rfi.release` (authority matrix, scope `rfi.desk`) and the reason-code family `closure` (alarm closure) are used as they are. The pack document gains the RFI templates (the six kinds and the template `authority_response.v1`) and its purpose-code list; the switch `rfi.pre_fill` is `false` in the seed, and section 7.21 reads it: the bank turns it on by a pack change once its map is in place. The pack is a document of the bank's configuration (M-75), not a code change.
+@@ -1728 +1728 @@ Every handler re-reads its owner first (phase 00 rule). Nothing in this phase is
+-17. **Routes and screens**: the screens of section 5 are catalogue entries of DESIGN-SYSTEM section 8.1 (W6, W8, W10, W11, G3 are already listed there); no screen id is added.
++17. **Routes and screens**: the screens of section 5 are catalogue entries of DESIGN-SYSTEM section 8.1 (W6, W8, W10, W11, G3 are already listed there); no screen id is added. Section 7.21 adds a panel to W8 and the tab RFI pre-fill to D3, and no screen id either.
+@@ -1744 +1744 @@ Screens (catalogue IDs from DESIGN-SYSTEM section 8.1; the layout rules of DESIG
+-### 5.2 W8 RFI composer and RFI desk (`/rfi`, LIST + FORM; DESIGN-SYSTEM 8.1; correspondents P2 for the desk)
++### 5.2 W8 RFI composer and RFI desk (`/rfi`, LIST + FORM; DESIGN-SYSTEM 8.1; correspondents P2 for the desk, but for the panel Proposed answers of section 7.21)
+@@ -1831 +1831 @@ Hand-written (not Orval): none. The step-up dialog of phase 01 is reused for eve
+-7. `make generate-api`: the OpenAPI document lists the 32 routes of section 2 (the 19 owned and the 13 added); the Orval hooks of section 5.6 exist with the names given.
++7. `make generate-api`: the OpenAPI document lists the 32 routes of section 2 (the 19 owned and the 13 added) and the three of section 7.21, 35 in all; the Orval hooks of section 5.6 and of section 7.21 exist with the names given.
+@@ -1951 +1951 @@ Section 3.9 Bulk reopen:
+-M-44 is carried in part. The desk, the log, the deadline clock, the four-eyes release, the tipping-off flag and the missed-by-monitoring signal are built here. The pre-fill of an incoming correspondent RFI from the replica is P2: it needs a map from each question key of the bank's template to canonical fields, and the plan holds none. In P1 the pack switch `rfi.pre_fill` stays `false` and no code reads it. An answer that the desk takes from AKR-TMS records is recorded by hand through `record_answers` with `source_kind = replica` (section 3.3).
++Replaced by section 7.21 (owner decision of 2026-10-10, DR-417): the pre-fill is built and the map it needs is admin-managed data. The text of this section was: M-44 is carried in part. The desk, the log, the deadline clock, the four-eyes release, the tipping-off flag and the missed-by-monitoring signal are built here. The pre-fill of an incoming correspondent RFI from the replica is P2: it needs a map from each question key of the bank's template to canonical fields, and the plan holds none. In P1 the pack switch `rfi.pre_fill` stays `false` and no code reads it. An answer that the desk takes from AKR-TMS records is recorded by hand through `record_answers` with `source_kind = replica` (section 3.3).
+@@ -1976,0 +1977,172 @@ the sample row keeps the run in `casework.qa_samples.eval_run_id` (the column ph
++Owner decisions (2026-10-10): the product owner overturned the lead decision of section 7.15 that left the RFI pre-fill to P2; lead-written, checked in the owner-decision round (tools/agent/owner-verdict.md).
++
++### 7.21 RFI pre-fill from the replica, and the map it reads (owner decision 4; DR-417)
++The desk gets proposed answers for an incoming correspondent RFI, computed from the product's own records, and a person records each one. What was missing is the map from a question key of the bank's template to a fact the product holds; it is now admin-managed data. M-44 is implemented.
++
++1. **The map** (extends DATA-MODEL s.12; the table is added to migration `0064_casework_followup_records.sql`, the guard, grants, classification and retention rows to `0065_casework_followup_guards_grants.sql`; owner `akr_app`):
++
++```sql
++-- migration 0064_casework_followup_records.sql, added part
++-- Phase 19 (owner decision 4, DR-417). Which fact of the product's records pre-fills which question key. Changed by change request only.
++CREATE TABLE IF NOT EXISTS casework.rfi_prefill_map (
++    id                  UUID PRIMARY KEY,
++    question_key        TEXT NOT NULL CHECK (question_key ~ '^[a-z][a-z0-9_.]{2,80}$'),
++    source_key          TEXT NOT NULL CHECK (source_key IN ('relationship.start_date', 'relationship.status', 'party.type',
++                                                            'party.residence_country', 'party.pep_status', 'accounts.open',
++                                                            'accounts.closed', 'accounts.signatories',
++                                                            'activity.declared_and_actual', 'rating.cbi_level')),
++    state               TEXT NOT NULL CHECK (state IN ('active', 'retired')),
++    change_request_id   UUID NOT NULL REFERENCES admin.change_requests(id) ON DELETE RESTRICT,
++    retired_by_request  UUID REFERENCES admin.change_requests(id) ON DELETE RESTRICT,
++    created_by          UUID NOT NULL REFERENCES admin.users(id) ON DELETE RESTRICT,
++    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
++    retired_at          TIMESTAMPTZ,
++    CHECK ((state = 'active') = (retired_at IS NULL)),
++    CHECK ((state = 'active') = (retired_by_request IS NULL))
++);
++CREATE UNIQUE INDEX IF NOT EXISTS uq_rfi_prefill_map_active ON casework.rfi_prefill_map (question_key) WHERE state = 'active';
++CREATE INDEX IF NOT EXISTS idx_rfi_prefill_map_change_request ON casework.rfi_prefill_map (change_request_id);
++```
++
++```sql
++-- migration 0065_casework_followup_guards_grants.sql, added part
++-- A map row is changed once, when it is retired; a retired row never changes again, and no row is deleted.
++CREATE OR REPLACE FUNCTION casework.rfi_prefill_map_guard() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP = 'DELETE' THEN
++        RAISE EXCEPTION 'pre-fill map rows are never deleted' USING ERRCODE = 'insufficient_privilege';
++    END IF;
++    IF OLD.state <> 'active' THEN
++        RAISE EXCEPTION 'pre-fill map row is retired' USING ERRCODE = 'insufficient_privilege';
++    END IF;
++    RETURN NEW;
++END $$;
++DROP TRIGGER IF EXISTS trg_rfi_prefill_map_guard ON casework.rfi_prefill_map;
++CREATE TRIGGER trg_rfi_prefill_map_guard BEFORE UPDATE OR DELETE ON casework.rfi_prefill_map
++    FOR EACH ROW EXECUTE FUNCTION casework.rfi_prefill_map_guard();
++
++GRANT SELECT, INSERT ON casework.rfi_prefill_map TO akr_app;
++GRANT UPDATE (state, retired_at, retired_by_request) ON casework.rfi_prefill_map TO akr_app;
++
++INSERT INTO admin.column_classification (schema_name, table_name, column_name, classification)
++SELECT 'casework', 'rfi_prefill_map', c, 'internal'::admin.data_classification
++FROM unnest(ARRAY['id', 'question_key', 'source_key', 'state', 'change_request_id', 'retired_by_request', 'created_by',
++                  'created_at', 'retired_at']) AS c
++ON CONFLICT (schema_name, table_name, column_name) DO NOTHING;
++
++INSERT INTO admin.retention_assignment (schema_name, table_name, retention_class, clock, clock_column, note) VALUES
++ ('casework', 'rfi_prefill_map', 'R9', 'retirement', NULL, 'RFI pre-fill map; retired rows are kept')
++ON CONFLICT (schema_name, table_name) DO NOTHING;
++```
++
++   The phase now creates fifteen tables. The map holds no customer data: 9 columns, all `internal`.
++
++2. **The source registry** (`PrefillSource`, a closed enum of `domain::rfi::prefill`; the SQL CHECK of item 1 lists the same ten keys). A map row names a source, not a column: a bank cannot point a question at an arbitrary canonical field, and a source is added by a release. Every source is computed for the subject party of the RFI (`casework.rfis.party_id`) and returns typed `facts`:
++
++| `source_key` | `facts` | Read through | Fits question format | Sensitive |
++|-|-|-|-|-|
++| `relationship.start_date` | `{ date }`: the earliest `onboarded_on` of the party's current `canon.customer` rows | `CanonPartyReader` (phase 18 section 3.14) | `value`, `free_text` | no |
++| `relationship.status` | `{ records: [{ status, cdd_level }] }`, one per current customer row; no CIF | `CanonPartyReader` | `value`, `free_text` | no |
++| `party.type` | `{ type, legal_form?, established_on? }` of the current `canon.party` row | `CanonPartyReader` | `value`, `free_text` | no |
++| `party.residence_country` | `{ iso2 }` | `CanonPartyReader` | `value`, `free_text` | no |
++| `party.pep_status` | `{ answer }`: `yes` for `pep`, `no` for `not_pep`, `unknown` otherwise | `CanonPartyReader` | `yes_no_unknown`, `value` | no |
++| `accounts.open` | `{ accounts: [{ type, currency, opened_on, status }] }`: the current accounts on which the party is `owner` or `joint` and `closed_on IS NULL`; no account number | `CanonPartyReader` | `value`, `free_text` | no |
++| `accounts.closed` | `{ accounts: [{ type, currency, opened_on, closed_on }] }`: the same accounts with `closed_on` set | `CanonPartyReader` | `value`, `free_text` | yes (a closure can show an exit) |
++| `accounts.signatories` | `{ parties: [{ role, name }], incomplete }`: the other parties with a current `joint` or `signatory` role on the accounts of `accounts.open`, each with its current primary name; a party the caller may not see under phase 18 section 3.10 is left out and `incomplete` is `true` | `CanonPartyReader` | `value`, `free_text` | no |
++| `activity.declared_and_actual` | `{ months: [{ period, currency, declared?, actual }] }` for the last three closed months | `ProfileQuery` of phase 13 with its `PartyProfilesView` projection (`actual`, `declared` and `status`; never a deviation, an own-history or a peer value) | `value`, `free_text` | no |
++| `rating.cbi_level` | `{ cbi_level }`: the CBI label of the current rating (`high`, `medium` or `low`); absent when the party has no rating | `RatingSource::levels` (phase 13 port, phase 15 implementation), as the party page reads it | `value`, `free_text` | yes (the bank's own view) |
++
++   No source reads an alert, a case, a decision, a report, a watch, a hibernation, a screening hit, the exit register, an internal report or an authority request, and none ever will: the registry test of item 11 asserts it on the SQL that each source runs. Not in the registry in this version, and so typed by hand as before: source of wealth, beneficial owners, counterparty history, rating history with reasons, the last periodic review, screening and adverse-media history, linked documents and the bank's own view (question 22 of the Wolfsberg list).
++
++3. **Routes** (three; router `rfis` for the first, a new router module `rfi_prefill_map` for the other two):
++
++| Method | Path | Scope | Description (cedar action) |
++|-|-|-|-|
++| GET | `/api/v1/rfis/{id}/prefill` | `rfi.desk` | Proposed answers for the open questions of an incoming correspondent RFI, computed from the product's records; nothing is stored; purpose required; `Cache-Control: no-store`; a masked 404 for a suspicion RFI that the caller may not see (New; `rfi.prefill.read`) |
++| GET | `/api/v1/rfi-prefill-map` | `config.author`, `config.approve`, `rfi.desk` | The active map rows and the source registry with the sensitive mark; `?state=all` adds retired rows (New; `rfi_prefill_map.read`) |
++| POST | `/api/v1/rfi-prefill-map` | `config.author` | Propose a change set of map rows, at most 100 entries; `Idempotency-Key`; CR `rfi_prefill_map` (New; `rfi_prefill_map.propose`) |
++
++   Count: 35 product routes (19 owned rows of API.md 3.12 and 16 added rows). API.md section 3.12 gains the three rows marked "(phase 19, added)".
++
++4. **Types.** Entity `RfiPrefillMapRow` (fields mirror item 1). Enum `PrefillSource` (the ten keys; methods `key()`, `sensitive()`, `fits(AnswerFormat)`). DTOs: `PrefillMapChange { set: Vec<PrefillMapEntry>, remove: Vec<String> }`, `PrefillMapEntry { question_key, source_key }`. utoipa schemas: `PrefillMapView { rows: [{ id, question_key, source_key, state, change_request_id, created_at, retired_at }], sources: [{ source_key, sensitive, fits }] }`, `PrefillMapChange`, `ChangeRequestAccepted` (phase 04, reused), and `RfiPrefillView { rfi_id, data_as_of, proposals: [RfiPrefillProposal] }` with `RfiPrefillProposal { question_id, question_key, source_key, sensitive, outcome, answer_kind?, facts? }`, where `outcome` is `proposed`, `empty` (the records hold nothing), `withheld` (a sensitive source and the caller is not the MLRO) or `format_mismatch`. `answer_kind` is `value`, or `yes`, `no` or `unknown` for `party.pep_status` on a `yes_no_unknown` question. Repository trait (domain layer, `PgRfiPrefillMapRepository` in `db`):
++
++```rust
++#[async_trait]
++pub trait RfiPrefillMapRepository: Send + Sync {
++    async fn list(&self, conn: &mut PgConnection, include_retired: bool) -> Result<Vec<RfiPrefillMapRow>, RepoError>;
++    async fn active_for_keys(&self, conn: &mut PgConnection, question_keys: &[String]) -> Result<Vec<RfiPrefillMapRow>, RepoError>;
++    async fn insert(&self, tx: &mut Tx, row: &RfiPrefillMapRow) -> Result<(), RepoError>;
++    /// Retires the active row of a question key; `Ok(false)` when the key has none.
++    async fn retire(&self, tx: &mut Tx, question_key: &str, cr: Uuid) -> Result<bool, RepoError>;
++}
++```
++
++   AppState: `api` gains `rfi_prefill: Arc<RfiPrefillService>` and one more change target.
++
++5. **`RfiPrefillService::proposals(ctx, rfi_id)`** (`GET /rfis/{id}/prefill`):
++   1. Load the RFI under the visibility rule of section 3.2 (a suspicion RFI that the caller may not see is a masked 404, section 3.14); Cedar `rfi.prefill.read` on Rfi.
++   2. The RFI has `kind = correspondent` and `direction = in`, and its status is `released` or `answered`; otherwise 409 `E_NOT_ALLOWED_IN_STATE`, sub-code `prefill_not_applicable`. The pack pinned to the RFI's case (`casework.policy_pack_version`, phase 17) has the switch `rfi.pre_fill` set to `true`; otherwise the same 409 with sub-code `prefill_off`.
++   3. `X-Access-Purpose` holds a purpose code (422 `E_PURPOSE_REQUIRED` otherwise, phase 02).
++   4. Take the questions of the RFI in state `open` and the active map rows of their keys (`active_for_keys`). A question with no map row gives no proposal.
++   5. For each pair: when the source does not fit the question's `answer_format`, `outcome = format_mismatch`; when the source is sensitive and the caller does not hold role M, `outcome = withheld` and the source is not computed; otherwise compute the source (item 2), with `outcome = empty` when it returns nothing and `proposed` otherwise.
++   6. `data_as_of` is the canonical batch time of the party row (phase 11 freshness, as phase 18 section 3.14 step 6).
++   7. One access event `view` (resource `party`, the party's tier from `casework.effective_tier`, the purpose code) through the phase 02 access layer. No audit row: the read changes nothing.
++
++   Nothing is written to `casework.rfi_answers`. The desk person reads a proposal, edits the words and records it with `POST /rfis/{id}/answers` (section 3.3), with `source_kind = replica` and `source_ref = "prefill:<source_key>"`. The scan, the claim rules and the expiry of section 3.3 apply as to any answer, so every claim is still a person's act and `rfi.answer_recorded` is its record.
++
++6. **`RfiPrefillService::propose(caller, PrefillMapChange)`** (`POST /rfi-prefill-map`):
++   1. Shape: 1 to 100 entries in `set` and `remove` together; no question key twice across both lists; the key pattern of item 1. A failure is 422 `E_VALIDATION` with a JSON pointer to the entry.
++   2. Each `set`: `source_key` is a key of the registry (sub-code `source_unknown`); `question_key` is a question of an RFI template of kind `correspondent` in the active policy pack (phase 09; sub-code `question_unknown`); the source fits that question's `answer_format` (sub-code `format_mismatch`). A `set` on a key with an active row replaces that row at activation.
++   3. Each `remove` names a key with an active row (sub-code `not_mapped`).
++   4. An open change request with `object_key = 'rfi_prefill_map'` gives 409 `E_NOT_ALLOWED_IN_STATE`: the map takes one change set at a time.
++   5. Create the change request through phase 04 `ChangeRequestService` (kind `rfi_prefill_map`, `object_key` `rfi_prefill_map`, reason family `change`), route `cr_material`, volume effect `neutral`. The impact is `{set, removed, sensitive_sources}`, the last being the sensitive source keys in `set`.
++   6. Respond 201 with the change request; `change_request.created` is written by phase 04.
++
++7. **Change target `rfi_prefill_map`** (phase 04 `ChangeTarget`, registered in the registry, whose kinds are an open set; the route map gains no route): base class material, route `cr_material` (the MLRO and CHK, as for the policy pack whose templates the map extends), generic create no, emergency no, families `change`. `current_version` returns `None`. `prepare` runs steps 1 to 3 of item 6. `check_before_decision` runs steps 2 and 3 again against the pack that is active at the decision and returns the sub-codes as issues. `activate`, inside the approval transaction: for each `set`, retire the active row of the key if there is one and insert the new row as `active`; for each `remove`, retire the row; audit `rfi_prefill_map.applied`. `on_closed` with `Rejected` or `Withdrawn` writes nothing; there is no `revert`. `diff` shows the question keys and source keys before and after. The volume effect is always `neutral`: no scenario, rating or screening reads the map.
++
++8. **Audit event** (one more row of section 3.12): `rfi_prefill_map.applied` on a `rfi_prefill_map` change applied; resource `rfi_prefill_map`; payload `{set, removed}` as lists of question keys; no case chain. The proposal writes `change_request.created` (phase 04). The pre-fill read writes an access event, not an audit row.
++
++9. **Cedar** (schema and policies added to `92_followup.cedar`; one permit per role, as the file is written):
++
++```cedar
++action "rfi.prefill.read" appliesTo { principal: User, resource: Rfi, context: Ctx };
++action "rfi_prefill_map.read", "rfi_prefill_map.propose" appliesTo { principal: User, resource: System, context: Ctx };
++
++@id("followup.rfi.prefill") @role("RFI")
++permit (principal, action == Akr::Action::"rfi.prefill.read", resource is Akr::Rfi)
++when { principal.roles.contains("RFI") };
++
++@id("followup.m.rfi.prefill") @role("M")
++permit (principal, action == Akr::Action::"rfi.prefill.read", resource is Akr::Rfi)
++when { principal.roles.contains("M") };
++
++@id("followup.prefill_map.read.cfg") @role("CFG")
++permit (principal, action in [Akr::Action::"rfi_prefill_map.read", Akr::Action::"rfi_prefill_map.propose"], resource is Akr::System)
++when { principal.roles.contains("CFG") };
++
++@id("followup.prefill_map.read.chk") @role("CHK")
++permit (principal, action == Akr::Action::"rfi_prefill_map.read", resource is Akr::System)
++when { principal.roles.contains("CHK") };
++
++@id("followup.prefill_map.read.m") @role("M")
++permit (principal, action == Akr::Action::"rfi_prefill_map.read", resource is Akr::System)
++when { principal.roles.contains("M") };
++
++@id("followup.prefill_map.read.rfi") @role("RFI")
++permit (principal, action == Akr::Action::"rfi_prefill_map.read", resource is Akr::System)
++when { principal.roles.contains("RFI") };
++```
++
++   The two forbids `followup.forbid.suspicion.rfi` and `followup.forbid.suspicion.network.rfi` (section 3.13) gain `rfi.prefill.read` in their action lists, so the RFI desk never pre-fills a suspicion RFI and a suspicion RFI is pre-filled on the analyst network only. The scope gates of item 3 admit every role these policies admit.
++
++10. **Tipping-off review.** The answer goes to another bank, so what may be proposed is closed in code: ten facts of the customer file and the account list, none of which is derived from monitoring or from a case. The two facts that could let a reader infer more, a closed account and the bank's risk label, are computed for the MLRO only; the desk sees that a proposal exists and that it is withheld, nothing else. A proposal is never sent: it is shown to the desk person, who decides what to record, and an incoming correspondent RFI is released on `rfi_release_external`, which the MLRO signs (section 3.2). The map names question keys and source keys only. The read leaves an access event with its purpose, and the response carries `Cache-Control: no-store`.
++
++11. **Frontend and verification.**
++    - W8 detail (section 5.2) gains the panel **Proposed answers** for an incoming correspondent RFI, shown when the pinned pack has `rfi.pre_fill` on: "Propose from our records" asks for a purpose code, as the party page does, and calls the read; each proposal sits beside its question with the source as a word, the data time and "Use", which puts the rendered text into the "Record answer" form with the source "our records"; the text is rendered in the client from `facts` with the i18n keys `rfi.prefill.<source_key>` in Arabic and English; a withheld proposal says "Needs the MLRO"; nothing is recorded until the person submits the form. This panel is P1 by the owner decision; the rest of the DESIGN-SYSTEM note "correspondents P2" on W8 stands.
++    - Screen D3 (`/policy`, phase 09) gains the tab **RFI pre-fill**: the map as a table (question key, source as a word, the sensitive mark as a word), the registry list, and "Propose changes" for CFG (rows to set, rows to remove; the server's answer per row; `Idempotency-Key`; 201 and a link to G10). CHK, M and RFI read the tab.
++    - Hooks: `useGetRfisIdPrefill`, `useGetRfiPrefillMap`, `usePostRfiPrefillMap`.
++    - `make migrate`: `\d casework.rfi_prefill_map` exists with 9 classification rows and 1 retention row. As `akr_app`: `DELETE FROM casework.rfi_prefill_map` fails with `pre-fill map rows are never deleted`; an `UPDATE` of a retired row fails with `pre-fill map row is retired`; a second active row for one question key fails on `uq_rfi_prefill_map_active`; an `INSERT` with `source_key = 'case.status'` fails the CHECK.
++    - `cargo test`: the enum `PrefillSource` and the SQL CHECK hold the same ten keys; the statement of every source names no table of schema `alert`, `screening`, `scn` or `rpt`, and of `casework` only `effective_tier`; `party.pep_status` gives `yes`, `no` and `unknown` for the three stored values; `accounts.signatories` leaves out a party the caller may not see and sets `incomplete`; a sensitive source is not computed for a caller without role M (the reader is not called).
++    - Curl (`tests/curl/phase19_followup.sh`): as CFG `POST /api/v1/rfi-prefill-map` with `{"set":[{"question_key":"account.opened_on","source_key":"relationship.start_date"}]}` and `Idempotency-Key: pfm-0001` gives 201 with a CR of class material and volume effect `neutral`; with `source_key: "case.status"` gives 422 with `source_unknown`; with an unknown question key gives 422 with `question_unknown`; a second change set while the first is open gives 409. As CHK and M approve. With `rfi.pre_fill` off in the pinned pack, as RFI `GET /api/v1/rfis/<incoming correspondent RFI>/prefill` with a purpose gives 409 with `prefill_off`; with it on, 200 with one `proposed` row and `Cache-Control: no-store`; without `X-Access-Purpose`, 422 `E_PURPOSE_REQUIRED`; for a `branch_info` RFI, 409 with `prefill_not_applicable`. With `accounts.closed` mapped, as RFI the row is `withheld` with no `facts`, and as M it is `proposed`. As RFI for a suspicion RFI the read is a masked 404. As A1 `GET /api/v1/rfi-prefill-map` gives 403 `E_SCOPE`.
++    - Audit after the run: `change_request.created` and `rfi_prefill_map.applied`; `audit.access_event` holds one `view` row per pre-fill read with the purpose code; no `rfi.answer_recorded` row exists until a person records an answer.
++
+@@ -2000,0 +2173,2 @@ Numbered from DR-148 (phase 17 used DR-117 to DR-132 and phase 18 used DR-133 to
++**DR-417 (owner decision of 2026-10-10: the RFI pre-fill is built).** The lead had moved the pre-fill of M-44 to P2 because the plan held no map from the question keys of the bank's template to canonical fields. The owner decided to build it in this version with the map as admin-managed data. Section 7.21 adds `casework.rfi_prefill_map` (one active row per question key, naming one of ten sources of a closed registry in code), the change target `rfi_prefill_map` on `cr_material`, the read `GET /rfis/{id}/prefill` for an incoming correspondent RFI when the pinned pack has `rfi.pre_fill` on, and two map routes. A proposal is never stored: a person records it through `POST /rfis/{id}/answers` with `source_kind = replica`. Rationale: a map to a closed list of sources, not to free columns, keeps a bank from pointing a question at case or monitoring data; the two sources that could reveal more (a closed account, the bank's risk label) are computed for the MLRO only; and keeping the write on the existing answer route leaves the claim rules, the scan and the four-eyes release as they were. Not built: sources for source of wealth, beneficial owners, counterparty history, rating history, the last review, screening history and linked documents, which stay typed by hand.
++

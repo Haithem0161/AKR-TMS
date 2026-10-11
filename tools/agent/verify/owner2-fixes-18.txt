@@ -1,0 +1,28 @@
+Replacements of round 1 of the owner-decision check, key 18. 4 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-18-1]
+FILE: docs/plan/phase-18.md
+WHY: O-18-1 | CONFIRMED | LOW | 7.29 says "section 3.14 step 5", but section 3.14 has a step 5 under each of its two routes and the first one lists cases | name the route: "step 5 of `GET /parties/{id}/transactions`".
+OLD: that the row already returns (section 3.14 step 5), so the bank
+NEW: that the row already returns (section 3.14, step 5 of `GET /parties/{id}/transactions`), so the bank
+
+=== F2 [O-18-1-note]
+FILE: docs/plan/phase-18.md
+WHY: Agent note of round 1, not counted as a finding (the clipboard on a suspicion-tier party): the copied value is a UUID the caller already holds and names no person; one sentence is added to section 7.29 so nobody has to guess.
+OLD: and the copied value is an id the caller already holds. Test: the menu
+NEW: and the copied value is an id the caller already holds. This is so at every tier: the value is a UUID in a response the caller was already given, and it names no person. Test: the menu
+
+=== F3 [O-19-16]
+FILE: docs/plan/phase-18.md
+WHY: O-19-16 | CONFIRMED | MEDIUM (agent: HIGH) | three sources are read "through `CanonPartyReader`", which has no method for the customer rows or for the other holders of an account | the block adds two reader methods and names them in the table.
+OLD: `current_accounts(conn, party_id)` (joins `canon.account_party_role` where `recorded_to IS NULL`), `transactions(conn, account_ids, filter, cursor)`.
+NEW: `current_accounts(conn, party_id)` (joins `canon.account_party_role` where `recorded_to IS NULL`), `transactions(conn, account_ids, filter, cursor)`. Phase 19 section 7.21 item 4 adds `current_customers(conn, party_id)` and `co_holders(conn, account_ids)` for the RFI pre-fill.
+
+=== F4 [L-1]
+FILE: docs/plan/phase-18.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message. // Phase 18 section 6 item 9: the five append-only casework tables (akr_app: SELECT, INSERT only).
+OLD: `casework.opened_views` or `casework.evidence_items` (the append-only trigger raises);
+NEW: `casework.opened_views` or `casework.evidence_items` (permission denied: it holds SELECT and INSERT only; as the owner `akr_migrate` the append-only trigger raises);

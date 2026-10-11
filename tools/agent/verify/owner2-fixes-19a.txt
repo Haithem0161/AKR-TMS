@@ -1,0 +1,120 @@
+Replacements of round 1 of the owner-decision check, key 19a. 19 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-19-1]
+FILE: docs/plan/phase-19.md
+WHY: O-19-1 | CONFIRMED | LOW (agent: MEDIUM) | 7.21 item 1 says "owner `akr_app`"; tables are owned by `akr_migrate` and written by `akr_app` (phase 00) | "owner `akr_migrate`; written by `akr_app`". The same words in phase 13 section 7.17 item 1 are fixed with it. // Carried from phase 19 (already decided there): O-19-1 (owner words of item 1), O-19-3 (`reason_code`, `reason_text` in `SourceTagChange` and the curl body), O-19-4 (`ChangeRequestService::create` with origin Dedicated), O-19-5 (`ChangeRequestView`), O-19-9 (`insert` returns the row).
+OLD: the guard, grants, classification and retention rows to `0065_casework_followup_guards_grants.sql`; owner `akr_app`):
+NEW: the guard, grants, classification and retention rows to `0065_casework_followup_guards_grants.sql`; owner `akr_migrate`, written by `akr_app`):
+
+=== F2 [O-19-13]
+FILE: docs/plan/phase-19.md
+WHY: O-19-13 | CONFIRMED | LOW | `domain::rfi::prefill` does not follow the crate rule of the phase (`domain::casework`) | `domain::casework::prefill`.
+OLD: (`PrefillSource`, a closed enum of `domain::rfi::prefill`;
+NEW: (`PrefillSource`, a closed enum of `domain::casework::prefill`;
+
+=== F3 [O-19-16]
+FILE: docs/plan/phase-19.md
+WHY: O-19-16 | CONFIRMED | MEDIUM (agent: HIGH) | three sources are read "through `CanonPartyReader`", which has no method for the customer rows or for the other holders of an account | the block adds two reader methods and names them in the table.
+OLD: | `relationship.start_date` | `{ date }`: the earliest `onboarded_on` of the party's current `canon.customer` rows | `CanonPartyReader` (phase 18 section 3.14) |
+NEW: | `relationship.start_date` | `{ date }`: the earliest `onboarded_on` of the party's current `canon.customer` rows | `CanonPartyReader::current_customers` (the reader of phase 18; the method is added in item 4) |
+
+=== F4 [O-19-16]
+FILE: docs/plan/phase-19.md
+WHY: O-19-16 | CONFIRMED | MEDIUM (agent: HIGH) | three sources are read "through `CanonPartyReader`", which has no method for the customer rows or for the other holders of an account | the block adds two reader methods and names them in the table.
+OLD: | `relationship.status` | `{ records: [{ status, cdd_level }] }`, one per current customer row; no CIF | `CanonPartyReader` |
+NEW: | `relationship.status` | `{ records: [{ status, cdd_level }] }`, one per current customer row; no CIF | `CanonPartyReader::current_customers` |
+
+=== F5 [O-19-8]
+FILE: docs/plan/phase-19.md
+WHY: O-19-8 | CONFIRMED | HIGH | the source `party.pep_status` answers from the CBS-derived column `canon.party.pep_status`, which phase 15 says is not the PEP state (DR-38); the bank's PEP register (`kyc.party_pep_state`) is ignored, so a PEP the bank confirmed could be proposed as "unknown" or "no" | the source reads the register first: `pep` -> yes; `former_pep` -> yes, marked former; `candidate` -> unknown (an unconfirmed lead is never stated); no entry -> the customer-file value (`pep` yes, `not_pep` no, else unknown). New small reader over the view (SELECT is granted to `akr_app` by phase 15). Item 10 and the test of item 11 are reworded. // O-19-8 final design | new port `PartyPepReader::pep_state(conn, party_id)` over the view `kyc.party_pep_state`; the view's fourth state `none` (a former entry whose persistence has passed) is treated as "no row", so the customer file decides. Facts are `{ answer, former? }`.
+OLD: | `party.pep_status` | `{ answer }`: `yes` for `pep`, `no` for `not_pep`, `unknown` otherwise | `CanonPartyReader` | `yes_no_unknown`, `value` | no |
+NEW: | `party.pep_status` | `{ answer, former? }`. The bank's PEP register decides first (view `kyc.party_pep_state`, phase 15): `pep` gives `yes`; `former_pep` gives `yes` with `former: true`; `candidate` gives `unknown`, because an unconfirmed lead is never stated. With no row, or the state `none`, the customer file decides (`canon.party.pep_status`): `pep` gives `yes`, `not_pep` gives `no`, anything else `unknown` | `PartyPepReader` (item 4), then `CanonPartyReader::current_party` | `yes_no_unknown`, `value` | no |
+
+=== F6 [O-19-20]
+FILE: docs/plan/phase-19.md
+WHY: O-19-20 | CONFIRMED | HIGH | the flag `incomplete` of `accounts.signatories` tells the desk (and, through the answer, another bank) that a hidden party holds the account; the phase rule is "no count and no placeholder" (section 3.14) | the source becomes sensitive (names of other persons): computed for the MLRO only, a party the caller may not see is left out with no flag, and the flag is removed. Item 10 says so.
+OLD: | `accounts.signatories` | `{ parties: [{ role, name }], incomplete }`: the other parties with a current `joint` or `signatory` role on the accounts of `accounts.open`, each with its current primary name; a party the caller may not see under phase 18 section 3.10 is left out and `incomplete` is `true` | `CanonPartyReader` | `value`, `free_text` | no |
+NEW: | `accounts.signatories` | `{ parties: [{ role, name }] }`: the other parties with a current `joint` or `signatory` role on the accounts of `accounts.open`, each with its current `legal` name (`name_type = 'legal'`, `superseded_at IS NULL`; the Arabic or Kurdish form first). A party the caller may not see under phase 18 section 3.10 is left out, with no count and no flag | `CanonPartyReader::co_holders` (item 4) and `current_names` | `value`, `free_text` | yes (the names of other persons) |
+
+=== F7 [O-19-17]
+FILE: docs/plan/phase-19.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD: | `ProfileQuery` of phase 13 with its `PartyProfilesView` projection (`actual`, `declared` and `status`; never a deviation, an own-history or a peer value) | `value`, `free_text` | no |
+NEW: | `ProfileQuery` of phase 13 with its `PartyProfilesView` projection (`actual`, `declared` and `status`; never a deviation, an own-history or a peer value), called with the caller's context and purpose code, so the Cedar check `profile.read`, the purpose rule and the access events of phase 13 section 3.6 apply as on the party page | `value`, `free_text` | yes (the profile is restricted data that the desk may not read) |
+
+=== F8 [O-19-14]
+FILE: docs/plan/phase-19.md
+WHY: O-19-14 | CONFIRMED | LOW | "the bank's own view" names two different things in two lines | the second becomes "the respondent's comfort with the relationship (question 22 of the Wolfsberg list)".
+OLD: | `value`, `free_text` | yes (the bank's own view) |
+NEW: | `value`, `free_text` | yes (the bank's own risk label) |
+
+=== F9 [O-19-17]
+FILE: docs/plan/phase-19.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD:    No source reads an alert, a case, a decision, a report, a watch,
+NEW:    Four of the ten sources are sensitive: `accounts.closed`, `accounts.signatories`, `activity.declared_and_actual` and `rating.cbi_level`. A sensitive source is computed for a caller with role M only (item 5 step 5). No source reads an alert, a case, a decision, a report, a watch,
+
+=== F10 [O-19-14]
+FILE: docs/plan/phase-19.md
+WHY: O-19-14 | CONFIRMED | LOW | "the bank's own view" names two different things in two lines | the second becomes "the respondent's comfort with the relationship (question 22 of the Wolfsberg list)".
+OLD: linked documents and the bank's own view (question 22 of the Wolfsberg list).
+NEW: linked documents and the respondent's comfort with the relationship (question 22 of the Wolfsberg list).
+
+=== F11 [O-19-3]
+FILE: docs/plan/phase-19.md
+WHY: O-19-3 | CONFIRMED | HIGH | `PrefillMapChange` has no `reason_code` and `reason_text`, which phase 04 `create` requires, so the stated curl check (201) would get 422 | the DTO gains both fields; the curl body carries them. Same fix for `SourceTagChange` of phase 13 section 7.17.
+OLD: DTOs: `PrefillMapChange { set: Vec<PrefillMapEntry>, remove: Vec<String> }`,
+NEW: DTOs: `PrefillMapChange { set: Vec<PrefillMapEntry>, remove: Vec<String>, reason_code: String, reason_text: String }` (the two reason fields are the ones phase 04 `create` requires),
+
+=== F12 [O-19-5]
+FILE: docs/plan/phase-19.md
+WHY: O-19-5 | CONFIRMED | LOW | `ChangeRequestAccepted` is not a phase 04 type | the response is the phase 04 `ChangeRequestView`. Same fix in phase 13 section 7.17 item 5. // O-19-5 in phase 13, corrected by the lead while fixing: phase 13 section 2 defines `ChangeRequestAccepted` itself (the response of its two base proposal routes), so the source-tag POST keeps that schema and the block now says where it is defined. The change to `ChangeRequestView` holds for phase 19 only, where the block had called it a phase 04 type.
+OLD: `PrefillMapChange`, `ChangeRequestAccepted` (phase 04, reused), and `RfiPrefillView
+NEW: `PrefillMapChange`, the phase 04 `ChangeRequestView` (the answer of the POST), and `RfiPrefillView
+
+=== F13 [O-19-17]
+FILE: docs/plan/phase-19.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD: `withheld` (a sensitive source and the caller is not the MLRO) or `format_mismatch`.
+NEW: `withheld` (a sensitive source and the caller is not the MLRO, or phase 13 refused the profile read) or `format_mismatch`.
+
+=== F14 [O-19-9]
+FILE: docs/plan/phase-19.md
+WHY: O-19-9 | CONFIRMED | LOW | `insert` returns `()`, while the phase rule is `RETURNING` on every insert | `insert` returns the row.
+OLD:     async fn insert(&self, tx: &mut Tx, row: &RfiPrefillMapRow) -> Result<(), RepoError>;
+NEW:     async fn insert(&self, tx: &mut Tx, row: &RfiPrefillMapRow) -> Result<RfiPrefillMapRow, RepoError>;   // RETURNING
+
+=== F15 [O-19-16]
+FILE: docs/plan/phase-19.md
+WHY: O-19-16 | CONFIRMED | MEDIUM (agent: HIGH) | three sources are read "through `CanonPartyReader`", which has no method for the customer rows or for the other holders of an account | the block adds two reader methods and names them in the table.
+OLD:    AppState: `api` gains `rfi_prefill: Arc<RfiPrefillService>` and one more change target.
+NEW:    AppState: `api` gains `rfi_prefill: Arc<RfiPrefillService>` and one more change target.
+
+   Readers added for the registry. `CanonPartyReader` (phase 18 section 2) gains two methods: `current_customers(conn, party_id) -> Result<Vec<CustomerRow>, RepoError>`, the current `canon.customer` rows of the party (`recorded_to IS NULL`) with `onboarded_on`, `status` and `cdd_level`; and `co_holders(conn, account_ids) -> Result<Vec<CoHolder>, RepoError>`, the party id and role of every current `joint` or `signatory` row of `canon.account_party_role` on those accounts (`recorded_to IS NULL`). A new port `PartyPepReader` (domain layer; `PgPartyPepReader` in `db`) has one method, `pep_state(conn, party_id) -> Result<Option<String>, RepoError>`: the `pep_state` of the party's row in the view `kyc.party_pep_state`, on which phase 15 grants SELECT to `akr_app`. This phase reads the view and never writes the register.
+
+=== F16 [O-19-10]
+FILE: docs/plan/phase-19.md
+WHY: O-19-10 | CONFIRMED | LOW (agent: MEDIUM) | step 3 demands a purpose at every tier but points to phase 02, whose rule covers restricted and suspicion only | say it is a rule of this route at every tier, as the profile read of phase 13.
+OLD:    3. `X-Access-Purpose` holds a purpose code (422 `E_PURPOSE_REQUIRED` otherwise, phase 02).
+NEW:    3. `X-Access-Purpose` holds a purpose code (422 `E_PURPOSE_REQUIRED` otherwise). This is a rule of this route at every tier, as the profile read of phase 13 has one; the phase 02 rule alone covers restricted and suspicion data only.
+
+=== F17 [O-19-10]
+FILE: docs/plan/phase-19.md
+WHY: O-19-10 | CONFIRMED | LOW (agent: MEDIUM) | step 3 demands a purpose at every tier but points to phase 02, whose rule covers restricted and suspicion only | say it is a rule of this route at every tier, as the profile read of phase 13.
+OLD: | `PurposeRequired` | `E_PURPOSE_REQUIRED` | 422 | a kinship read or a suspicion item read without `X-Access-Purpose` |
+NEW: | `PurposeRequired` | `E_PURPOSE_REQUIRED` | 422 | a kinship read, a suspicion item read or a pre-fill read (section 7.21) without `X-Access-Purpose` |
+
+=== F18 [O-19-17]
+FILE: docs/plan/phase-19.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD: otherwise compute the source (item 2), with `outcome = empty` when it returns nothing and `proposed` otherwise.
+NEW: otherwise compute the source (item 2), with `outcome = empty` when it returns nothing and `proposed` otherwise. For `activity.declared_and_actual` a refusal by phase 13 (for the MLRO that is a purpose other than `investigation`) also gives `withheld`, and the other proposals of the response are not affected.
+
+=== F19 [O-19-17]
+FILE: docs/plan/phase-19.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD: through the phase 02 access layer. No audit row: the read changes nothing.
+NEW: through the phase 02 access layer; the profile read of `activity.declared_and_actual` writes its own access events in phase 13, one per customer record. No audit row: the read changes nothing.

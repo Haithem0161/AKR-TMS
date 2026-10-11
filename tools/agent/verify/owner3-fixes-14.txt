@@ -1,0 +1,10 @@
+Replacements of round 2 of the owner-decision check, key 14. 1 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [P-14b-1]
+FILE: docs/plan/phase-14.md
+WHY: P-14b-1 | CONFIRMED | LOW | the pointer "phase 04 section 3.2" in the Activate row: the rollback of an immediate approval is phase 04 section 3.4 (line ~1023) and the scheduled failure is the `cr_activate` row of section 3.6 (line ~1103) | "(phase 04: an immediate approval is rolled back with the error, section 3.4; a scheduled activation ends `failed`, section 3.6)". The same words stand in phase 07 section 7.6 (line ~1193) and are fixed with it. // P-07b-2 | CONFIRMED | LOW | the same defect as P-14b-1 (the pointer "phase 04 section 3.2" in the Activate row of section 7.6 item 7) | fixed with P-14b-1.
+OLD: (phase 04 section 3.2: an immediate approval is rolled back with the error, and a scheduled activation ends `failed`)
+NEW: (phase 04: an immediate approval is rolled back with the error, section 3.4; a scheduled activation ends `failed`, section 3.6)

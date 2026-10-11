@@ -1,0 +1,109 @@
+Replacements of round 1 of the owner-decision check, key 07a. 16 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-07-1]
+FILE: docs/plan/phase-07.md
+WHY: O-07-1 | CONFIRMED | HIGH | `check_before_decision` enqueues `goaml_case_intake` and then issues `intake_stale`; the issue is a refusal, phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row, so the stated check "then approval succeeds" cannot pass | the re-run is enqueued where it commits: the Activate of the `goaml_profile` target enqueues `goaml_case_intake` for every `proposed` case of the code; `check_before_decision` only issues `intake_stale`. (Verify phase 04 line ~1649 and phase 00 line ~788 when fixing.) // O-07-1 final design | the profile activation enqueues the intake only for `proposed` cases that have a stored file (new repository method `stored_proposed_for_code`): a case whose first intake was not met has no file left, and a re-run would only replace "not met" by the refusal `file_gone`. A case whose first intake is still queued runs under the new active version anyway (job step 2 reads the active version when it runs).
+OLD: runs already queued keep their pinned version; audit `goaml_profile.activated {code, profile_version, from_version, change_request_id}` |
+NEW: runs already queued keep their pinned version; audit `goaml_profile.activated {code, profile_version, from_version, change_request_id}`; then enqueue `goaml_case_intake {case_id}` for every `proposed` bank case of the code that has a stored file (`stored_proposed_for_code`, section 7.6 item 4), so its intake result is taken again under the new active version before anyone decides it |
+
+=== F2 [O-07-1]
+FILE: docs/plan/phase-07.md
+WHY: O-07-1 | CONFIRMED | HIGH | `check_before_decision` enqueues `goaml_case_intake` and then issues `intake_stale`; the issue is a refusal, phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row, so the stated check "then approval succeeds" cannot pass | the re-run is enqueued where it commits: the Activate of the `goaml_profile` target enqueues `goaml_case_intake` for every `proposed` case of the code; `check_before_decision` only issues `intake_stale`. (Verify phase 04 line ~1649 and phase 00 line ~788 when fixing.) // O-07-1 final design | the profile activation enqueues the intake only for `proposed` cases that have a stored file (new repository method `stored_proposed_for_code`): a case whose first intake was not met has no file left, and a re-run would only replace "not met" by the refusal `file_gone`. A case whose first intake is still queued runs under the new active version anyway (job step 2 reads the active version when it runs).
+OLD: `intake_result.profile_version` differs from the active version's -> enqueue `goaml_case_intake {case_id}` again and issue `intake_stale` (the approver decides after the job).
+NEW: `intake_result.profile_version` differs from the active version's -> issue `intake_stale`. This hook enqueues nothing: an issue is a refusal, phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row. The intake is run again by the activation of the profile version (section 3.6, Activate), which commits, and the approver decides after that job.
+
+=== F3 [O-07-1]
+FILE: docs/plan/phase-07.md
+WHY: O-07-1 | CONFIRMED | HIGH | `check_before_decision` enqueues `goaml_case_intake` and then issues `intake_stale`; the issue is a refusal, phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row, so the stated check "then approval succeeds" cannot pass | the re-run is enqueued where it commits: the Activate of the `goaml_profile` target enqueues `goaml_case_intake` for every `proposed` case of the code; `check_before_decision` only issues `intake_stale`. (Verify phase 04 line ~1649 and phase 00 line ~788 when fixing.) // O-07-1 final design | the profile activation enqueues the intake only for `proposed` cases that have a stored file (new repository method `stored_proposed_for_code`): a case whose first intake was not met has no file left, and a re-run would only replace "not met" by the refusal `file_gone`. A case whose first intake is still queued runs under the new active version anyway (job step 2 reads the active version when it runs).
+OLD:     async fn count_open(&self, conn: &mut PgConnection, code: &str) -> Result<i64, RepoError>;          // proposed + active
+    async fn set_intake(
+NEW:     async fn count_open(&self, conn: &mut PgConnection, code: &str) -> Result<i64, RepoError>;          // proposed + active
+    async fn stored_proposed_for_code(&self, tx: &mut Tx, code: &str) -> Result<Vec<Uuid>, RepoError>;  // proposed, evidence_id set
+    async fn set_intake(
+
+=== F4 [O-07-1]
+FILE: docs/plan/phase-07.md
+WHY: O-07-1 | CONFIRMED | HIGH | `check_before_decision` enqueues `goaml_case_intake` and then issues `intake_stale`; the issue is a refusal, phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row, so the stated check "then approval succeeds" cannot pass | the re-run is enqueued where it commits: the Activate of the `goaml_profile` target enqueues `goaml_case_intake` for every `proposed` case of the code; `check_before_decision` only issues `intake_stale`. (Verify phase 04 line ~1649 and phase 00 line ~788 when fixing.) // O-07-1 final design | the profile activation enqueues the intake only for `proposed` cases that have a stored file (new repository method `stored_proposed_for_code`): a case whose first intake was not met has no file left, and a re-run would only replace "not met" by the refusal `file_gone`. A case whose first intake is still queued runs under the new active version anyway (job step 2 reads the active version when it runs).
+OLD:    4. Later run (`evidence_id` is set; item 7 asks for it when the active profile changed): `EvidenceStore::open(evidence_id)` gives the masked bytes.
+NEW:    4. Later run (`evidence_id` is set; the activation of a profile version of the code asks for it, section 3.6): `EvidenceStore::open(evidence_id)` gives the masked bytes.
+
+=== F5 [O-07-1]
+FILE: docs/plan/phase-07.md
+WHY: O-07-1 | CONFIRMED | HIGH | `check_before_decision` enqueues `goaml_case_intake` and then issues `intake_stale`; the issue is a refusal, phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row, so the stated check "then approval succeeds" cannot pass | the re-run is enqueued where it commits: the Activate of the `goaml_profile` target enqueues `goaml_case_intake` for every `proposed` case of the code; `check_before_decision` only issues `intake_stale`. (Verify phase 04 line ~1649 and phase 00 line ~788 when fixing.) // O-07-1 final design | the profile activation enqueues the intake only for `proposed` cases that have a stored file (new repository method `stored_proposed_for_code`): a case whose first intake was not met has no file left, and a re-run would only replace "not met" by the refusal `file_gone`. A case whose first intake is still queued runs under the new active version anyway (job step 2 reads the active version when it runs).
+OLD:   - `goaml_case_intake` (payload `{case_id}`; enqueued when a bank case is proposed and when its intake is stale;
+
+NEW:   - `goaml_case_intake` (payload `{case_id}`; enqueued when a bank case is proposed, and for every `proposed` case
+    with a stored file when a profile version of its code is activated (section 3.6);
+
+
+=== F6 [O-07-1]
+FILE: docs/plan/phase-07.md
+WHY: O-07-1 | CONFIRMED | HIGH | `check_before_decision` enqueues `goaml_case_intake` and then issues `intake_stale`; the issue is a refusal, phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row, so the stated check "then approval succeeds" cannot pass | the re-run is enqueued where it commits: the Activate of the `goaml_profile` target enqueues `goaml_case_intake` for every `proposed` case of the code; `check_before_decision` only issues `intake_stale`. (Verify phase 04 line ~1649 and phase 00 line ~788 when fixing.) // O-07-1 final design | the profile activation enqueues the intake only for `proposed` cases that have a stored file (new repository method `stored_proposed_for_code`): a case whose first intake was not met has no file left, and a re-run would only replace "not met" by the refusal `file_gone`. A case whose first intake is still queued runs under the new active version anyway (job step 2 reads the active version when it runs).
+OLD: after a profile activation -> 422 `intake_stale` and a new `goaml_case_intake` job, then approval succeeds;
+NEW: a profile activation enqueues one `goaml_case_intake` job for the `proposed` case; a decision before that job ran -> 422 `intake_stale` and no new job row; after it ran, approval succeeds;
+
+=== F7 [O-07-2]
+FILE: docs/plan/phase-07.md
+WHY: O-07-2 | CONFIRMED | HIGH | the curl check expects 403 `E_SCOPE` for DS on the GET, but DS holds `config.author`, which the route accepts, so Cedar answers 403 `E_FORBIDDEN` | "as DS the GET -> 403 `E_FORBIDDEN`; as SS the GET -> 403 `E_SCOPE`". (Verify docs/API.md line ~95 when fixing.)
+OLD: as CFG the POST -> 403 `E_SCOPE`; as DS the GET -> 403 `E_SCOPE`;
+NEW: as CFG the POST -> 403 `E_SCOPE`; as DS the GET -> 403 `E_FORBIDDEN` (DS holds `config.author`, which the route accepts, and Cedar denies); as SS the GET -> 403 `E_SCOPE`;
+
+=== F8 [O-07-3]
+FILE: docs/plan/phase-07.md
+WHY: O-07-3 | CONFIRMED | MEDIUM | the curl sequence approves before the intake job can have run | "after the intake job has completed (poll the GET until `intake_result` is set)".
+OLD: the same key and body -> the stored 202 with `x-idempotent-replay: true`; as CHK approve -> the case `active`; as CFG `GET /api/v1/goaml/corpus-cases`
+NEW: the same key and body -> the stored 202 with `x-idempotent-replay: true`; after the intake job has completed (the script polls `GET /api/v1/goaml/corpus-cases` as A2 until `intake_result` is set), as CHK approve -> the case `active`; as CFG `GET /api/v1/goaml/corpus-cases`
+
+=== F9 [O-07-4]
+FILE: docs/plan/phase-07.md
+WHY: O-07-4 | CONFIRMED | MEDIUM | a case withdrawn before its intake keeps the uploaded file until the sweep | job step 1: a state other than `proposed` deletes the transient object and ends. // O-07-4 and O-07-5 final design | the event `goaml_corpus_case.transient_deleted {case_id, by}` has `by` = `intake` or `sweep`. Job step 1 deletes and writes it only for a case with no `intake_result` (the only case in which a file can still be staged). The failed proposal (item 5 step 5) writes none, as a failed check request writes none.
+OLD:    1. Load the case. A state other than `proposed` -> done.
+NEW:    1. Load the case. A state other than `proposed` -> done; when the case has no `intake_result` (its request was withdrawn or rejected before the first run, so the uploaded file is still staged), first `delete_transient("goaml", case_id)` and the audit event `goaml_corpus_case.transient_deleted {case_id, by: "intake"}`.
+
+=== F10 [O-07-5]
+FILE: docs/plan/phase-07.md
+WHY: O-07-5 | CONFIRMED | MEDIUM | the deletion of the uploaded file has no audit event, while the same deletion for a check run has `goaml_check.transient_deleted` | new kind `goaml_corpus_case.transient_deleted {case_id, by}` (seven kinds, not six), written after each `delete_transient` and by the sweep. // O-07-4 and O-07-5 final design | the event `goaml_corpus_case.transient_deleted {case_id, by}` has `by` = `intake` or `sweep`. Job step 1 deletes and writes it only for a case with no `intake_result` (the only case in which a file can still be staged). The failed proposal (item 5 step 5) writes none, as a failed check request writes none.
+OLD:    8. After the transaction of a first run, in every path: `delete_transient("goaml", case_id)`. An object left by a crash is deleted by `maintenance_sweep` after `evidence.staging_ttl_h`: its owner is not a run, which the sweep of section 3.2 step 13 treats as a missing run.
+NEW:    8. After the transaction of a first run, in every path: `delete_transient("goaml", case_id)`, then the audit event `goaml_corpus_case.transient_deleted {case_id, by: "intake"}`. An object left by a crash is deleted by `maintenance_sweep` after `evidence.staging_ttl_h`: its owner is not a run, which the sweep of section 3.2 step 13 treats as a missing run; when the owner id is the id of a corpus case the sweep writes `goaml_corpus_case.transient_deleted {case_id, by: "sweep"}` in place of `goaml_check.transient_deleted`.
+
+=== F11 [O-07-5]
+FILE: docs/plan/phase-07.md
+WHY: O-07-5 | CONFIRMED | MEDIUM | the deletion of the uploaded file has no audit event, while the same deletion for a check run has `goaml_check.transient_deleted` | new kind `goaml_corpus_case.transient_deleted {case_id, by}` (seven kinds, not six), written after each `delete_transient` and by the sweep. // O-07-4 and O-07-5 final design | the event `goaml_corpus_case.transient_deleted {case_id, by}` has `by` = `intake` or `sweep`. Job step 1 deletes and writes it only for a case with no `intake_result` (the only case in which a file can still be staged). The failed proposal (item 5 step 5) writes none, as a failed check request writes none.
+OLD: 9. **Audit events** (six more kinds in section 3.8, all on resource `goaml_corpus_case`): `goaml_corpus_case.proposed`, `goaml_corpus_case.retire_proposed`, `goaml_corpus_case.intake_ran`, `goaml_corpus_case.activated`, `goaml_corpus_case.retired` and `goaml_corpus_case.rejected`.
+NEW: 9. **Audit events** (seven more kinds in section 3.8, all on resource `goaml_corpus_case`): `goaml_corpus_case.proposed`, `goaml_corpus_case.retire_proposed`, `goaml_corpus_case.intake_ran`, `goaml_corpus_case.transient_deleted` (`{case_id, by}`, `by` is `intake` or `sweep`; the uploaded file is gone, as `goaml_check.transient_deleted` says for a check run), `goaml_corpus_case.activated`, `goaml_corpus_case.retired` and `goaml_corpus_case.rejected`. The failed proposal of item 5 step 5 writes no event: no case row exists, as for a failed check request (section 3.2 step 4).
+
+=== F12 [O-07-5]
+FILE: docs/plan/phase-07.md
+WHY: O-07-5 | CONFIRMED | MEDIUM | the deletion of the uploaded file has no audit event, while the same deletion for a check run has `goaml_check.transient_deleted` | new kind `goaml_corpus_case.transient_deleted {case_id, by}` (seven kinds, not six), written after each `delete_transient` and by the sweep. // O-07-4 and O-07-5 final design | the event `goaml_corpus_case.transient_deleted {case_id, by}` has `by` = `intake` or `sweep`. Job step 1 deletes and writes it only for a case with no `intake_result` (the only case in which a file can still be staged). The failed proposal (item 5 step 5) writes none, as a failed check request writes none.
+OLD:     final or missing are deleted and the run flagged `transient_deleted` (audit `goaml_check.transient_deleted` with
+    `by: sweep`).
+NEW:     final or missing are deleted and the run flagged `transient_deleted` (audit `goaml_check.transient_deleted` with
+    `by: sweep`; for an object whose owner is a bank corpus case, `goaml_corpus_case.transient_deleted`, section 7.6
+    item 6).
+
+=== F13 [O-07-5]
+FILE: docs/plan/phase-07.md
+WHY: O-07-5 | CONFIRMED | MEDIUM | the deletion of the uploaded file has no audit event, while the same deletion for a check run has `goaml_check.transient_deleted` | new kind `goaml_corpus_case.transient_deleted {case_id, by}` (seven kinds, not six), written after each `delete_transient` and by the sweep. // O-07-4 and O-07-5 final design | the event `goaml_corpus_case.transient_deleted {case_id, by}` has `by` = `intake` or `sweep`. Job step 1 deletes and writes it only for a case with no `intake_result` (the only case in which a file can still be staged). The failed proposal (item 5 step 5) writes none, as a failed check request writes none.
+OLD: a file with a `<!DOCTYPE` -> refusal `not_maskable`; an EICAR file -> refusal `unsafe_file`.
+NEW: a file with a `<!DOCTYPE` -> refusal `not_maskable`; an EICAR file -> refusal `unsafe_file`; a case whose request is withdrawn before the job ran -> after the job no object under `transient/goaml/<case_id>/` and one `goaml_corpus_case.transient_deleted` event.
+
+=== F14 [O-07-5]
+FILE: docs/plan/phase-07.md
+WHY: O-07-5 | CONFIRMED | MEDIUM | the deletion of the uploaded file has no audit event, while the same deletion for a check run has `goaml_check.transient_deleted` | new kind `goaml_corpus_case.transient_deleted {case_id, by}` (seven kinds, not six), written after each `delete_transient` and by the sweep. // O-07-4 and O-07-5 final design | the event `goaml_corpus_case.transient_deleted {case_id, by}` has `by` = `intake` or `sweep`. Job step 1 deletes and writes it only for a case with no `intake_result` (the only case in which a file can still be staged). The failed proposal (item 5 step 5) writes none, as a failed check request writes none.
+OLD: Audit: `goaml_corpus_case.proposed`, `.intake_ran`, `.activated`, `.retire_proposed` appear,
+NEW: Audit: `goaml_corpus_case.proposed`, `.intake_ran`, `.transient_deleted`, `.activated`, `.retire_proposed` appear,
+
+=== F15 [O-07-6]
+FILE: docs/plan/phase-07.md
+WHY: O-07-6 | CONFIRMED | LOW (agent: MEDIUM) | "a key that names a person is refused at approval, as any reason text is" reads as a system step; none exists | the form asks for a code, not a name; the approver rejects a key that names a person; the system does not screen the key. // O-07-6 addition | phase 08 section 7.11 item 3 gains the same hint at the key field.
+OLD: The key is typed by the maker and read by the approver, so a key that names a person is refused at approval, as any reason text is.
+NEW: The key is typed by the maker and read by the approver. The form asks for a short code for the rule and says that it must not be a name (item 13), and the approver rejects a request whose key names a person; the system does not screen the key.
+
+=== F16 [O-07-6]
+FILE: docs/plan/phase-07.md
+WHY: O-07-6 | CONFIRMED | LOW (agent: MEDIUM) | "a key that names a person is refused at approval, as any reason text is" reads as a system step; none exists | the form asks for a code, not a name; the approver rejects a key that names a person; the system does not screen the key. // O-07-6 addition | phase 08 section 7.11 item 3 gains the same hint at the key field.
+OLD: for A2 and M the action "Add a case" (one XML file, a key, the expected outcome,
+NEW: for A2 and M the action "Add a case" (one XML file, a key with the hint "A short code for the rule. Never a name.", the expected outcome,

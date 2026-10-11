@@ -1,0 +1,35 @@
+Replacements of round 2 of the owner-decision check, key 11. 4 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [P-11-3]
+FILE: docs/plan/phase-11.md
+WHY: P-11-3 | CONFIRMED | LOW | the table comment of `quarantine_items` in phase 11 section 1.1 (line ~175) describes `row_conflict` rows only as rows whose canonical value differs from a settled one. It is a SQL comment, which the round's rules do not count; it is copied into the migration, so it is brought in step | the comment names the parent case too.
+OLD: -- Rows that did not map (`row_failed`) and rows whose canonical value differs from a settled one (`row_conflict`,
+-- returned by the CanonicalWriter, phase 10 section 3.7).
+NEW: -- Rows that did not map (`row_failed`) and rows the CanonicalWriter returns as a conflict (`row_conflict`, phase 10
+-- section 3.7): a canonical value that differs from a settled one, or a parent key that has not landed (`parent_missing`).
+
+=== F2 [P-11-1]
+FILE: docs/plan/phase-12.md
+WHY: P-11-1 | CONFIRMED | MEDIUM | phase 12 section 3.3 step 1 now maps four conflict reasons, but the value object `ConflictKind` (section 2, line ~472) lists three and the section 6 test (line ~1226) counts "the three `ConflictKind` values" | `ConflictKind` gains `ParentMissing`; the test says four.
+OLD: `ConflictKind` (`FactChangedInSource`,
+  `LabelChange`, `ValueChange`; the mapping to `DqKind` is section 3.3)
+NEW: `ConflictKind` (`FactChangedInSource`,
+  `LabelChange`, `ValueChange`, `ParentMissing`; the mapping to `DqKind` is section 3.3)
+
+=== F3 [P-11-1]
+FILE: docs/plan/phase-12.md
+WHY: P-11-1 | CONFIRMED | MEDIUM | phase 12 section 3.3 step 1 now maps four conflict reasons, but the value object `ConflictKind` (section 2, line ~472) lists three and the section 6 test (line ~1226) counts "the three `ConflictKind` values" | `ConflictKind` gains `ParentMissing`; the test says four.
+OLD: the three `ConflictKind` values map to their kinds and severities
+NEW: the four `ConflictKind` values map to their kinds and severities
+
+=== F4 [P-11-2]
+FILE: docs/plan/phase-12.md
+WHY: P-11-2 | CONFIRMED | LOW | the opening of phase 12 section 3.3 says a conflict "disagrees with a settled one, so it is never retried"; a `parent_missing` row disagrees with nothing and is met again by the trailing re-read window (phase 10 section 7.20) | the sentence names the exception.
+OLD: is a mapped row that disagrees with a settled one, so it is never retried; it is closed when its issue is resolved
+(section 3.4).
+NEW: is a mapped row that disagrees with a settled one, so it is never retried; it is closed when its issue is resolved
+(section 3.4). One kind is the exception: a `parent_missing` row disagrees with nothing (its parent has not landed yet),
+and the trailing re-read window of phase 10 section 7.20 meets it again.

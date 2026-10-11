@@ -896,7 +896,8 @@ maker or an earlier decider), more than one (a person eligible for two parallel 
 (the second refuses them anyway, unique index); then `engine.act(task, Approve | Reject, if_match, assertion)`.
 Inside the engine envelope, before the action applies, the change subject runs **`check_before_decision`**: evidence
 freshness, the target's re-check (SoD for grants, shadow age for bundles, base version for all) -> failures are
-returned as 409 `E_STALE_BASE`, 422 `E_EVIDENCE_STALE` or 422 `E_VALIDATION`, and the task stays open.
+returned as 409 `E_STALE_BASE`, 422 `E_EVIDENCE_STALE` or 422 `E_VALIDATION`, and the task stays open. A `Reject` is not
+checked (section 7.21).
 
 **Outcome handling** (the change subject's `on_ended` and the effects; all inside the engine transaction):
 - Final approval reaches the terminal `activate_change` effect: `set_decided(approved, checker = the deciding person,
@@ -1805,6 +1806,19 @@ return step.
 
 ### 7.20 Two effects may share a kind (V-15-01-d, HIGH; DR-413)
 From phase 15 on, the effect registry resolves a terminal effect by its `kind` and the resource kind of the instance. Two effects may share a kind when their `resource_kinds` do not overlap (phase 15 registers `record_decision` for `change_request`, `kyc_review` and `exit_decision`; phase 18 for `case`); an overlap fails start-up. `E_EFFECT_UNAVAILABLE` is unchanged.
+
+### 7.21 A rejection of a change request is not held by the subject check (owner-decision check round 2, HIGH; DR-423)
+Section 3.2 (`decide`) and section 3.4 step 6 run the subject check before every action, a rejection included, and the hook of section 7.1 is not told which action it guards. For a change request this leaves a request that can be neither approved nor rejected whenever its check fails: a moved base, evidence past `change.evidence_max_age_days`, `shadow_too_short`, `volume_effect_changed` (section 7.9), or a refusal of a later phase's target such as `intake_not_met` (phase 07 section 7.6). Only its maker could then end it, by a withdraw. Section 3.6 says of an offboarded maker's submitted requests that "their checkers still decide them", and phase 07 section 7.6 with phase 08 section 7.11 closes an unmet corpus case by the approver's reject. So:
+
+1. Trait `WorkflowSubject` (section 2; section 7.1) gains one method with a default body:
+
+       fn holds_reject(&self) -> bool { true }
+
+2. Section 3.4 step 6 (as section 7.1 reads) now reads: "Subject check before decision: the subject's `check_before_decision` runs in the same transaction, before the action applies; it is skipped when the action is `TaskAction::Reject` and the subject's `holds_reject()` is `false`. A refusal rolls the action back and the task stays open."
+3. The change subject returns `false`. A rejection of a change request therefore runs neither the evidence-age check of section 3.2 nor `ChangeTarget::check_before_decision`. Steps 1 to 5 of section 3.4 (task and instance state, step type, Cedar, four-eyes, step-up) apply as before, and the outcome handling of section 3.2 is unchanged: `set_decided(rejected)`, `target.on_closed(Rejected)`, audit `change_request.rejected`.
+4. Every other subject keeps the default `true`: the checks of the subjects of later phases (the case, RFI, freeze, operations-task, report and legal-hold subjects among them) run for a rejection as they do for an approval.
+5. Reading rule. Where this file or a later phase says that the check of a change target runs "at every deciding action" or refuses "the decision", it means every action other than a rejection. No target changes: `ChangeTarget::check_before_decision` keeps its signature and is not called for a rejection.
+6. Tests (added to section 6): a submitted `_dev_object` request whose dev row's version was bumped: approve -> 409 `E_STALE_BASE` and the task stays open; reject by the same approver, with a comment -> 200, the request is `rejected`, `on_closed(Rejected)` ran and `change_request.rejected` is in the audit trail. A request whose evidence is older than `change.evidence_max_age_days`: approve -> 422 `E_EVIDENCE_STALE`; reject -> 200. A test subject that keeps the default and whose check refuses: a reject returns that refusal and the task stays open.
 
 ## What This Phase Does NOT Touch
 

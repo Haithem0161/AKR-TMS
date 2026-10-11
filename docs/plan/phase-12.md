@@ -470,7 +470,7 @@ backend/
   `GlTieout`; ordered as listed), `Outcome` (`Reconciled`, `Open`, `ConfirmedGap`, `SourceAnomaly`), `GroupKey` (date,
   branch, currency and ledger; serialised `date|branch|currency|ledger` with the bank's own codes, never a name),
   `Tolerance` (non-negative decimal; `Tolerance::within(delta)` is `|delta| <= t`), `ConflictKind` (`FactChangedInSource`,
-  `LabelChange`, `ValueChange`; the mapping to `DqKind` is section 3.3), `DqKind`, `Severity` (ordered `Low` < `Critical`),
+  `LabelChange`, `ValueChange`, `ParentMissing`; the mapping to `DqKind` is section 3.3), `DqKind`, `Severity` (ordered `Low` < `Critical`),
   `DqStatus`, `Resolution` (`Fixed`, `Explained`, `NotApplicable`, `Superseded`), `UnitKind` (`Branch`, `Product`,
   `TxnType`, `Channel`, `Feed`), `DarkReason` (`Monitored`, `Excluded`, `BlindPeriod`, `SourceStale`, `NoPostingsSince`),
   `CertStatus`, `Attestation { by, at, digest }`, `VolumeEffect` (`Increase`, `Neutral`, `Decrease`, `Unknown`; the phase
@@ -725,7 +725,8 @@ value; phase 11 section 3.2 step 5): that is the row-level evidence a steward ca
 load loop in the same transaction, counts the same conflicts, the row failures and the gate counts into one open
 `dq_issues` row per `(source, object, field, kind)`: that is the register with owners, severities and ages. A conflict
 is a mapped row that disagrees with a settled one, so it is never retried; it is closed when its issue is resolved
-(section 3.4).
+(section 3.4). One kind is the exception: a `parent_missing` row disagrees with nothing (its parent has not landed yet),
+and the trailing re-read window of phase 10 section 7.20 meets it again.
 
 Called by phase 11's load loop inside the batch transaction, after `CanonicalWriter::write` returns its `WriteOutcome`, so a
 rolled-back batch leaves no issue behind. Signature:
@@ -736,7 +737,8 @@ where `BatchDqInputs` carries the `conflicts: Vec<RowConflict>` of the writer, t
 1. Map each `RowConflict` to a kind, with the reason names phase 11 writes on its quarantine rows: a fact conflict
    (`fact_changed_in_source`, a settled fact whose source hash changed; the new version stays in `raw`) ->
    `row_conflict_fact` (high); `label_change` -> `row_conflict_label` (low); `value_change` -> `row_conflict_value`
-   (medium). Rule failures -> `validation_rule`, with `field` the attribute name (severity from the rule's `severity`, default
+   (medium); `parent_missing` (a row whose parent key has not landed, phase 10 sections 7.20 and 7.27) ->
+   `unresolved_pointer` (medium). Rule failures -> `validation_rule`, with `field` the attribute name (severity from the rule's `severity`, default
    medium). Unmapped code -> `unmapped_code`, `field` = the code map kind (`txn_type`, `currency`, ...; never the code
    value). Unresolved pointer -> `unresolved_pointer` (medium). A card-guard stop -> `card_guard` (critical), `field` the
    column name.
@@ -1139,7 +1141,7 @@ A `Blackout`, `OutsideWindow` or `Paused` answer from the governor is not an att
   - Phase 09: the reason codes of family `exclusion` (prefix `EXC_`) must be activated by a family change request before the
     first exclusion (DR-82).
   - Phase 10: no change. The writer's `RowConflict`s are read through the reason names phase 11 writes
-    (`fact_changed_in_source`, `value_change`, `label_change`; section 3.3).
+    (`fact_changed_in_source`, `value_change`, `label_change`, `parent_missing`; section 3.3).
   - Phase 11: the batch receipts carry `control_totals.read` for each unit (section 3.1 step 4; `business_from` is the
     first date read, the re-read window included); the load loop calls `DataQualityRecorder::record_batch` in the batch
     transaction after it writes its quarantine rows (DR-97); `QuarantineRepository` gains `assign` and
@@ -1222,7 +1224,7 @@ phase 11 hooks `useGetQuarantine`, `usePostQuarantineIdRetry`, `usePostQuarantin
    - `GroupKey` and `Tolerance`: round trip of `date|branch|currency|ledger`; a negative tolerance is refused; ordering is
      by date then branch.
    - `DataQualityRecorder`: two batches with the same conflict produce one row whose `count` is the sum; a rolled-back batch
-     leaves no row; the three `ConflictKind` values map to their kinds and severities; a property test asserts that a
+     leaves no row; the four `ConflictKind` values map to their kinds and severities; a property test asserts that a
      serialised `DqIncrement` contains only the allowed keys (no value, no key, no row).
    - `DarkRule` (`domain/coverage/tests`): a table test over the precedence `excluded`, `blind_period`, `source_stale`,
      `no_postings_since`, `monitored`; `since` is NULL when no posting exists in the lookback; `covered` equals

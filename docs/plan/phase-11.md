@@ -172,8 +172,8 @@ CREATE INDEX IF NOT EXISTS idx_batches_mapped_bd      ON admin.batches (source_i
 CREATE INDEX IF NOT EXISTS idx_batches_mapping_version ON admin.batches (mapping_version_id)
     WHERE mapping_version_id IS NOT NULL;
 
--- Rows that did not map (`row_failed`) and rows whose canonical value differs from a settled one (`row_conflict`,
--- returned by the CanonicalWriter, phase 10 section 3.7). Phase 12 owns dq_issues and reads these rows as its
+-- Rows that did not map (`row_failed`) and rows the CanonicalWriter returns as a conflict (`row_conflict`, phase 10
+-- section 3.7): a canonical value that differs from a settled one, or a parent key that has not landed (`parent_missing`). Phase 12 owns dq_issues and reads these rows as its
 -- source until it exists; this table never holds a value, only codes, column names and the row hash.
 CREATE TABLE IF NOT EXISTS admin.quarantine_items (
     id                  UUID PRIMARY KEY,
@@ -801,7 +801,8 @@ range moves it. Every step is in the same transaction, so a crash leaves either 
    unmapped codes (DSL.md B.7: `unknown` plus a count; phase 12 owns the data-quality issue). Then
    `CanonicalWriter::write(tx, &mapped)` (phase 10 section 3.7) returns `WriteOutcome`. Each `RowConflict` becomes a
    `quarantine_items` row of kind `row_conflict` with reason `fact_changed_in_source` (a settled fact whose source hash
-   changed; the new version stays in raw), `value_change` or `label_change` (dimensions). Each
+   changed; the new version stays in raw), `value_change` or `label_change` (dimensions), or `parent_missing` (a row
+   whose parent key has no `admin.xref` row yet, phase 10 sections 7.20 and 7.27; the row is not written). Each
    row failure becomes a `row_failed` row with its reason code. Quarantine rows hold codes, column names and the
    row hash, never a value (section 1.1). From phase 12 the same transaction then calls `DataQualityRecorder::record_batch`, which counts these conflicts and failures into `dq_issues` (DR-97).
    Without a published version the step is skipped and the receipt is `landed`: canon is untouched and nothing is lost.
@@ -1791,6 +1792,7 @@ convention.
 11. A fresh install is stale (`never_loaded`) until its first unit, which may trip the MLRO alert on day one; the alert rule should exclude sources in their first 24 hours, and the lead should decide.
 12. The floor of two business days for `freshness.stale_business_days` is a proposal (DR-39), not a sourced figure.
 13. The outbox event `dq.stale` has no consumer until phase 18, and its payload is the DSL's name, not yet a catalogued event kind.
+14. The apply of section 3.8 runs the writer over the landed rows, and the writer's guard (phase 10 section 3.7 step 3) compares the hash of the landed row, which a mapping change does not move. Read literally, an apply finds every row unchanged. The writer needs a comparison of mapped values in the apply, or a stored hash that covers the mapped row; the choice is made when phases 10 and 11 are built. The three column rules of phase 10 sections 7.26 and 7.27 (`capture_source`, `paid_on` with `paid_amount`, `granted_on`) do not wait for it: they test mapped values. Found in the owner-decision round (2026-10-11).
 
 ## What This Phase Does NOT Touch
 

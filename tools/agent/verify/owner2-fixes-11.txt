@@ -1,0 +1,33 @@
+Replacements of round 1 of the owner-decision check, key 11. 4 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-10-5b]
+FILE: docs/plan/phase-11.md
+WHY: O-10-5 | CONFIRMED | MEDIUM | 7.27 (and verified 7.20) say phase 11 records a `parent_missing` conflict, but the reason list of phase 11 section 3.2 step 5 and the mapping of phase 12 section 3.3 step 1 do not name it | phase 11 step 5 gains the reason `parent_missing`; phase 12 maps it to the issue kind `unresolved_pointer` (medium). Two small base corrections outside the ten changed phases; both go into round 2.
+OLD: changed; the new version stays in raw), `value_change` or `label_change` (dimensions). Each
+NEW: changed; the new version stays in raw), `value_change` or `label_change` (dimensions), or `parent_missing` (a row
+   whose parent key has no `admin.xref` row yet, phase 10 sections 7.20 and 7.27; the row is not written). Each
+
+=== F2 [L-3-doubt]
+FILE: docs/plan/phase-11.md
+WHY: L-3 | MEDIUM | `row_hash` is the hash of the landed source row, so a mapping version that only adds or changes `capture_source`, `paid_on` or `granted_on` leaves the hash equal and step 3 of the writer writes nothing; phase 11 says "a later publication does not re-map history". The three owner decisions would then not reach rows already stored | the three column rules test mapped values, not the hash: `set_capture_source` (new, with a column grant in migration 0030), `pay_instalment` (now also for part payments, `paid_on` optional) and `set_granted_on` run when the mapped value differs, also with an equal hash (re-land or the apply of a mapping replay). `CurrentRow` carries the four columns. // L-3 note (base text, outside the owner blocks): the apply of phase 11 section 3.8 runs the writer, whose guard compares the landed hash, so read literally an apply changes nothing. Recorded as phase 11 Open doubts 14 for the build of phases 10 and 11; reported to the user. Not fixed in this round: it needs a design for value comparison in the apply.
+OLD: 13. The outbox event `dq.stale` has no consumer until phase 18, and its payload is the DSL's name, not yet a catalogued event kind.
+
+NEW: 13. The outbox event `dq.stale` has no consumer until phase 18, and its payload is the DSL's name, not yet a catalogued event kind.
+14. The apply of section 3.8 runs the writer over the landed rows, and the writer's guard (phase 10 section 3.7 step 3) compares the hash of the landed row, which a mapping change does not move. Read literally, an apply finds every row unchanged. The writer needs a comparison of mapped values in the apply, or a stored hash that covers the mapped row; the choice is made when phases 10 and 11 are built. The three column rules of phase 10 sections 7.26 and 7.27 (`capture_source`, `paid_on` with `paid_amount`, `granted_on`) do not wait for it: they test mapped values. Found in the owner-decision round (2026-10-11).
+
+
+=== F3 [O-10-5c]
+FILE: docs/plan/phase-12.md
+WHY: O-10-5 | CONFIRMED | MEDIUM | 7.27 (and verified 7.20) say phase 11 records a `parent_missing` conflict, but the reason list of phase 11 section 3.2 step 5 and the mapping of phase 12 section 3.3 step 1 do not name it | phase 11 step 5 gains the reason `parent_missing`; phase 12 maps it to the issue kind `unresolved_pointer` (medium). Two small base corrections outside the ten changed phases; both go into round 2.
+OLD:    (medium). Rule failures -> `validation_rule`,
+NEW:    (medium); `parent_missing` (a row whose parent key has not landed, phase 10 sections 7.20 and 7.27) ->
+   `unresolved_pointer` (medium). Rule failures -> `validation_rule`,
+
+=== F4 [O-10-5d]
+FILE: docs/plan/phase-12.md
+WHY: O-10-5 | CONFIRMED | MEDIUM | 7.27 (and verified 7.20) say phase 11 records a `parent_missing` conflict, but the reason list of phase 11 section 3.2 step 5 and the mapping of phase 12 section 3.3 step 1 do not name it | phase 11 step 5 gains the reason `parent_missing`; phase 12 maps it to the issue kind `unresolved_pointer` (medium). Two small base corrections outside the ten changed phases; both go into round 2.
+OLD: (`fact_changed_in_source`, `value_change`, `label_change`; section 3.3).
+NEW: (`fact_changed_in_source`, `value_change`, `label_change`, `parent_missing`; section 3.3).

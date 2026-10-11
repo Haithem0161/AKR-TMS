@@ -1,0 +1,84 @@
+Replacements of round 1 of the owner-decision check, key 14a. 13 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-14-1]
+FILE: docs/plan/phase-14.md
+WHY: O-14-1 | CONFIRMED | MEDIUM | section 4.2 still counts 25 operations, 17 of them `screening` | 27 and 19.
+OLD: tags `lists` (8 operations) and `screening` (17); 25 in all, each with
+NEW: tags `lists` (8 operations) and `screening` (19: the 17 of section 2.8 and the 2 of section 7.19); 27 in all, each with
+
+=== F2 [O-14-2]
+FILE: docs/plan/phase-14.md
+WHY: O-14-2 | CONFIRMED | MEDIUM | section 6 item 1 checks "the ten new tables" | eleven, naming `alert.harness_cases`.
+OLD: the phase 00 schema checks pass for the ten new tables (classification and retention rows present).
+NEW: the phase 00 schema checks pass for the eleven new tables, `alert.harness_cases` of section 7.19 among them (classification and retention rows present).
+
+=== F3 [O-14-3]
+FILE: docs/plan/phase-14.md
+WHY: O-14-3 | CONFIRMED | MEDIUM | the ungoverned list of section 4.3 (a copy of 1.5) lacks `screening.harness_cases_max` | add it.
+OLD: `screening.search_per_min`, `screening.lookback_chunk`, and the four `schedule.*` keys. List thresholds
+NEW: `screening.search_per_min`, `screening.lookback_chunk`, `screening.harness_cases_max` (section 7.19), and the four `schedule.*` keys. List thresholds
+
+=== F4 [O-14-4]
+FILE: docs/plan/phase-14.md
+WHY: O-14-4 | CONFIRMED | MEDIUM | section 4.5 says phase 04 gets three change targets | four, naming `harness_case`. // O-14-4 addition | LOW | the crate listing said "the eleven tables of section 1" (base text; section 1 has ten) | "the ten tables of section 1 and alert.harness_cases (section 7.19)".
+OLD: - **Phase 04**: three change targets (`list_setting`, `screening_policy`, `good_guy_rule`); the route map is unchanged.
+NEW: - **Phase 04**: four change targets (`list_setting`, `screening_policy`, `good_guy_rule`, and `harness_case` of section 7.19); the route map is unchanged.
+
+=== F5 [O-14-4]
+FILE: docs/plan/phase-14.md
+WHY: O-14-4 | CONFIRMED | MEDIUM | section 4.5 says phase 04 gets three change targets | four, naming `harness_case`. // O-14-4 addition | LOW | the crate listing said "the eleven tables of section 1" (base text; section 1 has ten) | "the ten tables of section 1 and alert.harness_cases (section 7.19)".
+OLD: AlertDedupe, FreezeTrigger port, the three change targets (pure logic, ports only)
+NEW: AlertDedupe, FreezeTrigger port, the four change targets (pure logic, ports only)
+
+=== F6 [O-14-4]
+FILE: docs/plan/phase-14.md
+WHY: O-14-4 | CONFIRMED | MEDIUM | section 4.5 says phase 04 gets three change targets | four, naming `harness_case`. // O-14-4 addition | LOW | the crate listing said "the eleven tables of section 1" (base text; section 1 has ten) | "the ten tables of section 1 and alert.harness_cases (section 7.19)".
+OLD: # Pg repositories for the eleven tables of section 1
+
+NEW: # Pg repositories for the ten tables of section 1 and alert.harness_cases (section 7.19)
+
+
+=== F7 [O-14-4]
+FILE: docs/plan/phase-14.md
+WHY: O-14-4 | CONFIRMED | MEDIUM | section 4.5 says phase 04 gets three change targets | four, naming `harness_case`. // O-14-4 addition | LOW | the crate listing said "the eleven tables of section 1" (base text; section 1 has ten) | "the ten tables of section 1 and alert.harness_cases (section 7.19)".
+OLD: `GoodGuyTarget` (the three change targets, section 3.10), `RecordingFreezeTrigger`
+NEW: `GoodGuyTarget` (the three change targets of section 3.10; `HarnessCaseService` and the fourth target `HarnessCaseTarget` are in section 7.19), `RecordingFreezeTrigger`
+
+=== F8 [O-14-5]
+FILE: docs/plan/phase-14.md
+WHY: O-14-5 | CONFIRMED | LOW (agent: MEDIUM) | section 7.16 says `IdentifierInput` is never stored; 7.19 item 3 states the exception, 7.16 does not | 7.16 gains the pointer to the exception.
+OLD: is the raw form of `Identifiers` (section 2.1), hashed on receipt and never stored: `{ birth:
+NEW: is the raw form of `Identifiers` (section 2.1), hashed on receipt and never stored, except inside the sealed query of a known-answer case (section 7.19 item 3): `{ birth:
+
+=== F9 [O-14-6]
+FILE: docs/plan/phase-14.md
+WHY: O-14-6 | CONFIRMED | MEDIUM | the S3 tab shows a per-case result of the latest run, which no response carries (`report.bank_cases` holds only the unmet ids) | the report holds `results: [{case_id, result}]` (`met`, `unmet`, `absent`) in place of `unmet_ids`; the tab joins it by case id from the harness result S3 already loads, and shows the trial result for a case with no run yet.
+OLD: `report.bank_cases = {cases, met, unmet, absent, unmet_ids: [case ids]}`; `absent` counts cases
+NEW: `report.bank_cases = {cases, met, unmet, absent, results: [{case_id, result}]}`: `results` has one element per case the run took, and `result` is `met`, `unmet` or `absent`; `absent` counts cases
+
+=== F10 [O-14-6]
+FILE: docs/plan/phase-14.md
+WHY: O-14-6 | CONFIRMED | MEDIUM | the S3 tab shows a per-case result of the latest run, which no response carries (`report.bank_cases` holds only the unmet ids) | the report holds `results: [{case_id, result}]` (`met`, `unmet`, `absent`) in place of `unmet_ids`; the tab joins it by case id from the harness result S3 already loads, and shows the trial result for a case with no run yet.
+OLD: the state and the result of the latest run in words ("As expected", "Not as expected", "Entry no longer on the list"); "Add a case" (list, entry key, name, optional identifiers, expectation, reason) and "Retire". On S1,
+NEW: the state and the result in words ("As expected", "Not as expected", "Entry no longer on the list"); "Add a case" (list, entry key, name, optional identifiers, expectation, reason; the reason field carries the hint to write no name in it) and "Retire". The result of a case is its element of `report.bank_cases.results` in the newest `gate` or `oracle` run of the list's active version, joined by case id (`useGetScreeningHarnessRuns`, which S3 already calls); a case that no such run holds yet shows its trial result (`trial.met`). On S1,
+
+=== F11 [O-14-6]
+FILE: docs/plan/phase-14.md
+WHY: O-14-6 | CONFIRMED | MEDIUM | the S3 tab shows a per-case result of the latest run, which no response carries (`report.bank_cases` holds only the unmet ids) | the report holds `results: [{case_id, result}]` (`met`, `unmet`, `absent`) in place of `unmet_ids`; the tab joins it by case id from the harness result S3 already loads, and shows the trial result for a case with no run yet.
+OLD: The harness report, which CFG, CHK, IA and AS read on S3, holds counts and case ids.
+NEW: The harness report, which CFG, CHK, CH, IA and AS read on S3, holds counts and, for each case id, one of three results.
+
+=== F12 [L-4]
+FILE: docs/plan/phase-14.md
+WHY: L-4 | LOW | section 7.19 item 1 says a trial outcome can be `absent`, but item 4 step 3 refuses a key that the active version does not hold, so a trial is never `absent` | the sentence now says so; `absent` is a result of a later harness run only.
+OLD: (`hit`, `below_line`, `needs_more_data`, `clear`) or `absent` when the version has no entry with the key.
+NEW: (`hit`, `below_line`, `needs_more_data`, `clear`). A trial is never `absent`: item 4 step 3 refuses a key that the active version does not hold, and `absent` is a result of a later harness run only (item 6).
+
+=== F13 [O-14-7]
+FILE: docs/plan/phase-14.md
+WHY: O-14-7 | CONFIRMED | LOW (agent: MEDIUM) | the curl check names no list and no entry key | `list_code: "iq_national"` and an entry key of the fixture version of section 6, after that version is active.
+OLD: - Curl (added to the phase suite): as SS `POST /api/v1/screening/harness-cases` with a synthetic entry key, `expect: "hit"` and `Idempotency-Key: hc-0001` -> 202
+NEW: - Curl (added to the phase suite, after its Lists step has activated the fixture version of `iq_national`): as SS `POST /api/v1/screening/harness-cases` with `list_code: "iq_national"`, the `entry_key` and the name of one entry of that fixture version, `expect: "hit"` and `Idempotency-Key: hc-0001` -> 202

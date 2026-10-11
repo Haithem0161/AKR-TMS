@@ -1181,11 +1181,12 @@ threshold appears in any reason-code text the screen shows to branch roles.
 ## 6. Verification
 
 1. `make migrate`: migrations 0026 to 0028 apply after phases 00 to 06 and a second run is a no-op. Negative checks, each
-   as the owner role and as `akr_app`: `DELETE FROM ref.countries` fails with `reference rows are never deleted`;
-   `UPDATE ref.fx_rates SET rate_to_iqd = 1` fails with `an FX rate is a fact`; a second open override for one `iso2` fails
+   as the owner role `akr_migrate` and as `akr_app`: `DELETE FROM ref.countries` fails with `reference rows are never deleted`
+   and `UPDATE ref.fx_rates SET rate_to_iqd = 1` fails with `an FX rate is a fact` (the two messages as the owner; as `akr_app`,
+   which holds neither privilege, both statements fail with permission denied); a second open override for one `iso2` fails
    `uq_country_override_open`; a `calendar_days` row with `kind = 'ramadan_hours'` and empty `attrs` fails its CHECK; a second
    default calendar fails `uq_calendars_default`; `UPDATE admin.policy_packs SET document = document` fails with `versions are
-   append-only`; `akr_app` has no DELETE on any `ref` or `admin` table of this phase; `akr_app` cannot UPDATE
+   append-only` as the owner and with permission denied as `akr_app` (SELECT and INSERT only); `akr_app` has no DELETE on any `ref` or `admin` table of this phase; `akr_app` cannot UPDATE
    `ref.reason_codes.family` or `code`; `admin.timers` rejects a `calendar_id` that is not in `ref.calendars`.
 2. `cargo check` with `cargo sqlx prepare` (the ten tables and their queries); `cargo clippy --all-targets -- -D warnings`;
    `cargo deny check`.

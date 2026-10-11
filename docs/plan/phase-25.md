@@ -5,12 +5,12 @@
 **Dependencies:** Phase 00 (jobs, settings, cron schedules, the outbox (the reserved topic `siem.export` is not used, section 3.5), the network zone model and `deploy/zones.yaml`, OpenBao paths and AppRoles, `akr-ctl bundle verify` and the signed release bundle), Phase 01 (`StepUpService` with the closed classes `break_glass`, `approval`, `access_change`, `export`; `admin.users` with `kind` and `expires_at`; `admin.role_grants` with `valid_to` (altered here: source `support_session`); `ClientCredentials` service principals, the first consumer being the SIEM pull API; the Kratos and BFF session settings), Phase 02 (the audit writer, `audit.audit_log` and its chain, the catalogue with the `siem` flag, `audit.audit_anchors`, `EvidenceStore::put_generated`, the evidence owner registry), Phase 03 (`AccessMatrixBuilder::build(at)`, `OpsCockpit::snapshot()`, `MASKED_KINDS`, `admin.purpose_codes` (`break_glass`), the `system` and `user` entities of the Cedar schema, the `self` and `system_admin` action groups, the Cedar range 50 with `50_system.cedar`), Phase 04 (`admin.change_requests`, `ChangeTargetRegistry`, routes `cr_access` and `cr_access_adm`, the `role_grant` change target, `admin.evidence_objects` through phase 02), Phase 17 (`services::visibility::build`, the Cedar `Case` entity with `assignees`, `case.read` and the suspicion forbids of `90_alerts.cedar`), Phase 18 (`casework.case_acl` and its rule-5 clause, the case write and read actions of `91_cases.cedar`, sealed-case refusals with `E_CASE_SEALED`), Phase 19 (`casework.authority_requests`, the M-37 disclosure fields), Phase 22 (`notify.request`, the `NotificationDispatcher`, the closed `NoticeCode` list and the notice templates), Phase 24 (`audit.resource_tier(TEXT, UUID, UUID)` as SECURITY DEFINER, `GET /access/control-report`, the `pack.*` routes, the `G5` counts, `akr_readonly` rules)
 
 **Macro-phase:** P1
-**Complexity:** M (22 routes: 12 rows of API.md 3.2, 3.3, 3.20 and the help row owned here, 10 rows added beyond API.md; 11 tables in 3 migrations (`0080` to `0082`); 1 altered table (`admin.role_grants`); 1 SECURITY DEFINER read function in `audit`; 8 new job kinds; no timer kind; no new outbox topic)
-**Binaries touched:** akr-api (routers `access_reviews`, `break_glass`, `releases`, `support_sessions`, `help`, `siem_pull`; `AccessReviewService`, `BreakGlassService`, `ReleaseService`, `SupportSessionService`, `HelpCentreService` in `AppState`; the pull handler of `SiemForwarder` reads through `SiemRepository`) | akr-worker (jobs `access_review_snapshot`, `access_review_sweep`, `break_glass_sweep`, `siem_forward`, `support_session_sweep`, `support_bundle_purge`, `release_verify`, `anchor_timestamp`; `SiemForwarder` owns the push to the bank's SIEM) | akr-ctl (new subcommands `support-bundle`, `oidc upstream check` and `siem configure`, and `identity link-upstream` and `identity unlink-upstream` in the phase 01 `identity` group; no new binary) | akr-ingestd and akr-assess unchanged
+**Complexity:** XL by the template rule of 25 routes or more (26 routes: 12 rows of API.md 3.2, 3.3, 3.20 and the help row owned here, 14 rows added beyond API.md, four of them by the owner decisions of sections 7.23 and 7.24; 11 tables in 3 migrations (`0080` to `0082`); 1 altered table (`admin.role_grants`); 2 SECURITY DEFINER read functions in `audit` (`audit.siem_page`, and `audit.siem_access_page` of section 7.23); 8 new job kinds; no timer kind; no new outbox topic)
+**Binaries touched:** akr-api (routers `access_reviews`, `break_glass`, `releases`, `support_sessions`, `help`, `siem_pull`, and `siem_admin` of section 7.24; `AccessReviewService`, `BreakGlassService`, `ReleaseService`, `SupportSessionService`, `HelpCentreService`, and `SiemDeadLetterService` of section 7.24, in `AppState`; the pull handler of `SiemForwarder` reads through `SiemRepository`) | akr-worker (jobs `access_review_snapshot`, `access_review_sweep`, `break_glass_sweep`, `siem_forward`, `support_session_sweep`, `support_bundle_purge`, `release_verify`, `anchor_timestamp`; `SiemForwarder` owns the push to the bank's SIEM) | akr-ctl (new subcommands `support-bundle`, `oidc upstream check` and `siem configure`, and `identity link-upstream` and `identity unlink-upstream` in the phase 01 `identity` group; no new binary) | akr-ingestd and akr-assess unchanged
 
 **Requirements carried:**
 - Implemented here: SP-24 (break-glass: reason code, two named approvers, never the requester, step-up class `break_glass`, four-hour limit enforced by the database, every use flagged, CISO and MLRO notices, no export, automatic end, review within 24 hours, dedicated log; section 3.2), SP-25 (the quarterly access review part: snapshot, confirm or revoke, sign-off with step-up, overdue warning; the policy-governance part is phase 03 and 04), SP-43 (CEF or JSON over TLS syslog and a signed pull API, the use-case catalogue as data, the phase 02 stripping rule; section 3.5), SP-44 (partly: the inspector accounts reuse the assessor role `AS` of phase 24 with a bank-approved time box (section 3.7); the RFC 3161 option on anchors, off by default), SP-52 (partly: the disclosure record of support bundles only; section 3.8), SP-64 (bank-opened, time-boxed vendor sessions, the `VS` role with no data permissions, recorded, ended automatically; section 3.8), SP-65 (`akr-ctl support-bundle`: allow-list redaction, per-bundle pseudonym key, manifest confirmed by the bank, signature, size cap, deletion after 30 days), SP-66 (signed bundles only, release notes, SBOM diff, rollback plan, the bank's four-eyes approval, the operator's apply record, no call-home; section 3.6), TS-25 (generic OIDC upstream as Kratos configuration, local MFA still enforced; section 3.4), TS-27 (SIEM export over syslog and the pull API; the tested redaction filter is phase 00), TS-28 (new ops tiles only, on `OpsCockpit::snapshot()`), TS-30 (release bundle import, verification, four-eyes approval and the operator's apply record; section 3.6), M1 (P1 generic OIDC upstream), M2 (quarterly access review), M3 (break-glass with two approvers and a four-hour limit), M20 (release bundle import and verification, support sessions, platform health tiles, help centre with "what changed")
-- Partly implemented: SP-18 (the sign-in and step-up events the anomaly rules need are forwarded as kinds with the `siem` flag; the anomaly rules themselves are the SIEM rules of section 7+ (SP-36, partly implemented there)), SP-20 (the access-review snapshot reads the matrix of phase 03), SP-81 (not built here: the posture page is Open doubts 16), TS-34 (the single-tenant default is the installation model; the hosted cluster is phase 31 and Open doubts 17)
+- Partly implemented: SP-18 (the sign-in and step-up events the anomaly rules need are forwarded as kinds with the `siem` flag; the anomaly rules themselves are the SIEM rules of sections 7.13 and 7.23 (SP-36: by the owner decision of 2026-10-10 the access events are exported and the rule pack ships, except canary access (P2, DR-391) and the DBA and operator rules, which the bank feeds from pgAudit and its bastion)), SP-20 (the access-review snapshot reads the matrix of phase 03), SP-81 (not built here: the posture page is Open doubts 16), TS-34 (the single-tenant default is the installation model; the hosted cluster is phase 31 and Open doubts 17)
 - Not carried here: SP-03, SP-07, SP-76 and the other vendor programme rows (outside the product), SP-89 (hosted model, Open doubts 17), SAML and SCIM (phase 31, TS-25 and SP-14), K3s, Helm and automated failover (phase 30, TS-29, TS-32), the general disclosure register of SP-52 beyond support bundles (Open doubts 9), the posture page of SP-81 (Open doubts 16)
 - Gap pass 1 (coverage), partly implemented: SP-90 (signed release bundles verified on import; no call-home); VA-25 (signed release bundles with a recorded rollback plan), VA-38 (the support session opened by the bank), VA-47 (in-product help and the bilingual glossary), VA-56 and VO-08 (offline signed bundles for the platform); VB-52 (on-premises runtime with signed offline bundles), VD-20 (no call-home; offline signed bundles), VD-38 (no licence server or call-home).
 - Gap pass 1 (coverage), not carried: SP-01, SP-67, SP-68, SP-77 (vendor security programme and contract, DR-396), SP-50 (pseudonymised tuning sets and vendor bundles, P2, DR-396); SP-30 (canary records, P2, DR-391); VA-01, VA-50 and VO-05 (escrow and continuity terms, DR-396); VA-20 and VO-06 (pricing); VA-34 (support policy); VO-14 (sanctions clause in the contract); VO-13 (release-gate note; the ROADMAP P1 exit criteria are the gate); DR-402; VB-26, VD-08, VD-09, VD-14, VD-15, VD-26, VD-28, VD-29, VD-30, VD-31, VD-35 and VD-37 (vendor, commercial and process items, DR-403); VC-27, VC-40, VC-46, VC-49, VC-50, VC-60 to VC-65, VC-76 and VC-84 (vendor, commercial, contract and procurement items, DR-404).
@@ -316,20 +316,32 @@ CREATE TABLE IF NOT EXISTS admin.siem_cursors (
 );
 
 -- A line that the collector refused after siem.attempts_before_dead_letter tries, or that the formatter could not
--- render. It holds the audit id, the kind and a reason code, never the line itself.
+-- render. It holds the audit id, the kind and a reason code, never the line itself. An operator asks for a resend or
+-- marks it resolved with a code (section 7.24, owner decision 5).
 CREATE TABLE IF NOT EXISTS admin.siem_dead_letters (
     id                  UUID PRIMARY KEY,
-    audit_id            UUID NOT NULL,
+    stream              TEXT NOT NULL DEFAULT 'audit_log' CHECK (stream IN ('audit_log', 'access_event')),
+    audit_id            UUID NOT NULL,                       -- the audit row id, or the access event id (section 7.23)
     occurred_at         TIMESTAMPTZ NOT NULL,
     action              TEXT NOT NULL CHECK (action ~ '^[a-z][a-z_]*(\.[a-z][a-z_]*)+$'),
     reason_code         TEXT NOT NULL CHECK (reason_code IN ('format_failed', 'unknown_kind', 'collector_refused', 'oversize')),
     attempts            INT NOT NULL CHECK (attempts >= 1),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resend_requested_at TIMESTAMPTZ,
+    resend_requested_by UUID REFERENCES admin.users(id) ON DELETE RESTRICT,
     resolved_at         TIMESTAMPTZ,
     resolved_by         UUID REFERENCES admin.users(id) ON DELETE RESTRICT,
-    CHECK ((resolved_at IS NULL) = (resolved_by IS NULL))
+    resolution          TEXT CHECK (resolution IN ('resent', 'marked')),
+    resolution_code     TEXT CHECK (resolution_code IN ('delivered_other_way', 'not_needed', 'cannot_be_sent')),
+    version             INT NOT NULL DEFAULT 1 CHECK (version >= 1),
+    CHECK ((resolved_at IS NULL) = (resolved_by IS NULL)),
+    CHECK ((resolved_at IS NULL) = (resolution IS NULL)),
+    CHECK ((resend_requested_at IS NULL) = (resend_requested_by IS NULL)),
+    CHECK (((resolution = 'marked') IS TRUE) = (resolution_code IS NOT NULL))   -- a code on a marked row only; an open row has neither
 );
 CREATE INDEX IF NOT EXISTS idx_siem_dead_letters_open ON admin.siem_dead_letters (created_at) WHERE resolved_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_siem_dead_letters_resend ON admin.siem_dead_letters (resend_requested_at)
+    WHERE resend_requested_at IS NOT NULL AND resolved_at IS NULL;
 
 -- RFC 3161 time stamp token of an anchor, requested by the anchor_timestamp job when audit.rfc3161_enabled is TRUE.
 -- The anchor row itself stays immutable (phase 02 trigger); the token is a separate fact about it.
@@ -378,6 +390,67 @@ END $$;
 ALTER FUNCTION audit.siem_page(TIMESTAMPTZ, UUID, INT, TEXT[]) OWNER TO akr_migrate;
 REVOKE ALL ON FUNCTION audit.siem_page(TIMESTAMPTZ, UUID, INT, TEXT[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION audit.siem_page(TIMESTAMPTZ, UUID, INT, TEXT[]) TO akr_app;
+
+-- Access lines for the SIEM (SP-36, owner decision 1). One row per access event after the cursor, in chain order.
+-- A row is protected when its stored tier, the current tier of its resource or the current tier of its subject party
+-- is not normal: then resource_id and subject_party are not returned. The tier value is never returned.
+-- has_work: the actor holds a claimed alert on the subject party, or a live access-list grant on a case that names it.
+-- is_staff: the subject party is a staff member or is marked as related to staff (phase 10).
+CREATE OR REPLACE FUNCTION audit.siem_access_page(p_after_at TIMESTAMPTZ, p_after_id UUID, p_limit INT)
+RETURNS TABLE (
+    occurred_at     TIMESTAMPTZ,
+    access_id       UUID,
+    action          TEXT,
+    decision        TEXT,
+    actor_id        UUID,
+    actor_role      TEXT,
+    on_behalf_of    UUID,
+    resource_type   TEXT,
+    resource_id     UUID,
+    subject_party   UUID,
+    protected       BOOLEAN,
+    purpose_code    TEXT,
+    client_ip       INET,
+    work_link       BOOLEAN,
+    subject_staff   BOOLEAN
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
+BEGIN
+    IF p_limit IS NULL OR p_limit < 1 OR p_limit > 5000 THEN
+        RAISE EXCEPTION 'siem page size out of range' USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+    RETURN QUERY
+    SELECT e.occurred_at, e.id, e.action, e.decision, e.actor_id, e.actor_role, e.on_behalf_of, e.resource_type,
+           CASE WHEN NOT t.is_protected THEN e.resource_id END,
+           CASE WHEN NOT t.is_protected THEN e.subject_party END,
+           t.is_protected, e.purpose_code, e.client_ip, w.has_work, s.is_staff
+    FROM audit.access_event e
+    CROSS JOIN LATERAL (
+        SELECT (e.tier <> 'normal'
+                OR audit.resource_tier(e.resource_type, e.resource_id, NULL) <> 'normal'
+                OR (e.subject_party IS NOT NULL AND casework.effective_tier(e.subject_party) <> 'normal')) AS is_protected) t
+    CROSS JOIN LATERAL (
+        SELECT CASE WHEN e.subject_party IS NULL THEN NULL ELSE (
+                   EXISTS (SELECT 1 FROM alert.alerts a
+                            WHERE a.party_id = e.subject_party AND a.state = 'claimed' AND a.claimed_by = e.actor_id)
+                OR EXISTS (SELECT 1 FROM casework.case_acl g
+                             JOIN casework.case_parties cp ON cp.case_id = g.case_id
+                            WHERE g.principal_id = e.actor_id AND g.revoked_at IS NULL
+                              AND (g.expires_at IS NULL OR g.expires_at > e.occurred_at)
+                              AND cp.party_id = e.subject_party)) END AS has_work) w
+    CROSS JOIN LATERAL (
+        SELECT CASE WHEN e.subject_party IS NULL THEN NULL ELSE COALESCE((
+                   SELECT p.staff_flag OR COALESCE(p.related_to_staff, FALSE)
+                     FROM canon.party p
+                    WHERE p.id = e.subject_party AND p.recorded_to IS NULL
+                    ORDER BY p.valid_from DESC LIMIT 1), FALSE) END AS is_staff) s
+    WHERE (e.occurred_at, e.id) > (p_after_at, p_after_id)
+    ORDER BY e.occurred_at, e.id
+    LIMIT p_limit;
+END $$;
+ALTER FUNCTION audit.siem_access_page(TIMESTAMPTZ, UUID, INT) OWNER TO akr_migrate;
+REVOKE ALL ON FUNCTION audit.siem_access_page(TIMESTAMPTZ, UUID, INT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION audit.siem_access_page(TIMESTAMPTZ, UUID, INT) TO akr_app;
 
 -- Guards. Break-glass log: append-only. Break-glass grants: identity fixed, status moves forward only, the time box
 -- can only shrink, a reviewed grant is final. Access reviews: a signed review is final. Items: a decision is made once.
@@ -539,7 +612,8 @@ GRANT UPDATE (status, archive_deleted_at, version) ON admin.support_bundles TO a
 GRANT SELECT, INSERT, UPDATE (last_occurred_at, last_audit_id, forwarded_total, updated_at, version)
     ON admin.siem_cursors TO akr_app;
 GRANT SELECT, INSERT ON admin.siem_dead_letters TO akr_app;
-GRANT UPDATE (resolved_at, resolved_by) ON admin.siem_dead_letters TO akr_app;
+GRANT UPDATE (resend_requested_at, resend_requested_by, resolved_at, resolved_by, resolution, resolution_code, reason_code, attempts,
+              version) ON admin.siem_dead_letters TO akr_app;
 GRANT SELECT, INSERT ON admin.anchor_timestamps TO akr_app;
 GRANT UPDATE (verified_at) ON admin.anchor_timestamps TO akr_app;
 
@@ -571,6 +645,8 @@ INSERT INTO admin.settings (key, value, value_type, floor, governed, label) VALU
   '{"ar": "أقصى تأخير مقبول لتصدير الأحداث (ثوان)", "en": "Longest accepted SIEM export lag (seconds)"}'),
  ('siem.attempts_before_dead_letter', '5', 'integer', NULL, FALSE,
   '{"ar": "محاولات قبل نقل الحدث إلى قائمة الأحداث المرفوضة", "en": "Attempts before a SIEM line is dead-lettered"}'),
+ ('siem.export_access_events', 'true', 'boolean', NULL, TRUE,
+  '{"ar": "تصدير سجل الاطلاع على السجلات إلى نظام السجلات الأمنية", "en": "Export record-access events to the SIEM"}'),
  ('release.currency_days', '180', 'integer', NULL, FALSE,
   '{"ar": "أقصى عمر للإصدار المطبق قبل التنبيه (أيام)", "en": "Age of the applied release before a warning (days)"}'),
  ('audit.rfc3161_enabled', 'false', 'boolean', NULL, TRUE,
@@ -616,8 +692,9 @@ FROM (VALUES
                                         'signature', 'signing_key_version', 'pseudonym_key_ref', 'size_bytes', 'confirmed_by',
                                         'confirmed_at', 'archive_deleted_at', 'status', 'version']),
   ('siem_cursors', 'internal', ARRAY['consumer', 'last_occurred_at', 'last_audit_id', 'forwarded_total', 'updated_at', 'version']),
-  ('siem_dead_letters', 'internal', ARRAY['id', 'audit_id', 'occurred_at', 'action', 'reason_code', 'attempts', 'created_at',
-                                          'resolved_at', 'resolved_by']),
+  ('siem_dead_letters', 'internal', ARRAY['id', 'stream', 'audit_id', 'occurred_at', 'action', 'reason_code', 'attempts', 'created_at',
+                                          'resend_requested_at', 'resend_requested_by', 'resolved_at', 'resolved_by',
+                                          'resolution', 'resolution_code', 'version']),
   ('anchor_timestamps', 'internal', ARRAY['anchor_id', 'tsa_name', 'token', 'token_sha256', 'requested_at', 'verified_at'])
 ) AS v(t, cls, cols) CROSS JOIN LATERAL unnest(v.cols) AS c
 ON CONFLICT (schema_name, table_name, column_name) DO NOTHING;
@@ -650,7 +727,7 @@ ON CONFLICT (schema_name, table_name) DO NOTHING;
   - `HelpArticle { id, release_id, code, kind: ArticleKind, title: Bilingual, body: Bilingual, sha256, sort_order }`
   - `SupportSession { id, vendor_user_id, requested_by, approved_by, reason_code: SupportReason, ticket_ref, requested_hours, status: SupportStatus, requested_at, approved_at, starts_at, ends_at, ended_at, ended_by, version }`
   - `SupportBundle { id, session_id, created_by, created_at, manifest_sha256, archive_sha256, signature: [u8; 64], signing_key_version, pseudonym_key_ref, size_bytes, confirmed_by, confirmed_at, sent_at, archive_deleted_at, status, version }`
-  - `SiemLine { occurred_at, audit_id, action, severity: SiemSeverity, actor_id, on_behalf_of, resource_type, resource_id: Option<Uuid>, resource_key: Option<String>, details }` (the output of `audit.siem_page` plus the `severity` of the catalogue entry, section 3.5; never a `case_id` field)
+  - `SiemLine { occurred_at, audit_id, action, severity: SiemSeverity, actor_id: Option<Uuid>, on_behalf_of: Option<Uuid>, resource_type, resource_id: Option<Uuid>, resource_key: Option<String>, details }` (the output of `audit.siem_page` plus the `severity` of the catalogue entry, section 3.5; never a `case_id` field)
   - `SiemCursor { consumer, last_occurred_at, last_audit_id, forwarded_total, version }`
 - **Closed enums** (each a Rust enum with a fixed string per variant; a value outside it cannot be built): `ReviewDecision { Pending, Confirmed, RevokeProposed, Flagged, Superseded }`, `ReviewNote { StillNeeded, RoleChanged, LeftPost, Other }`, `BreakGlassReason { MlroUnavailable, CaseUnowned, RegulatorDeadline, StuckWork, Other }`, `BreakGlassStatus { Requested, Active, Ended, Expired, Lapsed }`, `ApproverRole { Ch, Sec }`, `BreakGlassEventKind` (the nine values of `break_glass_log.kind`), `ReleaseStatus { Imported, Verifying, Verified, Refused, Proposed, Approved, Applied, Superseded }`, `RefusalCode` (the nine codes of `0081`), `ArticleKind { Article, Glossary, WhatChanged }`, `SupportReason { DefectReproduction, UpgradeAssist, IncidentBridge }`, `SupportStatus { Requested, Active, Ended, Expired, RefusedTimeout }`, `SiemSeverity { Info, Notice, Warning, Critical }` (mirrors phase 02 `Severity`).
 - **Create/Update DTOs**: `CreateAccessReview { }` (the snapshot instant is the server clock); `DecideAccessReviewItem { decision: ReviewDecision (confirmed, flagged, revoke_proposed), note_code: Option<ReviewNote> }` with `If-Match` on the item version; `CreateBreakGlassRequest { case_id, reason_code }`; `DecideBreakGlass { }` (approval only); `ReviewBreakGlass { outcome_code }`; `VerifyRelease { bundle_ref }`; `ProposeRelease { }`; `RecordReleaseApplied { rollout_evidence_id: Option<Uuid> }`; `CreateSupportSession { vendor_user_id, reason_code, ticket_ref, requested_hours }`; `RegisterSupportBundle { session_id, manifest_sha256, archive_sha256, signature, signing_key_version, pseudonym_key_ref, size_bytes }`. Update DTOs carry `version` for `If-Match`; no other update of these records exists.
@@ -660,7 +737,7 @@ ON CONFLICT (schema_name, table_name) DO NOTHING;
   - `ReleaseRepository`: `insert`, `lock`, `set_verification(tx, id, VerificationResult)`, `set_status(tx, id, from, to, expected_version)`, `record_applied(tx, id, by, at)`, `find_applied_latest()`, `newest_verified()`.
   - `HelpRepository`: `insert_many(tx, release_id, Vec<HelpArticle>)` (write once), `list(kind: Option<ArticleKind>, lang)`.
   - `SupportSessionRepository`: `insert`, `lock`, `set_approval(tx, id, by, at, starts_at, ends_at, expected_version)`, `end(tx, id, status, by, at)`, `open_for_vendor(vendor_user_id)`, `due_sweep(now)`, `insert_bundle(tx, &SupportBundle)`, `mark_bundle_purged(tx, id, at)`.
-  - `SiemRepository`: `page(after: (DateTime<Utc>, Uuid), limit, kinds: &[&str]) -> Vec<SiemLine>` (calls `audit.siem_page`), `cursor_lock(tx, consumer)`, `advance(tx, consumer, at, id, n)`, `dead_letter(tx, &DeadLetter)`, `status() -> SiemStatus { lag_s, dead_letters_7d, last_forwarded_at }` (`dead_letters_7d` is the count of dead letters created in the last 7 days, section 7.16).
+  - `SiemRepository`: `page(after: (DateTime<Utc>, Uuid), limit, kinds: &[&str]) -> Vec<SiemLine>` (calls `audit.siem_page`), `cursor_lock(tx, consumer)`, `advance(tx, consumer, at, id, n)`, `dead_letter(tx, &DeadLetter)`, `status() -> SiemStatus { lag_s, dead_letters_open, last_forwarded_at }` (`dead_letters_open` is the count of dead letters with `resolved_at IS NULL`, section 7.24).
 - **Repository impl notes** (`Pg*Repository`, `akr_app` pool): every `UPDATE` names its column list from the grants of section 1.3 (a column outside the list is a permission error, which is a test); `RETURNING` is used for the version after each update; `set_status` is `UPDATE ... WHERE id = $1 AND version = $2 AND status = $3` and returns `E_VERSION_CONFLICT` on zero rows. `SiemRepository::page` reads only through `audit.siem_page`; the code has no `SELECT` on `audit.audit_log`.
 - **utoipa schemas** (request and response DTOs, tag `platform`): `AccessReviewView`, `AccessReviewItemView` (no grant row copy; grant id, user id, role, decision), `AccessReviewStarted` (202), `BreakGlassRequestView` (no case title, no party; the case id is returned only to the requester, see section 3.2), `BreakGlassDetailView`, `ReleaseView` (notes bilingual; `refusal_code` closed list), `ReleaseVerifyAccepted` (202 with job id), `HelpArticleView`, `SupportSessionView` (vendor user id and ticket reference, no personal fields), `SupportBundleRegistered`, `SiemEventPage { events: Vec<SiemEventDto>, next: Option<SiemCursorDto> }`, `SiemEventDto` (the CEF fields as JSON keys, section 3.5), `Problem` (phase 00).
 - **Route table** (scopes from API.md section 2; markers SU (step-up), CR (change request), 4E (four eyes), IDEM (`Idempotency-Key`), IF (`If-Match`); the Cedar action of each row is in section 3.12). A row marked *owned* is API.md 3.2, 3.3, 3.20 or the help row; *added* rows are new in this phase and are added to API.md in the same change.
@@ -689,9 +766,13 @@ ON CONFLICT (schema_name, table_name) DO NOTHING;
 | POST | `/api/v1/admin/support-sessions/{id}/bundles` | `admin.system` | Register a support bundle the operator built and confirmed (`akr-ctl support-bundle`); **SU** `export`; IDEM (added) |
 | GET | `/api/v1/help/articles` | `self` | Bilingual help articles and "what changed" entries of the installed release; `?kind=` (owned) |
 | GET | `/api/v1/siem/events` | `siem.pull` | Pull API for a service principal: events after a cursor, allow-listed fields only (added; section 3.5) |
+| GET | `/api/v1/siem/access-events` | `siem.pull` | Pull API for a service principal: access lines after a cursor, the fields of section 7.23 item 5 (added; section 7.23) |
+| GET | `/api/v1/admin/siem/dead-letters` | `admin.system, security.ops` | Dead letters, newest first; `?state=open\|resolved\|all` (default `open`), cursor, limit (added; section 7.24) |
+| POST | `/api/v1/admin/siem/dead-letters/{id}/resend` | `admin.system` | Ask the forwarder to send the line again; 202; IF; IDEM (added; section 7.24) |
+| POST | `/api/v1/admin/siem/dead-letters/{id}/resolve` | `admin.system` | Mark a dead letter resolved without sending it, with a resolution code; IF (added; section 7.24) |
 
-- **Router**: `pub fn router() -> Router<AppState>` in each of the six modules (`access_reviews`, `break_glass`, `releases`, `support_sessions`, `help`, `siem_pull`), merged in `build_app`. The `siem_pull` router is mounted only when `siem.pull` is granted to a client in the token allow-list, and is otherwise absent (404 by the router, not by the handler).
-- **Route count**: 22 rows, of which 12 are owned (API.md 3.2, 3.3, 3.20 and the help row) and 10 are added (the review detail, the review item decision, the break-glass list and review, the release propose and applied records, the rollout record upload of section 7.22, the support session list and bundle record, and the SIEM pull route). The count is within the M size band (15 to 22). The owned `GET /api/v1/admin/releases` row gains the scope `security.ops` (the SEC reader of section 3.12); the change is listed in section 4.5.
+- **Router**: `pub fn router() -> Router<AppState>` in each of the seven modules (`access_reviews`, `break_glass`, `releases`, `support_sessions`, `help`, `siem_pull`, and `siem_admin` of section 7.24), merged in `build_app`. The `siem_pull` router is mounted only when `siem.pull` is granted to a client in the token allow-list, and is otherwise absent (404 by the router, not by the handler).
+- **Route count**: 26 rows, of which 12 are owned (API.md 3.2, 3.3, 3.20 and the help row) and 14 are added (the review detail, the review item decision, the break-glass list and review, the release propose and applied records, the rollout record upload of section 7.22, the support session list and bundle record, the SIEM pull route, the access-line pull route of section 7.23, and the three dead-letter routes of section 7.24). The size of the phase is XL (25 routes or more; section 7.24 item 2). The owned `GET /api/v1/admin/releases` row gains the scope `security.ops` (the SEC reader of section 3.12); the change is listed in section 4.5.
 
 ## 3. Business Logic
 
@@ -965,7 +1046,7 @@ impl SupportSessionService {
 | Tile | Source | Warn | Critical |
 |-|-|-|-|
 | `siem_lag` | the lag of section 3.5 step 7 (the age of the oldest exported row after the cursor; 0 when there is none) | above `siem.max_lag_s / 2` | above `siem.max_lag_s` |
-| `siem_dead_letters` | count of `siem_dead_letters` created in the last 7 days (resolving one is P2, section 7+) | at least 1 | above 10 |
+| `siem_dead_letters` | count of `siem_dead_letters` with `resolved_at IS NULL` (an operator resends or resolves them, section 7.24) | at least 1 | above 10 |
 | `release_currency` | age of the applied release against `release.currency_days`; a newer verified, proposed or approved release not applied | either condition | a newer verified, proposed or approved release has waited unapplied for more than 30 days, counted from its `verified_at` |
 | `support_sessions_open` | count of sessions `active` (and `requested` older than 1 hour) | at least 1 | none (count is information) |
 | `break_glass_active` | count of grants `active` | at least 1 | a grant `active` past `expires_at` (must not happen; alarm) |
@@ -1202,6 +1283,7 @@ The SIEM column is the flag of the new kinds; the kinds of phases 03 and 04 keep
 | `siem.batch_size` | integer | FALSE | none | 3.5 |
 | `siem.max_lag_s` | duration_s | FALSE | none | 3.5 and tile |
 | `siem.attempts_before_dead_letter` | integer | FALSE | none | 3.5 |
+| `siem.export_access_events` | boolean | TRUE | none | 7.23 item 6 |
 | `release.currency_days` | integer | FALSE | none | 3.10 |
 | `audit.rfc3161_enabled` | boolean | TRUE | none | 3.7 |
 | `auth.upstream_mode` | string | TRUE | none | 3.4 |
@@ -1250,7 +1332,7 @@ No timer kind is added: the four-hour end is enforced by the predicate at read t
 ### 4.4 Network zones, metrics, readiness, OpenAPI
 
 - **Zone rules** (`deploy/zones.yaml`, checked by `make zone-check`; SP-04, DR-235): `akr-worker` -> `z2_bank` (new network, not internal, attached to `akr-worker` only, egress limited by the rendered nftables rules to the SIEM collector address and the TSA address declared at install with `akr-ctl siem configure`); `kratos` -> `z3_idp` (new network, not internal, attached to `kratos` only, egress limited to the bank's OIDC issuer address when `auth.upstream_mode = oidc`; the rule is absent in `local_only`); `akr-api` -> no new destination. Every other rule of phase 00 stands. The `log-forwarder` (Fluent Bit) keeps its JSON stdout path; the SIEM path of this phase is the forwarder's own and does not replace it.
-- **Metrics** (phase 00 OTel and `/metrics`, labels without ids): `akr_siem_lag_seconds`, `akr_siem_forwarded_total`, `akr_siem_dead_letters_7d`, `akr_break_glass_active`, `akr_break_glass_review_overdue`, `akr_access_reviews_overdue`, `akr_support_sessions_active`, `akr_release_applied_age_days`, `akr_anchor_timestamp_unverified`.
+- **Metrics** (phase 00 OTel and `/metrics`, labels without ids): `akr_siem_lag_seconds`, `akr_siem_forwarded_total`, `akr_siem_dead_letters_open`, `akr_break_glass_active`, `akr_break_glass_review_overdue`, `akr_access_reviews_overdue`, `akr_support_sessions_active`, `akr_release_applied_age_days`, `akr_anchor_timestamp_unverified`.
 - **Readiness**: no change. The SIEM forwarder reports unready only when the lag of section 3.5 step 7 is above `siem.max_lag_s` for 3 consecutive checks (a warning on the tile, not a readiness failure for `akr-worker`, so a SIEM outage does not restart the worker).
 - **OpenAPI**: tag `platform` for every route of section 2 except the pull route, which takes tag `siem`; `make generate-api` regenerates the Orval client in the same change (phase 00 drift check).
 
@@ -1423,7 +1505,7 @@ report keeps `canary_not_built: true` (phase 24 section 7+ closes its Open doubt
 
 Verification pass (2026-10-10), from tools/agent/verify/; lead-verified (tools/agent/verify-verdict.md).
 
-### 7.13 SP-36 behaviour rules: what ships and what does not (V-01-07-a, MEDIUM; DR-413)
+### 7.13 SP-36 behaviour rules: what ships and what does not (item 3 replaced by section 7.23) (V-01-07-a, MEDIUM; DR-413)
 No phase carried SP-36 (the behaviour rule pack of research 30 section 9.3), and this phase's header named phase 24
 for it. Decision: SP-36 is partly implemented here and the rest is P2.
 1. Shipped: `deploy/siem/use_cases.yaml` (section 3.5) gains the correlation rules that the exported kinds can feed,
@@ -1439,7 +1521,7 @@ for it. Decision: SP-36 is partly implemented here and the rest is P2.
 2. Built elsewhere as controls, not as alerts: purpose codes and the conflict check (phase 03), the volume-reduction
    flag and its second approver (phase 04), QA samples (phase 19), and the monthly counts of the control report
    (phase 24 section 3.2).
-3. Not built (P2): the rules that need the allowed reads, which are not exported (`authz.allowed` has SIEM "no",
+3. Replaced by section 7.23 (owner decision of 2026-10-10: the access events are exported and these rules ship). The text of gap pass 1 was: Not built (P2): the rules that need the allowed reads, which are not exported (`authz.allowed` has SIEM "no",
    phase 03): mass lookup, off-hours or off-network access, access with no work reason, snooping on staff or
    relatives, export spikes as an alert, and closure patterns; canary access is P2 already (7.12). A behaviour engine
    inside the product over `access_event` is that P2 item.
@@ -1451,9 +1533,9 @@ for it. Decision: SP-36 is partly implemented here and the rest is P2.
 ### 7.15 `SiemForwarder`: fields and entry point (V-25-02-d, LOW; DR-413)
 `pub struct SiemForwarder { siem: Arc<dyn SiemRepository>, settings: Arc<SettingsService>, collector: Arc<dyn SiemCollector> }`. `SiemCollector` is the TLS syslog client of the transport paragraph of section 3.5: `send(line: &str) -> Result<(), PlatformError>` returns `Ok` only on the collector's delivery acknowledgement. The job `siem_forward` calls `pub async fn forward(&self) -> Result<(), PlatformError>`, which runs the steps of section 3.5.
 
-### 7.16 Moves that write no audit event; dead letters are not resolved in P1 (V-25-02-f, V-25-04-e, LOW; V-25-02-g, MEDIUM; DR-413)
+### 7.16 Moves that write no audit event; dead letters (second item replaced by section 7.24) (V-25-02-f, V-25-04-e, LOW; V-25-02-g, MEDIUM; DR-413)
 - The rule of section 3.13 has two exceptions, both technical markers and not business data. The advance of `admin.siem_cursors` writes no event, as anchoring writes none in phase 02: an event per batch would be forwarded by the forwarder itself. The move of a release to `verifying` writes no event: it is the job's own marker between `release.imported` and `release.verified` or `release.refused`.
-- Lead decision. Resolving a dead letter is P2. No route or method sets `resolved_at` or `resolved_by` in P1; the two columns, their CHECK, the index and the UPDATE grant of section 1 stay for it. The tile `siem_dead_letters` (section 3.10) therefore counts the dead letters created in the last 7 days, with the same warn and critical lines, so it clears seven days after the last dead letter. The rows stay as the record.
+- Replaced by section 7.24 (owner decision of 2026-10-10: an operator resends or resolves a dead letter, and the tile counts the open ones). The text of the verification pass was: Lead decision. Resolving a dead letter is P2. No route or method sets `resolved_at` or `resolved_by` in P1; the two columns, their CHECK, the index and the UPDATE grant of section 1 stay for it. The tile `siem_dead_letters` (section 3.10) therefore counts the dead letters created in the last 7 days, with the same warn and critical lines, so it clears seven days after the last dead letter. The rows stay as the record.
 
 ### 7.17 Sub-codes, audit kinds and methods the steps name (V-25-01-c, V-25-03-a, V-25-03-d, V-25-03-e, V-25-04-b, V-25-07-b, V-25-07-e, MEDIUM; V-25-06-d, V-25-07-c, LOW; DR-413)
 - Section 3.11 gains the sub-codes `approver_role_required`, `vendor_user_invalid`, `sod_conflict` (phase 04's code, reused), `bundle_not_found`, `manifest_missing` under `E_VALIDATION`, and `session_open` under `E_NOT_ALLOWED_IN_STATE`.
@@ -1482,6 +1564,247 @@ Section 6 check 4 gains the database test that 7.3 cites: the row-count list of 
 Section 7.8 says the operator first uploads `rollout.json`; no route did that. The route table of section 2 gains one row:
 | POST | `/api/v1/admin/releases/{id}/evidence` | `admin.system` | Upload the `rollout.json` of the apply (multipart, `EvidenceStore::stage`, declared content type `text/plain`: JSON is UTF-8 text, and `application/json` is not in `evidence.allowed_types`): kind `package`, owner kind `release`, owner id this release, retention R10, classification `internal`; answers 201 with the evidence id; IDEM (added; Cedar `release.applied`) |
 The release must be `approved` or `applied` (else 409 `E_NOT_ALLOWED_IN_STATE`). Audit: the phase 02 evidence event of `stage`; no new kind.
+
+Owner decisions (2026-10-10): the product owner overturned two lead decisions of this phase (sections 7.13 item 3 and 7.16); lead-written, checked in the owner-decision round (tools/agent/owner-verdict.md).
+
+### 7.23 Reads are exported to the SIEM and the SP-36 rule pack ships (owner decision 1; DR-414)
+The owner's decision: allowed reads go to the bank's SIEM too, so the behaviour rules of research 30 section 9.3 ship in this version. This block replaces item 3 of section 7.13 and extends its item 1. Where it differs from sections 3.5, 3.10 and 4.4, it wins. DR-422 locks the correction of the check round of 2026-10-11 to item 6 (which events the off switch holds back).
+
+**1. What is exported.** Every row of `audit.access_event` (phase 02; decisions `allow`, `deny` and `conflict`) is exported as an access line, beside the audit lines of section 3.5. `authz.allowed` keeps its SIEM flag "no" (phase 03): it is the policy decision row of every request, and the read of a record is the access event (SP-35). No change to phases 02 and 03.
+
+**2. Read function.** Migration `0082` gains this function after `audit.siem_page` (written into section 1.3 in the same change):
+
+```sql
+-- Access lines for the SIEM (SP-36, owner decision 1). One row per access event after the cursor, in chain order.
+-- A row is protected when its stored tier, the current tier of its resource or the current tier of its subject party
+-- is not normal: then resource_id and subject_party are not returned. The tier value is never returned.
+-- has_work: the actor holds a claimed alert on the subject party, or a live access-list grant on a case that names it.
+-- is_staff: the subject party is a staff member or is marked as related to staff (phase 10).
+CREATE OR REPLACE FUNCTION audit.siem_access_page(p_after_at TIMESTAMPTZ, p_after_id UUID, p_limit INT)
+RETURNS TABLE (
+    occurred_at     TIMESTAMPTZ,
+    access_id       UUID,
+    action          TEXT,
+    decision        TEXT,
+    actor_id        UUID,
+    actor_role      TEXT,
+    on_behalf_of    UUID,
+    resource_type   TEXT,
+    resource_id     UUID,
+    subject_party   UUID,
+    protected       BOOLEAN,
+    purpose_code    TEXT,
+    client_ip       INET,
+    work_link       BOOLEAN,
+    subject_staff   BOOLEAN
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
+BEGIN
+    IF p_limit IS NULL OR p_limit < 1 OR p_limit > 5000 THEN
+        RAISE EXCEPTION 'siem page size out of range' USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+    RETURN QUERY
+    SELECT e.occurred_at, e.id, e.action, e.decision, e.actor_id, e.actor_role, e.on_behalf_of, e.resource_type,
+           CASE WHEN NOT t.is_protected THEN e.resource_id END,
+           CASE WHEN NOT t.is_protected THEN e.subject_party END,
+           t.is_protected, e.purpose_code, e.client_ip, w.has_work, s.is_staff
+    FROM audit.access_event e
+    CROSS JOIN LATERAL (
+        SELECT (e.tier <> 'normal'
+                OR audit.resource_tier(e.resource_type, e.resource_id, NULL) <> 'normal'
+                OR (e.subject_party IS NOT NULL AND casework.effective_tier(e.subject_party) <> 'normal')) AS is_protected) t
+    CROSS JOIN LATERAL (
+        SELECT CASE WHEN e.subject_party IS NULL THEN NULL ELSE (
+                   EXISTS (SELECT 1 FROM alert.alerts a
+                            WHERE a.party_id = e.subject_party AND a.state = 'claimed' AND a.claimed_by = e.actor_id)
+                OR EXISTS (SELECT 1 FROM casework.case_acl g
+                             JOIN casework.case_parties cp ON cp.case_id = g.case_id
+                            WHERE g.principal_id = e.actor_id AND g.revoked_at IS NULL
+                              AND (g.expires_at IS NULL OR g.expires_at > e.occurred_at)
+                              AND cp.party_id = e.subject_party)) END AS has_work) w
+    CROSS JOIN LATERAL (
+        SELECT CASE WHEN e.subject_party IS NULL THEN NULL ELSE COALESCE((
+                   SELECT p.staff_flag OR COALESCE(p.related_to_staff, FALSE)
+                     FROM canon.party p
+                    WHERE p.id = e.subject_party AND p.recorded_to IS NULL
+                    ORDER BY p.valid_from DESC LIMIT 1), FALSE) END AS is_staff) s
+    WHERE (e.occurred_at, e.id) > (p_after_at, p_after_id)
+    ORDER BY e.occurred_at, e.id
+    LIMIT p_limit;
+END $$;
+ALTER FUNCTION audit.siem_access_page(TIMESTAMPTZ, UUID, INT) OWNER TO akr_migrate;
+REVOKE ALL ON FUNCTION audit.siem_access_page(TIMESTAMPTZ, UUID, INT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION audit.siem_access_page(TIMESTAMPTZ, UUID, INT) TO akr_app;
+```
+
+The function is the second read of the audit schema for `akr_app`; like `audit.siem_page` it is owned by `akr_migrate` and reads as its owner, so no table grant changes. `work_link` and `subject_staff` are read when the line is paged, not when the record was read; the forwarder runs every 10 seconds, so the two differ only inside the forwarder's lag.
+
+**3. Setting.** The settings insert of migration `0082` gains one row, and section 3.15 one line (`siem.export_access_events`, boolean, governed, no floor, used by item 6 below; both written in the same change):
+
+```sql
+ ('siem.export_access_events', 'true', 'boolean', NULL, TRUE,
+  '{"ar": "تصدير سجل الاطلاع على السجلات إلى نظام السجلات الأمنية", "en": "Export record-access events to the SIEM"}'),
+```
+
+It is governed (a change request of phase 04): turning it off removes the data the behaviour rules need.
+
+**4. Names.** The six access lines are named `access.view`, `access.search_hit`, `access.export`, `access.print`, `access.download` and `access.unmask` (the prefix `access.` and the verb of phase 02 section 7.9). They are the constant `ACCESS_LINE_KINDS` of the forwarder module. They are not `EventKind` values and are not added to the phase 02 catalogue. The CI check of section 3.5 counts them as exported kinds: each needs a use case in `deploy/siem/use_cases.yaml`, and a rule may name them.
+
+**5. Line format.**
+1. CEF: `CEF:0|AKR|AKR-TMS|<release version>|access.<verb>|Record access|<severity 0-10>|rt=<occurred_at ms> suid=<actor_id> spriv=<actor_role> src=<client_ip> outcome=<decision> cs1=<on_behalf_of> cs1Label=onBehalfOf cs2=<resource_type> cs2Label=resourceType cs3=<resource_id or empty> cs3Label=resourceId cs4=<access id> cs4Label=accessId cs5=<purpose_code or empty> cs5Label=purposeCode cs6=<subject_party or empty> cs6Label=subjectParty cn1=<protected 0 or 1> cn1Label=protected cn2=<work_link 0 or 1> cn2Label=workLink cn3=<subject_staff 0 or 1> cn3Label=subjectStaff`. `cn2` and `cn3` with their labels are left out when the value is null. Severity: 3 for `allow`, 5 for `deny`, 7 for `conflict`.
+2. JSON: `{"time", "access_id", "action", "decision", "actor_id", "actor_role", "on_behalf_of", "resource_type", "resource_id", "subject_party", "protected", "purpose_code", "client_ip", "work_link", "subject_staff"}`; `action` is the name of item 4.
+3. The transport, the framing and the 8 KiB limit are those of section 3.5.
+
+**6. Forwarder.** After steps 2 to 6 of section 3.5 for the audit stream, and under the same advisory lock, the job runs an access pass:
+1. Read `siem.export_access_events`. When it is `false`: set the cursor of consumer `cef_access_forwarder` to `(now(), nil id)` (insert or update, `forwarded_total` unchanged) and end the pass. An access event recorded before an off-run is never sent. The cursor moves only when a run executes, so an event recorded after the last off-run (at most one run interval, 10 seconds, before the setting is `true` again) is sent by the first run that finds the setting `true`.
+2. Read the cursor `admin.siem_cursors WHERE consumer = 'cef_access_forwarder'`. A missing row starts at `(now(), nil id)`: the export starts with the first run, not with the oldest access event.
+3. `rows = audit.siem_access_page(cursor.at, cursor.id, siem.batch_size)`.
+4. Format, send, dead-letter and advance as steps 4 to 6 of section 3.5, with `stream = 'access_event'` on a dead letter (section 7.24), `audit_id` = the access id and `action` = the name of item 4.
+5. Back-pressure is step 7 of section 3.5 for this cursor. The lag of the tile `siem_lag` (section 3.10) and of `akr_siem_lag_seconds` is the larger of the two streams' lags; `akr_siem_forwarded_total` gains the label `stream` (`audit_log`, `access_event`).
+
+**7. Rust.** `SiemAccessLine { occurred_at, access_id, action, decision, actor_id, actor_role, on_behalf_of: Option<Uuid>, resource_type, resource_id: Option<Uuid>, subject_party: Option<Uuid>, protected: bool, purpose_code: Option<String>, client_ip: Option<IpAddr>, work_link: Option<bool>, subject_staff: Option<bool> }`. `SiemRepository` gains `access_page(after: (DateTime<Utc>, Uuid), limit) -> Vec<SiemAccessLine>` (calls `audit.siem_access_page`) and `set_cursor(tx, consumer, at, id)` (step 1 and the first insert of step 2). `cursor_lock`, `advance` and `dead_letter` are used as they are, with the consumer `cef_access_forwarder`. `SiemForwarder::forward` (section 7.15) runs both passes.
+
+**8. Pull route.** The route table of section 2 gains one row (added; scope and Cedar action `siem.pull`, the policy `siem.pull.service` of section 3.12, no new action):
+
+| Method | Path | Scope | Description |
+|-|-|-|-|
+| GET | `/api/v1/siem/access-events` | `siem.pull` | Pull API for a service principal: access lines after a cursor, the fields of section 7.23 item 5 (added; section 7.23) |
+
+`GET /api/v1/siem/access-events?after_at=&after_id=&limit=` follows the four steps of the pull API of section 3.5, with `audit.siem_access_page` and the JSON fields of item 5. It is mounted with the `siem_pull` router. When `siem.export_access_events` is `false` it answers 200 with no events and the caller's cursor. utoipa: `SiemAccessEvent` and `SiemAccessPage { events, next }`.
+
+**9. The rule pack.** `deploy/siem/use_cases.yaml` gains one use case for the six access kinds (`record_access`) and these correlation rules. An entry may now carry `where` (a list of `field = value` tests over the line fields of its kinds; the CI check refuses a field that a named kind does not carry) and `siem_lists` (names of lists that the bank keeps in its SIEM, not in the product). Windows and thresholds are proposed starting values, as in section 7.13.
+
+| Rule id | Kinds | Where | Group, window, threshold | Research 30 rule |
+|-|-|-|-|-|
+| `ub_mass_lookup` | `access.view`, `access.search_hit` | `resource_type = customer`, `decision = allow`, `work_link = 0` | actor, 1 hour, 30 lines | Mass lookup |
+| `ub_off_hours_protected` | the six access kinds | `protected = 1` | actor, 1 event, when the time is outside `working_hours` or `src` is outside `staff_networks` (`siem_lists`) | Off-hours or off-network access to restricted tiers |
+| `ub_no_work_reason` | `access.view` | `resource_type = customer`, `decision = allow`, `work_link = 0` | actor, 24 hours, 10 lines; the SIEM samples them for review | Access without a work reason |
+| `ub_staff_record` | the six access kinds | `subject_staff = 1` | actor, 1 event | Snooping on staff and relatives |
+| `ub_conflict_read` | the six access kinds | `decision = conflict` | actor, 1 event | Snooping on staff and relatives (the conflict check of phase 15) |
+| `ub_export_spike` | `access.export`, `access.print`, `access.download` | none | actor, 1 hour, 10 lines | Export spikes |
+| `ub_closure_burst` | `case.decided`, `case.closed` (phase 18, exported) | none | actor, 1 hour, 15 events; also any event outside `working_hours` (`siem_lists`) | Alert closure patterns |
+
+The rules run in the bank's SIEM. Their recipients are the second line and security, never the actor's manager, and the product tells the actor nothing (section 7.13 item 1 stands). The "Action" column of research 30 section 9.3 is not built as a product reaction: the rules alert, and the controls of section 7.13 item 2 stand. The access line carries no size, so `ub_export_spike` counts exports and does not weigh them.
+
+**10. Still not built.** Canary access (P2, section 7.12, DR-391). DBA and operator anomalies: research 30 section 9.3 takes them from pgAudit and the bastion, which the bank forwards to its SIEM itself; the pack ships no rule for them. A behaviour engine inside the product stays out of this version.
+
+**11. Tipping-off review** (extends section 3.14). An access line of a protected row carries the time, the access id, the decision, the actor, the role, the on-behalf-of id (a staff id, when the read used a delegated role), the verb, the resource kind, the purpose code, the client address and three flags. The access id is the id of the access event and opens nothing in the SIEM. It carries no resource id, no subject party and no tier, so a SIEM reader cannot tell whose record was read, and cannot tell a restricted record from a suspicion one. `subject_staff = 1` on a protected line says that a protected record about some staff member or relative was read; it names nobody. A line of a normal row carries the pseudonymous ids that the audit lines of section 3.5 already carry for normal resources. Purpose codes are codes of `admin.purpose_codes`, never free text; `access_event.reason` is never exported.
+
+**12. Tests** (added to section 6):
+- `audit.siem_access_page` on a fixture with one access event on a normal customer and one on a suspicion-tier customer: the first row has `resource_id` and `subject_party`, the second has both NULL and `protected` TRUE; no column is named `tier`. A normal-tier event whose party is raised to `suspicion` afterwards is returned with both ids NULL on the next call. `EXECUTE` by `akr_readonly` is refused.
+- `work_link`: TRUE for an actor who holds a claimed alert on the party, TRUE for an actor with a live `casework.case_acl` grant on a case of the party, FALSE after the grant is revoked, NULL for an event with no subject party.
+- `subject_staff`: TRUE for a party with `staff_flag` TRUE and for a party with `related_to_staff` TRUE, FALSE for a party with `related_to_staff` NULL.
+- Forwarder: with the setting `true`, an access event written after the first run reaches the collector stub as one CEF line with `cs4` equal to its id; with the setting `false` no access line is sent; the test writes two access events, lets one more run pass with the setting `false`, sets it back to `true`, and the two events are not sent, while an event written after that off-run is sent.
+- `siem-pull` calls `GET /api/v1/siem/access-events?limit=500` → 200; no event carries a `tier` key; a user token → 403 `E_SCOPE`.
+- CI: `use_cases.yaml` with a rule whose `where` names `work_link` on the kind `case.closed` fails the build; an access kind with no use case fails the build.
+
+### 7.24 Dead letters: resend and resolve (owner decision 5; DR-418)
+The owner's decision: an operator can resend a dead letter or mark it resolved, and each act is audited. This block replaces the second item of section 7.16, the `siem_dead_letters` row of section 3.10 and the table DDL of section 1.3. DR-422 locks the correction of the check round of 2026-10-11 to the last CHECK of the table.
+
+**1. Table.** In migration `0082` the table and its indexes read (section 1.3 carries this text since the same change, with the grant line and the classification row below):
+
+```sql
+CREATE TABLE IF NOT EXISTS admin.siem_dead_letters (
+    id                  UUID PRIMARY KEY,
+    stream              TEXT NOT NULL DEFAULT 'audit_log' CHECK (stream IN ('audit_log', 'access_event')),
+    audit_id            UUID NOT NULL,                       -- the audit row id, or the access event id (section 7.23)
+    occurred_at         TIMESTAMPTZ NOT NULL,
+    action              TEXT NOT NULL CHECK (action ~ '^[a-z][a-z_]*(\.[a-z][a-z_]*)+$'),
+    reason_code         TEXT NOT NULL CHECK (reason_code IN ('format_failed', 'unknown_kind', 'collector_refused', 'oversize')),
+    attempts            INT NOT NULL CHECK (attempts >= 1),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resend_requested_at TIMESTAMPTZ,
+    resend_requested_by UUID REFERENCES admin.users(id) ON DELETE RESTRICT,
+    resolved_at         TIMESTAMPTZ,
+    resolved_by         UUID REFERENCES admin.users(id) ON DELETE RESTRICT,
+    resolution          TEXT CHECK (resolution IN ('resent', 'marked')),
+    resolution_code     TEXT CHECK (resolution_code IN ('delivered_other_way', 'not_needed', 'cannot_be_sent')),
+    version             INT NOT NULL DEFAULT 1 CHECK (version >= 1),
+    CHECK ((resolved_at IS NULL) = (resolved_by IS NULL)),
+    CHECK ((resolved_at IS NULL) = (resolution IS NULL)),
+    CHECK ((resend_requested_at IS NULL) = (resend_requested_by IS NULL)),
+    CHECK (((resolution = 'marked') IS TRUE) = (resolution_code IS NOT NULL))   -- a code on a marked row only; an open row has neither
+);
+CREATE INDEX IF NOT EXISTS idx_siem_dead_letters_open ON admin.siem_dead_letters (created_at) WHERE resolved_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_siem_dead_letters_resend ON admin.siem_dead_letters (resend_requested_at)
+    WHERE resend_requested_at IS NOT NULL AND resolved_at IS NULL;
+```
+
+The grant line reads `GRANT UPDATE (resend_requested_at, resend_requested_by, resolved_at, resolved_by, resolution, resolution_code, reason_code, attempts, version) ON admin.siem_dead_letters TO akr_app;`. The classification row of the table lists the fifteen columns above, all `internal`. The retention row is unchanged (R12, `age`, `created_at`). A mark carries a code and no free text, as everywhere in this phase: `delivered_other_way` (the bank gave the event to its SIEM by hand), `not_needed` (the bank's security accepts the gap) or `cannot_be_sent` (the line can never be formatted or accepted).
+
+**2. Routes.** The route table of section 2 gains three rows (added), in a new router module `siem_admin`:
+
+| Method | Path | Scope | Description |
+|-|-|-|-|
+| GET | `/api/v1/admin/siem/dead-letters` | `admin.system, security.ops` | Dead letters, newest first; `?state=open\|resolved\|all` (default `open`), cursor, limit (added; section 7.24) |
+| POST | `/api/v1/admin/siem/dead-letters/{id}/resend` | `admin.system` | Ask the forwarder to send the line again; 202; IF; IDEM (added; section 7.24) |
+| POST | `/api/v1/admin/siem/dead-letters/{id}/resolve` | `admin.system` | Mark a dead letter resolved without sending it, with a resolution code; IF (added; section 7.24) |
+
+With the row of section 7.23 the phase has 26 routes: 12 owned and 14 added. By the template rule (25 routes or more) the size of the phase is XL; it was M with 22 routes.
+
+**3. Cedar.** `schema.cedarschema` gains `action "siem_dead_letter.read" appliesTo { principal: User, resource: System, context: Ctx };` and `action "siem_dead_letter.resend", "siem_dead_letter.resolve" in ["system_admin"] appliesTo { principal: User, resource: System, context: Ctx };`. `51_platform.cedar` gains:
+
+```cedar
+// SIEM dead letters (owner decision 5). ADM acts; SEC reads.
+@id("siem.dl.adm") @role("ADM")
+permit (principal, action in [Akr::Action::"siem_dead_letter.read", Akr::Action::"siem_dead_letter.resend",
+        Akr::Action::"siem_dead_letter.resolve"], resource is Akr::System)
+when { principal.roles.contains("ADM") };
+
+@id("siem.dl.sec.read") @role("SEC")
+permit (principal, action == Akr::Action::"siem_dead_letter.read", resource is Akr::System)
+when { principal.roles.contains("SEC") };
+```
+
+The routes map to the actions in the order of the table: `siem_dead_letter.read`, `siem_dead_letter.resend`, `siem_dead_letter.resolve`.
+
+**4. Rust.** `DeadLetter` gains `stream: SiemStream` (`AuditLog`, `AccessEvent`), `resend_requested_at`, `resend_requested_by`, `resolution: Option<DeadLetterResolution>` (`Resent`, `Marked`), `resolution_code: Option<DeadLetterResolutionCode>` (`DeliveredOtherWay`, `NotNeeded`, `CannotBeSent`) and `version`. `SiemRepository` gains `dead_letters(state, cursor, limit) -> Page<DeadLetter>` (keyset `(created_at, id)` descending), `find_dead_letter(conn, id)`, `request_resend(tx, id, by, expected_version)`, `resend_queue(conn, limit) -> Vec<DeadLetter>` (rows with `resend_requested_at IS NOT NULL AND resolved_at IS NULL`, oldest request first), `mark_resent(tx, id)`, `mark_resend_failed(tx, id, reason_code)` and `mark_resolved(tx, id, by, code, expected_version)`. `SiemStatus.dead_letters_7d` is renamed `dead_letters_open` (the count of rows with `resolved_at IS NULL`). `SiemDeadLetterService { siem: Arc<dyn SiemRepository>, audit: Arc<dyn AuditSink> }` holds the three methods below and is added to the `akr-api` AppState as `siem_dead_letters`. utoipa: `DeadLetterView { id, stream, audit_id, occurred_at, action, reason_code, attempts, created_at, resend_requested_at, resolved_at, resolved_by, resolution, resolution_code, version }`, `ResolveDeadLetterRequest { resolution_code }`.
+
+**5. `list(ctx, state, cursor, limit)`.** Cedar `siem_dead_letter.read`. Returns the page. The view carries ids, kinds, codes and times only; it never carries the line.
+
+**6. `request_resend(ctx, id, if_match)`.**
+1. Cedar `siem_dead_letter.resend`. `If-Match` is required (428 `E_PRECONDITION_REQUIRED`).
+2. Load the row; none → 404 `E_NOT_FOUND`. `resolved_at` set → 409 `E_NOT_ALLOWED_IN_STATE` (`already_resolved`). `resend_requested_at` set → 409 `E_NOT_ALLOWED_IN_STATE` (`resend_pending`).
+3. In one transaction: `resend_requested_at = now()`, `resend_requested_by = ctx.actor`, `version + 1` where `version` is the expected one (no row → 409 `E_VERSION_CONFLICT`); audit `siem.dead_letter_resend_requested`.
+4. Answer 202 with the view. No job is enqueued: the next `siem_forward` run (every 10 seconds) does the work.
+
+**7. Resend pass of the forwarder** (job `siem_forward`, after the advisory lock of step 1 of section 3.5 and before step 2). For each row of `resend_queue(siem.batch_size)`:
+1. Read the line again. For `stream = 'audit_log'`: `audit.siem_page(occurred_at - interval '1 microsecond', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 1, ARRAY[action])`. For `stream = 'access_event'`: `audit.siem_access_page` with the same two cursor values and limit 1. `occurred_at` is strictly increasing within a stream (phase 02), so the call returns the row of the dead letter; the forwarder checks that the returned id equals `audit_id`. The stripping rule is applied again, with the tier of today.
+2. Format and send the line once.
+3. On the collector's acknowledgement, in one transaction: `resolved_at = now()`, `resolved_by = resend_requested_by`, `resolution = 'resent'`, `version + 1`; audit `siem.dead_letter_resent` with the actor `resend_requested_by`.
+4. On any failure (the id does not match, the line cannot be formatted, the collector refuses or does not answer), in one transaction: `attempts + 1`, `reason_code` = the code of this failure (`format_failed` when the id does not match), `resend_requested_at` and `resend_requested_by` set to NULL, `version + 1`; audit `siem.dead_letter_resend_failed`. The row stays open and can be asked again.
+The pass never moves a cursor. A resent line can reach the collector a second time when the first acknowledgement was lost; the line carries its audit id (`cs4`), so the SIEM can drop the copy.
+
+**8. `resolve(ctx, id, resolution_code, if_match)`.**
+1. Cedar `siem_dead_letter.resolve`. `If-Match` is required (428 `E_PRECONDITION_REQUIRED`). `resolution_code` is one of the three codes of item 1 (else 422 `E_VALIDATION`, `resolution_code_invalid`).
+2. Load the row; none → 404 `E_NOT_FOUND`. `resolved_at` set → 409 `E_NOT_ALLOWED_IN_STATE` (`already_resolved`). `resend_requested_at` set → 409 `E_NOT_ALLOWED_IN_STATE` (`resend_pending`).
+3. In one transaction: `resolved_at = now()`, `resolved_by = ctx.actor`, `resolution = 'marked'`, `resolution_code` = the code, `version + 1` where `version` is the expected one (else 409 `E_VERSION_CONFLICT`); audit `siem.dead_letter_resolved`.
+4. Answer 200 with the view.
+
+**9. Audit events** (rows added to section 3.13; resource `siem`; detail keys are ids and codes):
+
+| Event kind | On | Resource | SIEM |
+|-|-|-|-|
+| `siem.dead_letter_resend_requested` | resend asked (`dead_letter_id`, `stream`) | siem | no |
+| `siem.dead_letter_resent` | the collector accepted the line (`dead_letter_id`) | siem | no |
+| `siem.dead_letter_resend_failed` | the resend failed (`dead_letter_id`, `reason_code`) | siem | no |
+| `siem.dead_letter_resolved` | marked resolved without sending (`dead_letter_id`, `stream`, `reason_code`, `resolution_code`) | siem | yes |
+
+The three kinds of the resend work (the request writes the first, the forwarder the other two) are not exported, for the reason `siem.dead_lettered` is not. `siem.dead_letter_resolved` is exported, with the use case `siem_delivery_gap_closed` in `use_cases.yaml`: a person closed a delivery gap without delivery, and security should see it. Section 3.11 gains the sub-codes `already_resolved` and `resend_pending` under `E_NOT_ALLOWED_IN_STATE`, and `resolution_code_invalid` under `E_VALIDATION`.
+
+**10. Tile and metric.** The `siem_dead_letters` row of section 3.10 reads: source = count of `admin.siem_dead_letters` with `resolved_at IS NULL`; warn at least 1; critical above 10. The tile clears when every dead letter is resent or marked. The metric `akr_siem_dead_letters_7d` of section 4.4 is renamed `akr_siem_dead_letters_open`.
+
+**11. Screen** (extends section 5.4, A3). The tile "SIEM dead letters" opens a table: time of the event, kind, stream, reason, attempts, state, and for a resolved row the resolver, the resolution and its code. Row actions for ADM on an open row: "Resend" and "Mark resolved" (a dialog with the three codes; one must be chosen). A row with a pending resend shows "Resend pending" and no action. SEC sees the table with no action. Hooks: `useGetAdminSiemDeadLetters`, `usePostAdminSiemDeadLettersIdResend`, `usePostAdminSiemDeadLettersIdResolve`.
+
+**12. Tipping-off review** (extends section 3.14). The list shows the kind and the time of an event that was not delivered, the reason code and the audit id. It shows no case id, no resource, no party and no line content, and the audit id opens nothing for ADM: the audit viewer of phase 24 applies its own tier rule. A resent line passes the stripping rule again, so a resource that became protected after the first attempt is sent without its id.
+
+**13. Tests** (added to section 6):
+- A fixture line that the collector stub refuses is dead-lettered; the tile is `warn`. `adm@` posts `resend` with the row's version → 202; with the stub accepting, within two forwarder runs the row has `resolution = 'resent'`, the stub holds the line once, the tile is `ok`, and the audit trail holds `siem.dead_letter_resend_requested` and `siem.dead_letter_resent`.
+- With the stub still refusing, the resend leaves the row open with `attempts` one higher and `resend_requested_at` NULL, and the audit trail holds `siem.dead_letter_resend_failed`.
+- `adm@` posts `resolve` with no code → 422 `E_VALIDATION` (`resolution_code_invalid`); with `not_needed` → 200, `resolution = 'marked'`; a second `resolve` or a `resend` on the row → 409 `E_NOT_ALLOWED_IN_STATE` (`already_resolved`); the next SIEM page holds `siem.dead_letter_resolved`.
+- `sec@` reads the list → 200 and posts `resend` → 403 `E_SCOPE`; `a1@` reads the list → 403 `E_SCOPE`.
+- A stale `If-Match` → 409 `E_VERSION_CONFLICT`; no `If-Match` → 428.
+- `UPDATE admin.siem_dead_letters SET action = 'x.y'` as `akr_app` is refused (no column grant).
 
 ## Decisions
 
@@ -1517,6 +1840,10 @@ Numbered from DR-232, as the lead assigned. Each decision is one paragraph with 
 
 **Lead corrections (review 2026-10-09).** A break-glass request is unique per requester and case, not per case: a per-case index dropped a second requester's request while auditing it, told that requester another request was open, and let one requester hold a case's emergency path shut. The read-only rule is an allow-list of fifteen read actions under purpose `break_glass`, because team membership also feeds later team checks (phase 19 `Rfi.assignees`) that a list of forbidden writes would miss. `audit.siem_page` returns no tier value (the label `suspicion` must not leave for the SIEM), is owned by `akr_migrate` and pins `search_path = pg_catalog`. The requester is A2 only: phase 17 rule 1 admits only A1, A2 and M to a case row, so a grant to SEC or CH opened nothing and M needs none. The visibility clause requires the purpose `break_glass`, as the Cedar adapter does, so the list predicate and Cedar stay equal. The support-session approval is step-up class `access_change` (it creates a role grant). A `VS` case read is refused by the scope gate (`E_SCOPE`) for every id.
 
+**DR-414 (owner decision of 2026-10-10: reads are exported to the SIEM, and the behaviour rule pack ships).** The lead had kept the rules that need allowed reads as P2 (section 7.13). The owner overturned it. Every access event is exported as an access line through `audit.siem_access_page`, with its own cursor, the pull route `GET /api/v1/siem/access-events` and the governed switch `siem.export_access_events`. A protected line carries no resource id, no subject party and no tier. The pack gains seven rules. Canary access (DR-391) and the DBA and operator rules stay out (section 7.23).
+
+**DR-418 (owner decision of 2026-10-10: dead letters are resent or resolved).** The lead had kept resolving a dead letter as P2 (section 7.16). The owner overturned it. ADM asks for a resend, which the forwarder does on its next run through the same stripping rule, or marks the dead letter resolved with one of three codes. Each act is audited, and the mark is exported to the SIEM. The tile counts the open dead letters (section 7.24).
+
 ## Open doubts (for gap pass 1 and the bank)
 
 1. **Break-glass for a party.** Scope is a case only. A party grant needs the party entity of phase 15 and its visibility clause of phase 18 section 3.10 (rule 5) to take a grant as team membership, which is a phase 15 change. The request route refuses a party scope (`party_scope_not_shipped`) until the bank asks for it.
@@ -1547,8 +1874,9 @@ Numbered from DR-232, as the lead assigned. Each decision is one paragraph with 
 - No SAML and no SCIM (phase 31, Ory Polis); no K3s, Helm or automated failover (phase 30); no hosted multi-tenant model (phase 31 or later, Open doubts 17).
 - No SIEM push of case, party or record content, no SIEM use-case rules that read suspicion content, and no change to the audit trail's chain, anchors or signing keys (phase 02); the RFC 3161 token is an extra row beside the anchor.
 - No new role code, no new step-up class, no new problem code, no new outbox topic and no timer kind. `siem.export` is released, not used.
+- No change to phase 02's access log, its chain or its grants, and no change to the SIEM flag of `authz.allowed` (phase 03): the access lines of section 7.23 are read through `audit.siem_access_page`. No behaviour engine inside the product, no canary records and no rule over database or bastion sessions (section 7.23 item 10).
 - No change to the case access list `casework.case_acl`, its reasons or its expiry (phase 18); no change to `services::visibility::build` beyond the one clause of section 3.2, and no change to the suspicion forbids of `90_alerts.cedar` or `91_cases.cedar` (phases 17 and 18).
-- No change to the Cedar files other than `51_platform.cedar`; `schema.cedarschema` receives the action declarations of section 3.12 only (the appended-declarations pattern of phases 17, 18 and 24); `50_system.cedar` (phase 03), `60_audit.cedar` and `C0_governance.cedar` (phase 24), `61_retention.cedar` (phase 23), `80_detection.cedar` (phase 06) and `90_alerts.cedar` (phase 17) are unchanged.
+- No change to the Cedar files other than `51_platform.cedar`; `schema.cedarschema` receives the action declarations of section 3.12 and of section 7.24 item 3 only (the appended-declarations pattern of phases 17, 18 and 24); `50_system.cedar` (phase 03), `60_audit.cedar` and `C0_governance.cedar` (phase 24), `61_retention.cedar` (phase 23), `80_detection.cedar` (phase 06) and `90_alerts.cedar` (phase 17) are unchanged.
 - No change to phase 03's access matrix, its routes, `DELETE /admin/users/{id}/grants/{grant_id}`, its purpose codes or its `sod.json`; no change to phase 04's workflow engine or to the `cr_access` and `cr_access_adm` routes beyond the two target entries of section 4.5.
 - No change to phase 19's M-37 register or to phase 19's internal reports and RFIs; the support bundles do not join that register.
 - No change to phase 21's reports, phase 22's notification templates other than the two codes of section 4.5, or phase 23's retention engine and holds (this phase adds its own retention rows only).

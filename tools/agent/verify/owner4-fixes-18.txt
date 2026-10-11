@@ -1,0 +1,10 @@
+Replacements of round 3 of the owner-decision check, key 18. 1 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [Q-18-1]
+FILE: docs/plan/phase-18.md
+WHY: Q-18-1 | CONFIRMED | LOW (agent: LOW) | the clause of phase 18 section 6 item 9 gives the guard message `an access grant is revoked, never changed` for any `casework.case_acl` row. The guard (line ~342) first raises `a revoked access grant does not change` when `OLD.revoked_at` is set, so the quoted message is reached only on a grant that is not revoked; the clause names no row state | the clause says "a `casework.case_acl` row that is not revoked" and names the second message for a revoked row.
+OLD: as the owner `akr_migrate` the guard raises `an access grant is revoked, never changed`).
+NEW: as the owner `akr_migrate` the guard raises `an access grant is revoked, never changed` for a grant that is not revoked and `a revoked access grant does not change` for a revoked one).

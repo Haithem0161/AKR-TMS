@@ -1,0 +1,16 @@
+Replacements of round 3 of the owner-decision check, key 13. 2 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [Q-13-1]
+FILE: docs/plan/phase-13.md
+WHY: Q-13-1 | CONFIRMED | LOW (agent: MEDIUM) | phase 13 section 6 item 1 (line ~976): the owner half of the `expression` check ("as the owner `akr_migrate`, with `feature definition content is immutable`") stands in the `make migrate` item, and `feat.feature_definitions` is filled only by the seed of item 3; `feat.definition_guard` is a row trigger (line ~290), so on the empty table the owner's UPDATE meets no row and raises nothing. Same class as P-19b-2 of round 2, and LOW for the same reason: the next clause of the item already names a fixture row ("on a `candidate` row"), and a guard test on an empty table fails at once, so nothing is built wrong | the clause says "on a stored row" and why, and gives the guard message in full as the trigger raises it (`feature definition content is immutable; propose a new version`, line ~284). The section 7.18 SQL and its four items passed (F12, F13). // Lead note on the class of Q-13-1 (not swept, by decision): the other check lines that give a guard message for the owner role (phase 03 line ~1180; phase 06 ~910; phase 07 ~912 and ~1230; phase 09 ~1184 and ~1189; phase 14 ~1271 and ~1603; phase 15 ~1931) also need a stored row, and their tables are filled by a seed command or by use, not by a migration. They are left as they stand: each stands in a list of negative checks whose other clauses name fixture rows ("on a live row", "of a `rejected` row", "an `active` version"), the key 07 and key 14 agents of this round read two of them under the row-trigger rule and passed them, and a test that expects a guard message from an empty table fails on its first run. Recorded as a build note for the report: a guard check is run on a fixture row.
+OLD: and, as the owner `akr_migrate`, with `feature definition content is immutable`;
+NEW: and, as the owner `akr_migrate` on a stored row (the guard is a row trigger, so the owner's statement needs a row: a fixture row, or a row of the seed of item 3), with `feature definition content is immutable; propose a new version`;
+
+=== F2 [Q-13-2]
+FILE: docs/DATA-MODEL.md
+WHY: Q-13-2 | CONFIRMED | LOW (agent: LOW) | docs/DATA-MODEL.md line ~545, the `feature_values` row that L2-2 changed, gives `no_history` as the only status of a reset row; phase 13 section 7.18 item 1 gives `beyond_window` for the kind `days_since` | the row names both.
+OLD: is kept without a value: `no_history`, `basis.reason = no_activity`; phase 13 section 7.18)
+NEW: is kept without a value: `no_history` (`beyond_window` for the kind `days_since`), `basis.reason = no_activity`; phase 13 section 7.18)

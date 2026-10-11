@@ -1,0 +1,8 @@
+# Bank-like data: kept on disk, never published
+cbs-discovery/
+test-poc/
+from-banks-pc.zip
+
+# Generated
+__pycache__/
+*.pyc

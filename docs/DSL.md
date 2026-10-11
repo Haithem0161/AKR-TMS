@@ -91,6 +91,14 @@ scenario still runs without it, in a degraded form that the readiness grade reco
 (`E_UNKNOWN_ATTRIBUTE`). Feature values are `feat.<feature_key>` (a row of `feat.feature_definitions`), rating
 values `rating.level`, `rating.cbi_level`, and list facts `screening.<fact>`.
 
+**Source-tag names** — `tag.payroll`, `tag.pension` and `tag.government_source` are three boolean names over the
+register of paying sources that the bank keeps by hand (owner decision DR-416; docs/plan phase 13 section 7.17). They
+are not CanonicalRefs and are valid in two places only: the `where` of a feature definition, and the predicate of a
+static segment (`=` with a boolean only; `E_FIELD_TYPE` otherwise). A scenario, a rating model and a mapping do not
+know the names: there, and in the `field` or `group` of a feature, a `tag.*` name is refused (`E_UNKNOWN_ATTRIBUTE`);
+a risk-overlay segment that names one is refused (`E_SEGMENT_INPUT_NOT_ALLOWED`). A scenario reads a tag only through
+a feature value (`feat.<feature_key>`) or through a segment.
+
 **ParamRef** — `:name`, a parameter declared in the same document. Only parameters, literals and canonical refs may
 appear in conditions; every parameter is bound at execution, never interpolated.
 

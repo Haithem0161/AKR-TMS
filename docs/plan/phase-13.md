@@ -15,16 +15,16 @@ access events), Phase 03 (purpose codes, resource adapters) and Phase 06 (`Attri
 Phase 15 later supplies the declared KYC profile and the rating source; both are ports with null implementations here.
 
 **Macro-phase:** P1
-**Complexity:** M (11 routes; the feature engine, the segment assignment and the peer clustering carry the weight)
+**Complexity:** M (13 routes: 11 of section 2 and 2 of section 7.17; the feature engine, the segment assignment and the peer clustering carry the weight)
 **Binaries touched:** akr-api (routers `segments` (mounted under `/ref`), `feature_definitions`, `peer_groups`,
-`profiles`; change targets `segment`, `feature_definition` and `peer_build` registered in process) | akr-worker (jobs
-`feature_compute`, `segment_assign`, `segment_stats_refresh`, `peer_group_build`, `profile_refresh`) | akr-ctl (`features
+`profiles`; change targets `segment`, `feature_definition`, `peer_build` and, by section 7.17, `source_tag` registered in process) | akr-worker (jobs
+`feature_compute`, `segment_assign`, `segment_stats_refresh`, `peer_group_build`, `profile_refresh`, and `counterparty_resolve` and `source_tag_refresh` of section 7+) | akr-ctl (`features
 seed`, `features verify`). akr-ingestd and akr-assess unchanged; nothing in this phase reaches a CBS.
 **Requirements carried:** T-07 (three-level segmentation: static, behavioural cluster, risk overlay; sections 3.3 and
 3.5), S-10 (a missing value falls back to the segment statistic and marks the customer degraded;
 unknown is never read as low; section 3.6), S-12 (the robust baseline service: percentiles and median-MAD by segment,
 currency and period, a minimum segment size of 200 with merge upward; sections 3.3 to 3.5).
-- Gap pass 1 (coverage), partly implemented: S-17 (public-salary accounts can form a static peer segment on `account.type`; the exclusion of the payroll pool account is a static exclusion of the scenario document (docs/DSL.md A.7; phase 16 section 3.1 rule 13) with an active reason code of family `exclusion`, `EXC_POOL_ACCOUNT` in the DSL example, and the payroll and pension batch tags and the government-source flag are P2, because the plan holds no CBS field for them), S-36 (the `dormant_days` feature); SP-46 (protected attributes blocked as inputs); L-49 (segment assignment from observed attributes); T-08 (deviations on monthly profiles against own history and peers), T-09 (the segment membership history), T-17 (month-end feature values keyed by as-of date), T-18 (robust median-MAD segment statistics), T-29 (the counterparty resolver for transfer counterparties with analyst confirmations, section 7.5), T-42 (daily event-time features compiled by the same compiler), T-65 (cash-share features and percentile statistics by segment, currency and period); VB-14 (the per-customer baseline store, offline: month-end feature values, monthly profiles and segment statistics, sections 3.2, 3.4 and 3.6; the online use within a latency budget is the requirement's Phase 2 and is not built).
+- Gap pass 1 (coverage), partly implemented: S-17 (implemented by the owner decision of 2026-10-10, section 7.17 and DR-416: the bank keeps the payroll and pension tags and the government-source flag by hand in `feat.source_tags`, and a static segment or a feature filter reads them, so public-salary and pension customers form peer segments; a segment on `account.type` stays possible, and the exclusion of the payroll pool account is a static exclusion of the scenario document (docs/DSL.md A.7; phase 16 section 3.1 rule 13) with an active reason code of family `exclusion`, `EXC_POOL_ACCOUNT` in the DSL example), S-36 (the `dormant_days` feature); SP-46 (protected attributes blocked as inputs); L-49 (segment assignment from observed attributes); T-08 (deviations on monthly profiles against own history and peers), T-09 (the segment membership history), T-17 (month-end feature values keyed by as-of date), T-18 (robust median-MAD segment statistics), T-29 (the counterparty resolver for transfer counterparties with analyst confirmations, section 7.5), T-42 (daily event-time features compiled by the same compiler), T-65 (cash-share features and percentile statistics by segment, currency and period); VB-14 (the per-customer baseline store, offline: month-end feature values, monthly profiles and segment statistics, sections 3.2, 3.4 and 3.6; the online use within a latency budget is the requirement's Phase 2 and is not built).
 - Gap pass 1 (coverage), partly implemented here: VB-05 (features keyed by counterparty for counterparties seen only in transactions, section 7+; counterparty profiles are P2).
 - Gap pass 1 (coverage), not carried: VB-47 (digital-channel signals, DR-397).
 
@@ -32,7 +32,7 @@ currency and period, a minimum segment size of 200 with merge upward; sections 3
 
 ## 1. SQLx Migration Changes
 
-Four migrations, `0040_feat_definitions_segments` to `0043_feat_settings_schedules`; `0044` was not used here and now holds the counterparty links of section 7+ (the shipped
+Four migrations, `0040_feat_definitions_segments` to `0043_feat_settings_schedules`; `0044` was not used here and now holds the counterparty links of section 7.5 and the source tags of section 7.17 (the shipped
 catalogue is installed from a signed file by `akr-ctl features seed`, section 3.1, as phase 06 installs its register).
 Schema `feat` exists since phase 00 (DATA-MODEL s.8). The DATA-MODEL s.8 table list is kept; this phase adds the
 columns and the two tables that the design needs and DATA-MODEL does not name, each marked "extends DATA-MODEL s.8":
@@ -40,7 +40,7 @@ columns and the two tables that the design needs and DATA-MODEL does not name, e
 of `feature_values`, `segment_stats` and `profiles`. Identifiers avoid the PostgreSQL reserved words (DR-20);
 `window` is named `window_spec`.
 
-Eight tables and no outbox topic: `feature_definitions` (R9), `feature_runs` (R4), `feature_values` (R4, monthly
+Eight tables and no outbox topic (section 7+ adds three more: `counterparty_links`, `source_tags` and `customer_source_tags`): `feature_definitions` (R9), `feature_runs` (R4), `feature_values` (R4, monthly
 partitions), `segments` (R9), `segment_memberships` (R4), `segment_stats` (R4, monthly partitions), `peer_groups` (R4),
 `profiles` (R4, monthly partitions).
 
@@ -450,7 +450,8 @@ backend/
   `BeyondWindow`), `ProfileStatus` (`Complete`, `Degraded`), `Comparator` (`Declared`, `OwnHistory`, `Peer`).
 - **Create and Update DTOs:** `NewFeatureDefinition` (proposal: key, entity, name, value kind, window, expression,
   currency mode), `NewSegment` (proposal: key, name, level `static` or `risk_overlay`, rule, merge target, sort order,
-  min size, `base_version?`), `PeerBuildRequest { currency }`. No Update struct: definitions and segments change only by
+  min size, `base_version?`), `PeerBuildRequest { currency }`. Both proposals also carry `reason_code` and
+  `reason_text`, which phase 04 `create` requires (a code of a family the target accepts, section 3.7). No Update struct: definitions and segments change only by
   new versions through change requests, and segment statistics and memberships are written by jobs.
 - **Repository traits** (domain layer):
 
@@ -465,6 +466,7 @@ pub trait FeatureRepository: Send + Sync {
 #[async_trait]
 pub trait FeatureValueWriter: Send + Sync {
     /// Set-based insert-or-update on the primary key; touches only rows whose basis differs. Returns (inserted, updated).
+    /// Section 7.18: the same statement resets the rows of the pair that the SELECT no longer produces; they count as updated.
     async fn write_month_end(&self, tx: &mut Tx, feature: &FeatureDefinition, as_of: NaiveDate, sql: &CompiledFeature)
         -> Result<(u64, u64), RepoError>;
 }
@@ -531,7 +533,7 @@ feature kind; a document or request naming another kind is refused.
 
 `FeatureValidator::check(def, catalogue)` is pure and runs in this order; the first failure stops the check:
 1. JSON Schema `feature-catalogue.v1.json`, then the closed enumerations (entity, kind, value kind, currency mode).
-2. Every `CanonRef` in `field`, `where`, `group` and joins exists in the phase 10 `CanonicalCatalogue` (`E_UNKNOWN_ATTRIBUTE`),
+2. Every `CanonRef` in `field`, `where`, `group` and joins exists in the phase 10 `CanonicalCatalogue` (`E_UNKNOWN_ATTRIBUTE`; a `where` may also name `tag.payroll`, `tag.pension` and `tag.government_source`, section 7.17 item 3),
    is not a class `personal`, `secret-str` or `card` column (one exception: the `field` of a `distinct_count` may be
    `txn.counterparty_id`, a surrogate id that is counted and never stored or shown), and is not a protected attribute: gender, religion,
    ethnicity, nationality, tribe and sect (DSL.md A.5, `E_PROTECTED_ATTRIBUTE`; the rating allowance of C.2 for
@@ -622,7 +624,8 @@ booking dates in a closed month sets `reopen_from` to that month-end. Steps:
    zero for `count` and `sum` and "not applicable" for the other kinds. For `not_ready` and `dark` runs an absent row
    means unknown and every consumer shows it as unknown.
 5. Idempotency: the primary key, the `basis` comparison and `feature_runs` make a second run for the same months write
-   zero rows. A re-run with changed data updates only the rows whose value changed.
+   zero rows. A re-run with changed data updates only the rows whose value changed. A row that the re-run no longer
+   produces is not left as it was: it is reset (section 7.18).
 6. Audit one `feature.computed {computed, not_ready, dark, inserted, updated, excluded_units}` per job run.
 
 Currency: IQD and USD are computed separately by `txn.currency`; a cross-currency measure exists only as
@@ -632,7 +635,7 @@ Currency: IQD and USD are computed separately by `txn.currency`; a cross-currenc
 
 **Definition.** `{scope: "customer", match: [Predicate...], merge_into: key | null}`. Predicates are conjunctions only (a
 disjunction is two segments in sort order). Static segments may read `customer.*`, `party.*`, `account.*` and
-`branch.*` attributes of the phase 10 catalogue that are not protected (section 3.1 step 2). A risk-overlay segment may
+`branch.*` attributes of the phase 10 catalogue that are not protected (section 3.1 step 2), and the three tag names of section 7.17 item 3. A risk-overlay segment may
 read `rating.*` attributes only (phase 15 registers them; until then a risk overlay cannot be proposed:
 `E_DANGLING_REF`). No definition may read alert, case, screening, watch, STR, decision or any `casework.*`, `alert.*`
 or `screening.*` attribute (`E_SEGMENT_INPUT_NOT_ALLOWED`). `merge_into` names a segment of the same level, must not
@@ -773,6 +776,8 @@ A candidate becomes live only through its change request (section 3.7). The job 
 | `feature_definition` | material | `cr_material` | no (dedicated route) | no | change | Insert the new version as `active`; retire the previous active row (`state`, `retired_at`); enqueue `feature_compute {catchup}`; audit `feature.activated` |
 | `peer_build` | material | `cr_material` | yes | no | change | Previous active build `superseded` and its cluster segments `superseded`; candidate `activating` with `activated_at`; new cluster segments `active`; enqueue `segment_assign {level: cluster, build_id}`; the worker sets the build `active` when every membership batch is written (audit `peer_group.activated`) |
 
+A fourth kind, `source_tag`, is in section 7.17 item 7, with its own volume-effect rule.
+
 Common rules. `prepare` runs the validator of the kind against the current catalogue and returns the impact (for a
 segment, the number of customers whose effective segment would change, computed by a dry run; for a peer build, the
 stability and the cluster sizes). `check_before_decision` runs the validator again: a referenced feature that has been
@@ -822,6 +827,8 @@ cannot be measured (section 3.3 step 3).
 | `profile.refreshed` | end of a `profile_refresh` run | `profile` (period) |
 | `change_request.created` | proposal (phase 04, reused) | `change_request` |
 
+Section 7.5 adds `counterparty.resolved`, and section 7.17 adds `source_tag.applied` and `source_tag.refreshed`.
+
 The profile read is an access event (`profile.read`, tier `restricted`, purpose code, party), written by the phase 02
 access layer, not an audit row. A refused read is `authz.denied` (phase 03).
 
@@ -835,6 +842,7 @@ access layer, not an audit row. A refused read is `authz.denied` (phase 03).
 | `feature.propose` | System | CFG, MRO |
 | `peer_group.read` | PeerGroup | CFG, M, CH, IA |
 | `profile.read` | Customer | A1 and A2 within branch scope; KYC; M |
+| `source_tag.read`, `source_tag.propose` (section 7.17 item 10) | System | CFG, CHK, M, CH read; CFG proposes |
 
 ```cedar
 // 81_features.cedar (excerpt; schema additions: entity Customer = { branch: Branch })
@@ -893,7 +901,7 @@ Settings (migration 0043): `segments.min_size` (governed, floor 200), `features.
 `features.catchup_months`, `profile.min_history_months` (governed, floor 3), `profile.lookback_months`, `peer.k` (governed,
 floor 2), `peer.sample_max`, `peer.min_stability`. Schedules: `schedule.feature_compute`, `schedule.segment_assign`,
 `schedule.segment_stats_refresh`, `schedule.peer_group_build`, `schedule.profile_refresh`. Each change of a governed key
-is a change request (phase 04).
+is a change request (phase 04). Migration 0044 adds `counterparty.recheck_days` and `schedule.counterparty_resolve` (section 7.5), and `source_tags.lookback_days` (governed, floor 35), `source_tags.min_credits` (governed, floor 1) and `schedule.source_tag_refresh` (section 7.17).
 
 ## 4. Infrastructure Updates
 
@@ -902,7 +910,7 @@ is a change request (phase 04).
 
 | Kind | Payload | Coalesce key | Concurrency | Attempts | Schedule or trigger |
 |-|-|-|-|-|-|
-| `feature_compute` | `{reopen_from?}` | `feature_compute` | 1 | 5 | `schedule.feature_compute` hourly at :10 bank time; enqueued by a `feature_definition` activation (with `catchup`) and by a replay of phase 11 |
+| `feature_compute` | `{reopen_from?}` | `feature_compute` | 1 | 5 | `schedule.feature_compute` hourly at :10 bank time; enqueued by a `feature_definition` activation (with `catchup`), by a replay of phase 11 and by a `source_tag` activation that a feature reads (with `reopen_from` and a coalesce key of its own, section 7.17 item 7) |
 | `segment_assign` | `{level, build_id?}` | `segment_assign:<level>` | 1 | 5 | `schedule.segment_assign` daily; enqueued by a `segment` or `peer_build` activation |
 | `segment_stats_refresh` | `{period}` | `segment_stats:<period>` | 1 | 3 | `schedule.segment_stats_refresh` on day 2 of the month; enqueued by `segment_assign` after a membership change |
 | `peer_group_build` | `{currency, requested_by}` | `peer_group_build:<currency>` | 1 | 3 | `schedule.peer_group_build` on day 5 for IQD and USD; `POST /peer-groups` |
@@ -920,12 +928,12 @@ is a change request (phase 04).
   `peers: Arc<PeerGroupService>`, `profiles: Arc<ProfileQuery>`, `targets` (three change targets registered in the
   phase 04 registry). `worker`: `FeatureEngine`, `SegmentService` (assignment and statistics), `PeerBuilder`,
   `ProfileService`, the null ports of section 3.8 and their real CBS-maintained variant. `ctl`: `features seed`,
-  `features verify` (the catalogue validated against the installed rows).
+  `features verify` (the catalogue validated against the installed rows). Section 7.17 item 5 adds `source_tags: Arc<SourceTagService>` and a fourth change target to `api`, and the `source_tag_refresh` handler to `worker`.
 - **OpenAPI registration.** Tag `segments` (routes under `/ref`: 4 operations), `feature-definitions` (3), `peer-groups`
-  (3) and `profiles` (1): 11 operations in all, each with `x-akr-action` and `x-akr-access` on the profile read. The
+  (3) and `profiles` (1): 11 operations in all (13 with the two source-tag operations of section 7.17, which join the tag `segments`), each with `x-akr-action` and `x-akr-access` on the profile read. The
   profile operation documents `X-Access-Purpose` as required and the `Cache-Control: no-store` header. Proposals document
   `Idempotency-Key` and the 201 or 202 response with `Location`.
-- **Network zones:** no change. Only the worker reads `canon` for this phase; the API reads `feat` only.
+- **Network zones:** no change. The worker reads `canon` for this phase; the API reads `feat`, and `canon.account` and `canon.counterparty` (read only, as `akr_app`, which holds the SELECT grants of phase 10) for the source-tag proposal, its decision check and its activation (section 7.17 items 6 and 7) only.
 - **Readiness:** `/readyz` of akr-api adds `feature_catalogue` (the active catalogue equals the signed file's keys and
   versions) and akr-worker adds `peer_builds` (no `activating` build older than one hour).
 - **Metrics:** `akr_feature_runs{state}` (counter), `akr_feature_compute_seconds` (histogram),
@@ -934,7 +942,7 @@ is a change request (phase 04).
   decision after 30 days.
 - **Existing entity, schema or route updates:**
   - Phase 04: three change targets registered (`segment`, `feature_definition`, `peer_build`); the registry gains
-    these three kinds, and the route map gains no route.
+    these three kinds, and the route map gains no route. Section 7.17 registers a fourth, `source_tag`, the same way.
   - Phase 02: `PartitionRegistry` gains three feat entries; the access layer gains the `profile.read` action.
   - Phase 03: the resource adapter `customer` is registered (Open doubts) and the `Customer` entity joins the schema.
   - Phase 06: `AttributeCatalogue` gains the active feature keys with their `requires` (extends phase 06 with method
@@ -947,7 +955,7 @@ is a change request (phase 04).
 
 ## 5. Frontend Impact
 
-Backend-only phase; no screen of the catalogue (DESIGN-SYSTEM.md 8.1) shows features, segment statistics or profiles.
+Backend-only phase but for one tab: section 7.17 item 13 adds the tab Source tags to screen D3 (owner decision of 2026-10-10). No screen of the catalogue (DESIGN-SYSTEM.md 8.1) shows features, segment statistics or profiles.
 Segment definitions and feature versions are reviewed through the change request screen G10 (phase 08) and the
 change-request detail, which shows the diff, the class, the volume effect and the route. The segment register is read
 by the studio D2 (phase 16) for parameters by segment (DESIGN-SYSTEM D2). The party page W4 and the transaction explorer
@@ -964,7 +972,8 @@ Generated-client hooks (available after `make generate-api`): `useGetRefSegments
    plus `feature_runs`) and the three monthly parents. `SELECT count(*) FROM admin.column_classification WHERE
    schema_name = 'feat'` returns 93 (one row per column); `SELECT count(*) FROM admin.retention_assignment WHERE
    schema_name = 'feat'` returns 8. Negative checks as `akr_app`: `DELETE FROM feat.feature_values` fails with permission
-   denied; `UPDATE feat.feature_definitions SET expression = '{}'` fails with `feature definition content is immutable`;
+   denied; `UPDATE feat.feature_definitions SET expression = '{}'` fails with permission denied (`expression` is not in the
+   column grant) and, as the owner `akr_migrate` on a stored row (the guard is a row trigger, so the owner's statement needs a row: a fixture row, or a row of the seed of item 3), with `feature definition content is immutable; propose a new version`;
    `UPDATE feat.peer_groups SET state = 'active'` on a `candidate` row fails with `illegal peer build transition`;
    `DELETE FROM feat.segment_memberships` fails; `SELECT feat.create_partition('feature_values', 2026, 12)` returns
    `feature_values_2026_12`, and a second call returns the same name.
@@ -1013,7 +1022,7 @@ Generated-client hooks (available after `make generate-api`): `useGetRefSegments
      as CFG -> 403 `E_SCOPE`; as DS -> 403 `E_SCOPE`; an unknown party id -> 404 `E_NOT_FOUND`.
    - No suspicion-tier resource exists in this phase, so the masked 404 is not exercised here; the profile read is a
      restricted-tier read (the 422 purpose check above is its gate).
-6. Swagger UI lists 11 new operations, each with `x-akr-action`; `make generate-api` run twice gives zero diff.
+6. Swagger UI lists 13 new operations (11 of section 2 and the two of section 7.17), each with `x-akr-action`; `make generate-api` run twice gives zero diff.
 7. Audit after the curl run: `audit_log` holds `feature.seeded`, `change_request.created` (segment and feature),
    `segment.applied`, `feature.activated`, `peer_group.built`, `profile.refreshed` and `feature.computed`;
    `audit.access_event` holds one `view` row per customer record of each profile response, with tier `restricted` and the purpose code;
@@ -1062,7 +1071,7 @@ resolver's links live in a table of their own (extends DATA-MODEL s.8), written 
 
 ```sql
 -- migration 0044_feat_counterparty_links.sql
--- Phase 13 (gap pass 1). Counterparty to party links. Owner akr_app; retention R2 (follows canon.counterparty).
+-- Phase 13 (gap pass 1). Counterparty to party links. Owner akr_migrate; written by akr_app; retention R2 (follows canon.counterparty).
 CREATE TABLE IF NOT EXISTS feat.counterparty_links (
     id                  UUID PRIMARY KEY,
     counterparty_id     UUID NOT NULL REFERENCES canon.counterparty(id) ON DELETE RESTRICT,
@@ -1205,6 +1214,268 @@ Section 7.5: the table has one repository, `CounterpartyLinkRepository` (`PgCoun
 ### 7.16 Feature values read for the model sweep (V-27-01-a, MEDIUM; DR-413)
 From phase 27 on, `FeatureValueWriter` has a read partner in the same module: `FeatureValueReader::read(conn, entity, entity_ids, features, as_of) -> Result<Vec<FeatureValueRow>, RepoError>`. `features` is a list of `(feature_id, currency)` pairs and `as_of` is a closed month-end. It reads `feat.feature_values` by its primary key columns and returns `FeatureValueRow { entity_id, feature_id, currency, value: Option<Decimal>, status }`; a pair with no row is not returned. The grant `SELECT, INSERT ON feat.feature_values TO akr_app` covers it. Phase 27 calls it in its sweep (section 3.4 step 3, alerts grouped by month-end) and for `feature_psi` (section 3.8); a pair with no row, or a row whose `status` is not `value`, is passed as missing.
 
+Owner decisions (2026-10-10): the product owner overturned the lead decision that left the payroll and pension batch tags and the government-source flag to P2 (header, S-17); lead-written, checked in the owner-decision round (tools/agent/owner-verdict.md).
+
+### 7.17 Source tags kept by the bank (owner decision 3; DR-416)
+No CBS field feeds the tags, so the bank keeps them by hand as governed data: a register of paying sources, each marked `payroll`, `pension` or `government_source`. The register is read in two places, a feature filter and a static segment predicate, so public-salary and pension customers can form peer segments (S-17). Counterparty profiles stay as section 7.7 says: VB-05 is carried as counterparty-keyed features, and a counterparty profile is P2. DR-422 locks the corrections of the check round of 2026-10-11: the order of the activation, the refusal of a double add, the default end date, the form `tag.<name> = true` in a feature filter, and the recompute of months already computed.
+
+1. **Tables** (extends DATA-MODEL s.8; added to migration `0044_feat_counterparty_links.sql` as its second part; owner `akr_migrate`, written by `akr_app`):
+
+```sql
+-- migration 0044_feat_counterparty_links.sql, part 2
+-- Phase 13 (owner decision 3, DR-416). The register of tagged paying sources, and the customers the tags reach.
+CREATE TABLE IF NOT EXISTS feat.source_tags (
+    id                  UUID PRIMARY KEY,
+    tag                 TEXT NOT NULL CHECK (tag IN ('payroll', 'pension', 'government_source')),
+    subject_kind        TEXT NOT NULL CHECK (subject_kind IN ('account', 'counterparty')),
+    subject_id          UUID NOT NULL,                       -- canon.account logical id, or the canon.counterparty row that was picked (no foreign key: account is bi-temporal)
+    account_hk          BYTEA NOT NULL CHECK (octet_length(account_hk) = 32),
+    alt_account_hk      BYTEA CHECK (alt_account_hk IS NULL OR octet_length(alt_account_hk) = 32),
+    payer_name          JSONB NOT NULL CHECK (payer_name ? 'ar' AND payer_name ? 'en'),
+    payer_ref           TEXT CHECK (payer_ref IS NULL OR char_length(payer_ref) BETWEEN 1 AND 64),
+    valid_from          DATE NOT NULL,
+    valid_to            DATE,
+    state               TEXT NOT NULL CHECK (state IN ('active', 'ended', 'void')),
+    change_request_id   UUID NOT NULL REFERENCES admin.change_requests(id) ON DELETE RESTRICT,
+    retired_by_request  UUID REFERENCES admin.change_requests(id) ON DELETE RESTRICT,
+    created_by          UUID NOT NULL REFERENCES admin.users(id) ON DELETE RESTRICT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    retired_at          TIMESTAMPTZ,
+    CHECK (valid_to IS NULL OR valid_to >= valid_from),
+    CHECK ((state = 'active') = (retired_at IS NULL)),
+    CHECK ((state = 'active') = (retired_by_request IS NULL)),
+    CHECK (state <> 'ended' OR valid_to IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_source_tags_active ON feat.source_tags (tag, account_hk) WHERE state = 'active';
+CREATE INDEX IF NOT EXISTS idx_source_tags_hk ON feat.source_tags (account_hk) WHERE state <> 'void';
+CREATE INDEX IF NOT EXISTS idx_source_tags_alt_hk ON feat.source_tags (alt_account_hk) WHERE alt_account_hk IS NOT NULL AND state <> 'void';
+CREATE INDEX IF NOT EXISTS idx_source_tags_change_request ON feat.source_tags (change_request_id);
+
+-- A row is changed once, when it is ended or voided; a closed row never changes again, and no row is deleted.
+CREATE OR REPLACE FUNCTION feat.source_tag_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'source tags are never deleted' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF OLD.state <> 'active' THEN
+        RAISE EXCEPTION 'source tag is closed' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_source_tag_guard ON feat.source_tags;
+CREATE TRIGGER trg_source_tag_guard BEFORE UPDATE OR DELETE ON feat.source_tags
+    FOR EACH ROW EXECUTE FUNCTION feat.source_tag_guard();
+
+-- The customers that a tag reaches today. Rebuilt by the job source_tag_refresh; a row exists only while the customer qualifies.
+CREATE TABLE IF NOT EXISTS feat.customer_source_tags (
+    customer_id         UUID NOT NULL,                       -- canon.customer logical id (no foreign key: bi-temporal)
+    tag                 TEXT NOT NULL CHECK (tag IN ('payroll', 'pension', 'government_source')),
+    credits             INT NOT NULL CHECK (credits >= 1),
+    first_credit_on     DATE NOT NULL,
+    last_credit_on      DATE NOT NULL,
+    refreshed_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (customer_id, tag),
+    CHECK (last_credit_on >= first_credit_on)
+);
+CREATE INDEX IF NOT EXISTS idx_customer_source_tags_tag ON feat.customer_source_tags (tag);
+
+GRANT SELECT, INSERT ON feat.source_tags TO akr_app;
+GRANT UPDATE (state, valid_to, retired_at, retired_by_request) ON feat.source_tags TO akr_app;
+GRANT SELECT, INSERT, DELETE ON feat.customer_source_tags TO akr_app;
+GRANT UPDATE (credits, first_credit_on, last_credit_on, refreshed_at) ON feat.customer_source_tags TO akr_app;
+-- akr_readonly and akr_assess get no privilege on either table: both hold keyed hashes or customer ids.
+
+INSERT INTO admin.column_classification (schema_name, table_name, column_name, classification)
+SELECT 'feat', v.t, c, v.cls::admin.data_classification
+FROM (VALUES
+  ('source_tags', 'personal', ARRAY['subject_id','account_hk','alt_account_hk','payer_name']),
+  ('source_tags', 'internal', ARRAY['id','tag','subject_kind','payer_ref','valid_from','valid_to','state',
+        'change_request_id','retired_by_request','created_by','created_at','retired_at']),
+  ('customer_source_tags', 'personal', ARRAY['customer_id']),
+  ('customer_source_tags', 'internal', ARRAY['tag','refreshed_at']),
+  ('customer_source_tags', 'financial', ARRAY['credits','first_credit_on','last_credit_on'])
+) AS v(t, cls, cols), unnest(v.cols) AS c
+ON CONFLICT (schema_name, table_name, column_name) DO NOTHING;
+
+INSERT INTO admin.retention_assignment (schema_name, table_name, retention_class, clock, clock_column, note) VALUES
+ ('feat', 'source_tags',          'R9', 'retirement', NULL, 'Source tag register; ended and void rows are kept'),
+ ('feat', 'customer_source_tags', 'R4', 'owner',      NULL, 'Current reach of the tags; the refresh job deletes a row when the customer no longer qualifies')
+ON CONFLICT (schema_name, table_name) DO NOTHING;
+
+INSERT INTO admin.settings (key, value, value_type, floor, governed, label) VALUES
+ ('source_tags.lookback_days', '100', 'integer',
+  '{"min": 35, "basis": "one monthly pay cycle and a late payment; proposed floor"}', TRUE,
+  '{"ar": "أيام الرجوع لوسوم مصادر الدفع", "en": "Days of credits read for the source tags"}'),
+ ('source_tags.min_credits', '2', 'integer',
+  '{"min": 1, "basis": "at least one credit from a tagged source; proposed floor"}', TRUE,
+  '{"ar": "أدنى عدد إيداعات من مصدر موسوم", "en": "Credits from a tagged source before a customer carries the tag"}'),
+ ('schedule.source_tag_refresh', '"0 10 2 * * *"', 'cron', NULL, FALSE,
+  '{"ar": "تحديث وسوم مصادر الدفع", "en": "Source tag refresh (daily, bank time, before segment assignment)"}')
+ON CONFLICT (key) DO NOTHING;
+```
+
+   `source_tags` has 16 columns and `customer_source_tags` has 6, so `admin.column_classification` gains 22 rows and `admin.retention_assignment` gains 2. The two hashes are copies of canonical values: for `subject_kind = 'account'`, `account_hk` is the account's `number_hk` and `alt_account_hk` its `iban_hk`; for `subject_kind = 'counterparty'`, `account_hk` is the counterparty row's `account_hk` and `alt_account_hk` is null. The product never hashes a typed account number for a tag, so a tag matches exactly what the adapter wrote. `payer_name` is the name the bank types for the payer (a ministry, a pension body, an employer); it is classed `personal` because an employer may be a natural person.
+
+2. **What a tag means.** `payroll`: the source pays salaries. `pension`: the source pays pensions. `government_source`: the source is a state account (a ministry, a governorate, a state company), whatever it pays. One source may carry more than one tag, one row each. `valid_from` and `valid_to` are business dates: the tag holds for postings whose `booking_date` lies between them (an open `valid_to` means "until further notice"). An `ended` row keeps holding for the postings inside its dates, so a re-run of a past month gives the same answer; a `void` row holds for nothing (the tag was a mistake).
+
+3. **Where a tag is read.** Three boolean names exist, `tag.payroll`, `tag.pension` and `tag.government_source`, in two places only:
+   - **Feature filter.** In the `where` of a feature definition (section 3.1) the name is written as a comparison with a boolean literal, `tag.payroll = true` or `tag.payroll = false`, the form the Filter subset of DSL.md has (as `txn.cash_flag = true` in the shipped catalogue). `tag.payroll = true` holds for a posting whose counterparty carries a row of that tag that holds on the posting's `booking_date`; `tag.payroll = false` holds for every other posting. Any other use of the name in a `where` (the bare name, another operator, a value that is not a boolean) is `E_FIELD_TYPE`. The name says nothing about direction: the definition adds `txn.dr_cr = 'C'` for credits from the source. `FeatureValidator` step 2 accepts the three names beside the canonical references; a tag name is valid only in `where`, never in `field` or `group` (`E_UNKNOWN_ATTRIBUTE` there). `requires` gains `txn.counterparty_id` for a definition that reads a tag name. `FeatureCompiler` compiles `tag.<name> = true` to the following, with the tag as a bound parameter, and `tag.<name> = false` to `NOT` of the same expression:
+
+```sql
+EXISTS (SELECT 1
+        FROM canon.counterparty c
+        JOIN feat.source_tags g ON c.account_hk IN (g.account_hk, g.alt_account_hk)
+        WHERE c.id = t.counterparty_id AND g.tag = $n AND g.state <> 'void'
+          AND t.booking_date >= g.valid_from AND (g.valid_to IS NULL OR t.booking_date <= g.valid_to))
+```
+
+   - **Static segment predicate.** `{ "ref": "tag.payroll", "op": "=", "value": true }` is true for a customer with a `feat.customer_source_tags` row of that tag; with `"value": false` it is true for a customer with no such row. Only `=` with a boolean is accepted (`E_FIELD_TYPE` otherwise). The assignment of section 3.3 step 1 compiles `true` to `EXISTS (SELECT 1 FROM feat.customer_source_tags s WHERE s.customer_id = cu.id AND s.tag = $n)`, where `cu` is the customer row of the page, and `false` to `NOT EXISTS` over the same subquery. A risk-overlay segment may not read a tag name (`E_SEGMENT_INPUT_NOT_ALLOWED`).
+   - **Nowhere else.** A scenario document, a rating model and a mapping do not know the names: a `tag.*` name in a scenario document stays `E_UNKNOWN_ATTRIBUTE` (phase 16 section 3.1 rule 6). A scenario reads a tag through a feature key (`feat.<key>`) or through a segment, which phase 16 already allows, so phase 16 does not change. The shipped catalogue of section 3.1 holds no feature that reads a tag, and no segment that reads one is seeded; the bank adds both by change request (section 3.7).
+
+4. **Routes** (added to the `segments` router, which phase 09 already mounts under `/ref`, so phase 09 does not change):
+
+| Method | Path | Scope | Description (cedar action) |
+|-|-|-|-|
+| GET | `/api/v1/ref/source-tags` | `config.author`, `config.approve` | The register: tag, subject kind and id, payer name and reference, dates, state, change request; filters `state` (`active` by default, `ended`, `void`, `all`) and `tag`; cursor; no hash, no account number, no customer count (`source_tag.read`) |
+| POST | `/api/v1/ref/source-tags` | `config.author` | Propose a change set: tags to add and tags to end or void, at most 200 entries; `Idempotency-Key`; CR `source_tag` (`source_tag.propose`) |
+
+   The phase now has 13 routes (11 of section 2 and these two) and stays M. OpenAPI: both operations join the tag `segments`, each with `x-akr-action`; the POST documents `Idempotency-Key` and the 201 response with `Location`.
+
+5. **Types.** Entities `SourceTag` and `CustomerSourceTag` (fields mirror item 1). Value objects `TagKind` (`Payroll`, `Pension`, `GovernmentSource`), `TagSubjectKind` (`Account`, `Counterparty`), `SourceTagState` (`Active`, `Ended`, `Void`; `#[sqlx(type_name = "text")]`). DTOs: `SourceTagChange { add: Vec<NewSourceTag>, retire: Vec<RetireSourceTag>, reason_code: String, reason_text: String }` (the two reason fields are the ones phase 04 `create` requires), `NewSourceTag { tag, subject_kind, subject_id, payer_name: { ar, en }, payer_ref?, valid_from }`, `RetireSourceTag { id, mode: end | void, valid_to? }`. utoipa schemas: `SourceTagView` (the columns of the GET row above; it has no `account_hk` and no `alt_account_hk` field, so a serializer cannot emit them), `SourceTagChange` and `ChangeRequestAccepted` (the response schema of section 2, reused: the change request id, class, route and volume effect). Repository trait (domain layer, `PgSourceTagRepository` in `db`):
+
+```rust
+#[async_trait]
+pub trait SourceTagRepository: Send + Sync {
+    async fn list(&self, conn: &mut PgConnection, f: &SourceTagFilter, page: Keyset) -> Result<Page<SourceTag>, RepoError>;
+    async fn get(&self, conn: &mut PgConnection, id: Uuid) -> Result<Option<SourceTag>, RepoError>;
+    async fn active_by_hash(&self, conn: &mut PgConnection, tag: TagKind, hashes: &[Vec<u8>]) -> Result<Vec<SourceTag>, RepoError>;
+    async fn insert(&self, tx: &mut Tx, row: &SourceTag) -> Result<SourceTag, RepoError>;   // RETURNING
+    /// Sets `ended` (with `valid_to`) or `void` on an `active` row, and for both `retired_at = now()` and
+    /// `retired_by_request = cr`; `Ok(false)` when the row is no longer active.
+    async fn close(&self, tx: &mut Tx, id: Uuid, to: SourceTagState, valid_to: Option<NaiveDate>, cr: Uuid) -> Result<bool, RepoError>;
+    /// Replaces the reach table: upserts the qualifying rows whose values differ and deletes the rest. Returns (added, removed).
+    async fn replace_reach(&self, tx: &mut Tx, from: NaiveDate, to: NaiveDate, min_credits: i32) -> Result<(u64, u64), RepoError>;
+}
+```
+
+   `SourceTagFilter { state: Option<SourceTagState>, tag: Option<TagKind> }`; `state: None` is the `all` of the route. AppState: `api` gains `source_tags: Arc<SourceTagService>` and a fourth change target; `worker` gains the handler of item 8.
+
+6. **`SourceTagService::propose(caller, SourceTagChange)`** (`POST /ref/source-tags`):
+   1. Shape: 1 to 200 entries in `add` and `retire` together; the closed enumerations; `payer_name.ar` and `payer_name.en` of 2 to 200 characters; `payer_ref` of 1 to 64; `valid_from` no later than today in bank time; no id twice in `retire`; no pair `(tag, subject_kind, subject_id)` twice in `add`. A failure is 422 `E_VALIDATION` with a JSON pointer to the entry.
+   2. Resolve each `add`. `account`: the current `canon.account` row of `subject_id` (`recorded_to IS NULL`); the hashes are its `number_hk` and `iban_hk`. `counterparty`: the `canon.counterparty` row of `subject_id`; its `account_hk` must not be null (sub-code `no_account_key`). A subject that does not resolve is sub-code `subject_not_found`. An `active` row of the same tag whose `account_hk` or `alt_account_hk` equals one of the entry's hashes, and that is not in `retire`, is sub-code `already_tagged`. So is an entry that shares a hash with an earlier entry of `add` for the same tag (an account and a counterparty row of that account, for example), at the later entry. Each is 422 `E_VALIDATION` at `/add/<i>/subject_id`.
+   3. Each `retire` id is an `active` row (sub-code `not_active`, 422 at `/retire/<i>/id`). `end` takes `valid_to` between the row's `valid_from` and today, and defaults to the later of the row's `valid_from` and the last closed business date (phase 11 `FreshnessQuery`), so the default never falls before `valid_from`; `void` takes no date (422 at `/retire/<i>/valid_to` when one is sent).
+   4. An open change request with `object_key = 'source_tags'` gives 409 `E_NOT_ALLOWED_IN_STATE`: the register takes one change set at a time.
+   5. Create the change request with phase 04 `ChangeRequestService::create` (origin Dedicated, so `submit` runs in the same transaction; kind `source_tag`, `object_key` `source_tags`, the caller's `reason_code` of family `change` and `reason_text`), route `cr_material`. `proposed` holds the entries as sent and never a hash; the impact is `{adds, retires, counterparty_rows, reading_segments, reading_features}`, where `counterparty_rows` counts the `canon.counterparty` rows that carry a hash of an added entry and the two lists hold the keys of the active static segments and active feature definitions that read a tag name of the change set. The tag names of a change set are the tags of its `add` entries and the tags of the rows that its `retire` entries name (read by `id`), so a change set that only ends or voids a tag has its readers counted too.
+   6. Respond 201 with the change request; `change_request.created` is written by phase 04.
+
+7. **Change target `source_tag`** (one more row of the section 3.7 table; registered in the phase 04 registry, whose kinds are an open set; the route map gains no route):
+
+| Kind | Base class | Route | Generic create | Emergency | Families | Activation (inside the approval transaction) |
+|-|-|-|-|-|-|-|
+| `source_tag` | material | `cr_material` | no (dedicated route) | no | change | In this order: close each `retire` as `ended` (with `valid_to`) or `void`, both with `retired_at = now()` and `retired_by_request` = this request; then insert each `add` as `active` with the hashes resolved again; enqueue `source_tag_refresh`; when a feature reads a tag of the change set, enqueue `feature_compute {reopen_from}` (first point below); audit `source_tag.applied` |
+
+   - **Order, and months already computed.** The retires are closed before the adds are inserted, because an add may take the place of a row that the same change set retires (item 6 step 2; this is how a payer name is changed) and `uq_source_tags_active` allows one active row per tag and account. A tag change also moves what a tag-reading feature gives for months that are already computed, and the hourly run takes again only the months within `features.catchup_months` (section 3.2 step 1). So, when `reading_features` of the stored impact is not empty, the activation enqueues `feature_compute {reopen_from}`, where `reopen_from` is the month-end of the month of the earliest date the change set moves: the earliest of the `valid_from` of every add, the `valid_from` of every voided row and the `valid_to` of every ended row (a row ended on day D still holds on D, so the first date that can change is the day after D; taking the month of D is at most one month early, which costs one recompute and changes no value). The job is enqueued with the coalesce key `feature_compute:reopen:<reopen_from>`, a key of its own: under the plain key `feature_compute` another queued job with that key (the catch-up enqueue of a feature activation, or the enqueue of a replay) would swallow the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen would be lost; the scheduler's hourly job is not one of them, because its key is `feature_compute:<slot>` (phase 00); the kind's concurrency of 1 still runs the jobs one at a time. Section 3.2 step 1 then takes every month from `reopen_from`, computes it again whatever its `basis` says (the register is not part of the basis), step 5 updates only the rows whose value changed, and section 7.18 resets the rows the recompute no longer produces (a customer whose only matching credits came from the changed tag).
+   - **Volume effect.** `neutral` when both impact lists are empty: nothing reads the tags yet. Otherwise `decrease`: a tag moves customers into a segment or a feature fitted to salary and pension inflows, which is what the tag is for, and the product does not measure the result. A change set with a reader therefore always takes the route of a decrease, where the Compliance Head joins (phase 04). The effect is fixed at submit (DR-360).
+   - `current_version` returns `None` (the register has no version; item 6 step 4 keeps change sets from overlapping). `prepare` runs steps 1 to 3 of item 6 and builds the impact.
+   - `check_before_decision` runs steps 2 and 3 again and returns their sub-codes as issues (a subject that no longer resolves, a row that is no longer active); it recomputes the volume effect and refuses the decision with `volume_effect_changed` when it differs from the stored one (section 7.3).
+   - `on_closed` with `Rejected` or `Withdrawn` writes nothing. There is no `revert` (no emergency route).
+   - `diff` shows, per entry, the tag, the subject kind, the payer name and reference and the dates. It shows no hash, no account number and no name read from `canon`.
+
+8. **Job `source_tag_refresh`** (akr-worker; payload `{}`; coalesce key `source_tag_refresh`; concurrency 1; attempts 3; `schedule.source_tag_refresh` daily at 02:10 bank time, before `segment_assign`; also enqueued by a `source_tag` activation):
+   1. `to` is the last closed business date (as section 3.2 step 1); `from = to - source_tags.lookback_days + 1`. When the `canon.txn` watermark is `halted` or `stale` (section 3.2 step 2a) the job writes nothing and leaves the table as it is.
+   2. `SourceTagRepository::replace_reach(tx, from, to, source_tags.min_credits)` runs in one transaction. The qualifying rows come from:
+
+```sql
+SELECT h.customer_id, h.tag, COUNT(*) AS credits, MIN(h.booking_date) AS first_credit_on, MAX(h.booking_date) AS last_credit_on
+FROM (SELECT DISTINCT a.customer_id, g.tag, t.id, t.booking_date
+      FROM canon.txn t
+      JOIN canon.account a ON a.id = t.account_id AND a.recorded_to IS NULL
+      JOIN canon.counterparty c ON c.id = t.counterparty_id
+      JOIN feat.source_tags g ON c.account_hk IN (g.account_hk, g.alt_account_hk) AND g.state <> 'void'
+           AND t.booking_date >= g.valid_from AND (g.valid_to IS NULL OR t.booking_date <= g.valid_to)
+      WHERE t.booking_date BETWEEN $1 AND $2 AND t.dr_cr = 'C' AND t.status = 'posted'
+        AND t.system_generated IS NOT TRUE) h
+GROUP BY h.customer_id, h.tag
+HAVING COUNT(*) >= $3;
+```
+
+      A qualifying row is inserted, or updated when `credits`, `first_credit_on` or `last_credit_on` differ (`refreshed_at = now()`); every other row of the table is deleted. A second run on the same data writes nothing.
+   3. When a row was inserted or deleted and an active static segment reads a tag name, enqueue `segment_assign {level: static}`.
+   4. Audit one `source_tag.refreshed {payroll, pension, government_source, added, removed}` per run (counts only).
+
+9. **Audit events** (the two events named after the table of section 3.10): `source_tag.applied` on a `source_tag` change applied (resource `source_tag`; payload `{added, ended, voided}` as lists of row ids) and `source_tag.refreshed` at the end of a `source_tag_refresh` run (resource `source_tag`, system). The proposal writes `change_request.created` (phase 04, reused). Neither payload holds a hash, an account number, a payer name or a customer id.
+
+10. **Cedar actions** (one more row of section 3.11, for both actions; policies in `81_features.cedar`; the scope gates of item 4 admit every role these policies admit):
+
+| Action | Resource | Who (shipped bundle) |
+|-|-|-|
+| `source_tag.read` | System | CFG, CHK, M, CH |
+| `source_tag.propose` | System | CFG |
+
+```cedar
+@id("source_tag.readers") @role("CFG,CHK,M,CH")
+permit (principal, action == Akr::Action::"source_tag.read", resource)
+when { principal.roles.containsAny(["CFG", "CHK", "M", "CH"]) };
+
+@id("source_tag.proposers") @role("CFG")
+permit (principal, action == Akr::Action::"source_tag.propose", resource)
+when { principal.roles.contains("CFG") };
+```
+
+11. **Errors.** No variant is added to section 3.9. `subject_not_found`, `no_account_key`, `already_tagged` and `not_active` are sub-codes of 422 `E_VALIDATION`, each with the JSON pointer of its entry; an open change set is 409 `E_NOT_ALLOWED_IN_STATE`; `volume_effect_changed` is the refusal of section 7.3 (phase 04).
+
+12. **Tipping-off review.** A tag says that a source pays salaries, pays pensions or is a state account. It is set by a configuration role through change control, it is not derived from an alert, a case, a screening hit or a decision, and a segment that reads it is a static segment like any other, so the register and the reach table say nothing about suspicion. The register shows the payer name that the bank typed and two ids, never an account number, a hash, a name read from the core system or the number of customers a tag reaches. The reach table is read by the assignment job only: no route returns it, `akr_readonly` and `akr_assess` hold no privilege on it, and it is in no pack or export. A customer's tag is never shown on the party page or on an alert in this phase.
+
+13. **Frontend.** Screen D3 (`/policy`, phase 09) gains the tab **Source tags**, built in this phase on the phase 08 layer. The tab has no role list of its own (phase 09 section 7.5): it renders when the caller may call `GET /ref/source-tags` (CFG, CHK, M and CH in the shipped bundle), and "Propose changes" renders when the caller may call the POST (CFG). The tab shows the register as a table (tag as a word, payer name in the interface language with the other language under it, payer reference, subject kind as a word, dates, state as a word, a link to the change request on G10), with the state and tag filters. "Propose changes" opens a form for CFG: rows to add (tag, subject kind, subject id pasted as text, payer name in Arabic and English, payer reference, valid from) and rows to end or void picked from the table; the form shows the server's answer per row, is submitted with `Idempotency-Key`, is answered 201 and links to G10. The form states that a change is material and needs the MLRO and CHK, and the Compliance Head when a segment or a feature reads the tag. The subject id is the `account_id` or `counterparty_id` of a transaction row of the explorer W5; phase 18 section 7.29 adds the copy actions. Hooks: `useGetRefSourceTags`, `usePostRefSourceTags`. Section 5's "Backend-only phase" holds for everything but this tab. Tests: the tab passes axe in Arabic and English; a CHK user sees no "Propose changes"; a 390 px width shows the table inside its container with no page scroll.
+
+14. **Verification.**
+    - `make migrate`: `\d feat.source_tags` and `\d feat.customer_source_tags` exist; the classification count of schema `feat` rises by 22 and the retention count by 2. A `DELETE` of a row of `feat.source_tags` fails, as `akr_app` with permission denied (no DELETE grant; with or without a row) and as the owner `akr_migrate` with `source tags are never deleted` (the guard is a row trigger, so the owner's statement needs a row). As `akr_app`: an `UPDATE` of the `state` of an `ended` row fails with `source tag is closed`; an `UPDATE` of `payer_name` fails with permission denied; a second `active` row with the same tag and `account_hk` fails on `uq_source_tags_active`. A change set that retires a row and adds the same subject under the same tag with another payer name activates without error (retires first).
+    - `cargo test`: the validator accepts `tag.payroll = true` and `tag.payroll = false` in a `where`, refuses the bare name there (`E_FIELD_TYPE`) and refuses the name in `field` (`E_UNKNOWN_ATTRIBUTE`); a static segment with `tag.pension = true` compiles to `EXISTS`, one with `tag.pension = false` to `NOT EXISTS`, and a risk overlay with either is refused (`E_SEGMENT_INPUT_NOT_ALLOWED`); the compiled filter of a fixture feature `payroll_credit_1m` (`where`: `txn.dr_cr = 'C' AND tag.payroll = true`) holds the `EXISTS` of item 3, and the same feature with `tag.payroll = false` holds `NOT EXISTS`; a posting dated after `valid_to` of an `ended` row is not matched and one inside its dates is; a `void` row matches nothing.
+    - Reach fixture: a payroll source tagged by its counterparty row and three customers with 3, 1 and 0 credits from it in 100 days give one row (`credits = 3`) with `source_tags.min_credits = 2`; a second run writes nothing; after the tag is voided the row is gone and `segment_assign` is enqueued when a segment reads `tag.payroll`. With the fixture feature `payroll_credit_1m` active, the activation of a change set that voids a tag whose `valid_from` lies five months back (outside `features.catchup_months`) enqueues one `feature_compute` job with that month's month-end as `reopen_from`, also while a `feature_compute` job with the plain key is queued, and after it ran the feature rows of those months no longer count the credits: the row of a customer with other payroll credits holds the smaller sum, and the row of a customer whose only payroll credits came from the voided tag holds no value (`no_history`, `basis.reason = no_activity`; section 7.18). An own account tagged as `account` reaches the customers whose credits carry a counterparty with that account's `number_hk` or `iban_hk`.
+    - Curl (`tests/curl/phase13_features.sh`): as CFG `POST /api/v1/ref/source-tags` with one `add` on a counterparty, a `reason_code` of family `change`, a `reason_text` and `Idempotency-Key: tag-0001` gives 201 with a CR of class material and volume effect `neutral`; the same key and body gives the stored 201; a second change set while the first is open gives 409 `E_NOT_ALLOWED_IN_STATE`; a body without `reason_code` gives 422 `E_VALIDATION`; an unknown subject gives 422 with `subject_not_found`; a counterparty with no account key gives 422 with `no_account_key`. As CHK and M approve; `GET /api/v1/ref/source-tags` then shows the row `active`, and a `jq` walk finds no key `account_hk` or `alt_account_hk`. With a static segment that reads `tag.payroll` active, a new change set has volume effect `decrease` and the route waits for CH. As A1 the GET gives 403 `E_SCOPE`; as CHK the POST gives 403 `E_SCOPE`.
+    - Audit after the run: `change_request.created`, `source_tag.applied` and `source_tag.refreshed`; no payload holds a hash or a payer name.
+
+### 7.18 A recompute resets the rows it no longer produces (owner-decision check round 2, HIGH; DR-423)
+The month-end statement of section 3.1 inserts or updates the rows its SELECT produces and leaves every other row of the pair `(feature, as_of)` as it was, and `akr_app` has no DELETE on `feat.feature_values` (section 1, by design). When a re-run no longer produces a group that an earlier run stored, the old value stayed. Two cases reach it: a replay that cancels the only posting an entity had in the window (section 3.2, `reopen_from`), and a source tag that is voided or ended when its credits were a customer's only match (section 7.17 item 7). The row then kept a value the data no longer supports, in the reopened months and in every later run.
+
+1. **Rule.** The write of a pair `(feature, as_of)` also resets, in the same statement, every stored row of that pair that holds a value and whose `(entity_id, currency)` the SELECT did not produce. The reset sets `value` to NULL, `status` to `no_history` (`beyond_window` for the kind `days_since`, as section 7.11 says of an account with no posting in its window), `basis` to the run's basis with the member `"reason": "no_activity"` added, and `computed_at` to `now()`. No row is deleted and no grant changes: `akr_app` holds UPDATE on these four columns (section 1). The reset runs only for a pair that passes the gate of section 3.2 step 2; a `not_ready` or `dark` pair writes nothing, as before.
+2. **Readers.** A row without a value is read as an absent row. Section 3.4 step 2 and the profile build of section 3.6 already take `status = value` only; "absent" in section 3.2 step 4 and in section 3.5 step 1 means no row with a value. So a reset row gives zero for a `count` or `sum` feature under a `computed` run and "not applicable" for the other kinds, and it is not counted in a segment statistic.
+3. **The statement.** `FeatureCompiler::compile` wraps the SELECT of the feature as the CTE `cur` (one row per `(entity_id, currency)`, with the value and the status the INSERT of section 3.1 selected) and emits one statement of four parts for every kind. For `credit_turnover_1m` it replaces the SQL of section 3.1:
+
+```sql
+WITH cur AS MATERIALIZED (
+    SELECT a.customer_id AS entity_id, t.currency AS currency, SUM(t.amount) AS value, 'value'::text AS status
+    FROM canon.txn t
+    JOIN canon.account a ON a.id = t.account_id AND a.recorded_to IS NULL
+    WHERE t.booking_date BETWEEN $4 AND $2 AND t.dr_cr = 'C' AND t.status = 'posted' AND t.system_generated IS NOT TRUE
+    GROUP BY a.customer_id, t.currency
+), had AS MATERIALIZED (                      -- the keys stored before this statement (one snapshot for all parts)
+    SELECT entity_id, currency FROM feat.feature_values WHERE feature_id = $1 AND as_of = $2
+), up AS (
+    INSERT INTO feat.feature_values (entity, entity_id, feature_id, currency, as_of, value, status, basis, computed_at)
+    SELECT 'customer', entity_id, $1, currency, $2, value, status, $3, now() FROM cur
+    ON CONFLICT (entity, entity_id, feature_id, currency, as_of) DO UPDATE
+        SET value = EXCLUDED.value, status = EXCLUDED.status, basis = EXCLUDED.basis, computed_at = now()
+        WHERE feat.feature_values.value IS DISTINCT FROM EXCLUDED.value
+           OR feat.feature_values.basis IS DISTINCT FROM EXCLUDED.basis
+    RETURNING entity_id, currency
+), gone AS (
+    UPDATE feat.feature_values v
+       SET value = NULL, status = 'no_history', basis = $3 || '{"reason": "no_activity"}'::jsonb, computed_at = now()
+     WHERE v.feature_id = $1 AND v.as_of = $2 AND v.status = 'value'
+       AND NOT EXISTS (SELECT 1 FROM cur c WHERE c.entity_id = v.entity_id AND c.currency = v.currency)
+    RETURNING 1
+)
+SELECT (SELECT count(*) FROM up u WHERE NOT EXISTS
+            (SELECT 1 FROM had h WHERE h.entity_id = u.entity_id AND h.currency = u.currency)) AS inserted,
+       (SELECT count(*) FROM up u WHERE EXISTS
+            (SELECT 1 FROM had h WHERE h.entity_id = u.entity_id AND h.currency = u.currency))
+     + (SELECT count(*) FROM gone)                                                             AS updated;
+```
+
+   `up` and `gone` never touch the same row: `up` writes the keys of `cur`, `gone` the stored keys that are not in `cur`. The lookup of `had` and `gone` uses `idx_feature_values_feature` inside the one monthly partition of `$2`. `write_month_end` reads the one result row and returns `(inserted, updated)`; reset rows count as updated, so `feature_runs.rows_written` and the audit event `feature.computed` include them. Only a row with `status = 'value'` is reset, so a second run for the same months still writes zero rows (section 3.2 step 5). A reset row whose entity has activity again is written by `up` with the run's basis, without the reason.
+4. **Tests** (added to section 6): a month with the customers A and B is computed; the fixture then cancels B's only posting of the month and the job runs with `reopen_from` = that month-end. B's row then has `value` NULL, `status = 'no_history'` and `basis->>'reason' = 'no_activity'`; A's row is unchanged; the run reports one updated row and the next run reports zero. `segment_stats_refresh` for the period does not count B in `n`. When B has a posting again and the month is reopened, B's row holds the new value and a basis without `reason`. As `akr_app`, `DELETE FROM feat.feature_values` still fails with permission denied (section 6 item 1).
+
 ## Decisions
 
 Recorded in docs/plan/research.md: DR-98 (the feature catalogue: nine closed expression kinds compiled from JSON by one
@@ -1226,6 +1497,8 @@ Lead corrections at review (2026-10-09): the volume effect of a segment or featu
 3.7, 3.8). The segment list route names `segment.list`. The Cedar excerpt uses the phase 03 schema form
 (`principal.roles.contains`), which is correct; phases 05 and 10 to 12 use `principal in Akr::Role::"X"`, for which
 the phase 03 schema has no entity, and are fixed in gap pass 1.
+
+**DR-416 (owner decision of 2026-10-10: the bank keeps the source tags by hand).** The lead had left the payroll and pension batch tags and the government-source flag of S-17 to P2, because no CBS field feeds them. The owner decided that the bank maintains them as admin data in this version. Section 7.17 adds the register `feat.source_tags` (tags `payroll`, `pension` and `government_source` on a paying source, which is an account of the bank or a counterparty row, matched by the keyed account hashes that the adapter wrote), the reach table `feat.customer_source_tags` rebuilt daily by `source_tag_refresh`, two routes under `/ref/source-tags`, the change target `source_tag` on `cr_material` (one change set at a time; volume effect `neutral` while nothing reads the tags and `decrease` afterwards, so the Compliance Head joins), and the three names `tag.payroll`, `tag.pension` and `tag.government_source`, valid in a feature filter and in a static segment predicate only. Rationale: a bank knows its few payroll, pension and state payers, a tag changes who a customer is compared with and so needs four-eyes, and copying the hashes from canonical rows means the product never hashes a typed account number. Not built: a counterparty profile (VB-05 stays features only, section 7.7), a tag read from a CBS field, and a lookup of a source by account number or name.
 
 ## Open doubts (for gap pass 1 and the bank)
 
@@ -1259,6 +1532,8 @@ the phase 03 schema has no entity, and are fixed in gap pass 1.
   segment-migration alert of T-09 is P2 (section 7+, DR-399).
 - **Dark-unit profiles.** A customer of an excluded unit gets `unknown`, although the exclusion is approved. Confirm that
   this is intended under DR-64 and DR-38.
+- **Source tags (section 7.17).** The two floors (`source_tags.lookback_days` 35, `source_tags.min_credits` 1) and the defaults (100 days, 2 credits) are proposals; the bank confirms them at onboarding. A source whose counterparty rows carry no account key cannot be tagged (`no_account_key`); the bank's mapping should supply `counterparty.account_hk` for its payroll and pension feeds. A tag is matched on the other side of a posting only, so the debits of a tagged account itself are not marked.
+- **Reopen enqueues and the coalesce key (found in the owner-decision round).** An enqueue of `feature_compute {reopen_from}` under the coalesce key `feature_compute` is dropped while another job with that plain key is queued (phase 00: `ON CONFLICT DO NOTHING`; the scheduler's hourly job has the key `feature_compute:<slot>` and is not one), and the reopen is lost. The source-tag activation uses a key of its own (section 7.17 item 7). The replay enqueue of section 3.2 has the same weakness as written and should take the same key form when it is built.
 
 ## What This Phase Does NOT Touch
 
@@ -1267,8 +1542,9 @@ the phase 03 schema has no entity, and are fixed in gap pass 1.
 - No rating, KYC, PEP or ownership table (phase 15); the rating and declared sources are ports with null implementations.
 - No screening data is read (phase 14) and no alert, case, STR or watch data is read or written.
 - No segment or feature statistic is shown per branch, per customer or in any export or pack.
-- No new change-request route (the three kinds use `cr_material` and the existing routes), no new problem code in API
+- No new change-request route (the four kinds, `source_tag` of section 7.17 among them, use `cr_material` and the existing routes), no new problem code in API
   section 6, no new step-up action class, no new role.
 - No change to phase 00 to 12 tables and no change to a phase 11 or phase 12 table or grant; `canon` is read only.
 - No outbox topic and no second partition maintenance job.
-- No screen (DESIGN-SYSTEM.md 8.1 lists none for this data); the party-page profile panel is phase 18.
+- No screen of its own (DESIGN-SYSTEM.md 8.1 lists none for this data); the one frontend change is the tab Source tags of D3 (section 7.17 item 13). The party-page profile panel is phase 18.
+- No counterparty profile (VB-05 stays features only, section 7.7), no tag read from a CBS field, no lookup of a source by account number or by name, and no tag shown on the party page or on an alert (section 7.17).

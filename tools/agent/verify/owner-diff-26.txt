@@ -1,0 +1,149 @@
+diff --git a/docs/plan/phase-26.md b/docs/plan/phase-26.md
+index e8ab8db..9d48485 100644
+--- a/docs/plan/phase-26.md
++++ b/docs/plan/phase-26.md
+@@ -8,2 +8,2 @@
+-**Complexity:** M by the template rule (6 routes: 4 rows of API.md 3.18 and two rows added (content, verify); 3 tables in 2 migrations `0083` and `0084`; 1 view; 1 altered CHECK on `canon.product`; 1 job kind; 5 settings rows (section 4.3); 8 library scenario documents; 4 audit kinds; 1 Cedar file). The brief said Size S; see Open doubts 22.
+-**Binaries touched:** akr-api (routers `islamic`, `sharia_board`; `IslamicDealService`, `PossessionEvidenceService`, `ShariaAggregateQuery` in `AppState`; the pooled branch of `FreezeService`) | akr-worker (job `islamic_evidence_sweep`) | akr-ingestd (unchanged code path: the `CanonicalWriter` library writes the two `canon` tables when phase 11 calls it) | akr-ctl (`packs seed --pack islamic`, `canon verify-catalogue`) | akr-assess unchanged
++**Complexity:** M by the template rule (6 routes: 4 rows of API.md 3.18 and two rows added (content, verify); 4 tables in 2 migrations `0083` and `0084` (the fourth is `canon.facility_instalments` of section 7.13); 1 view; 1 altered CHECK on `canon.product`; 1 column added to `canon.facility` (`granted_on`, section 7.13); 1 job kind; 5 settings rows (section 4.3); 8 library scenario documents; 4 audit kinds; 1 Cedar file). The brief said Size S; see Open doubts 22.
++**Binaries touched:** akr-api (routers `islamic`, `sharia_board`; `IslamicDealService`, `PossessionEvidenceService`, `ShariaAggregateQuery` in `AppState`; the pooled branch of `FreezeService`) | akr-worker (job `islamic_evidence_sweep`) | akr-ingestd (unchanged code path: the `CanonicalWriter` library writes the three `canon` tables, the third being `canon.facility_instalments` of section 7.13, when phase 11 calls it) | akr-ctl (`packs seed --pack islamic`, `canon verify-catalogue`) | akr-assess unchanged
+@@ -118,0 +119,35 @@ GRANT SELECT, DELETE ON canon.islamic_deals, canon.deal_parties TO akr_retention
++
++-- 6. Schedule sources (owner decision 6, DR-419). A facility gains the date it was granted, and each scheduled
++--    instalment is one row; paid_on is the repayment event. Written by the CanonicalWriter as a fact (phase 10
++--    sections 3.7 and 7.27). No foreign key to canon.facility: canon children are deleted by owner (phase 23).
++ALTER TABLE canon.facility ADD COLUMN IF NOT EXISTS granted_on DATE;
++
++CREATE TABLE IF NOT EXISTS canon.facility_instalments (
++    id                  UUID PRIMARY KEY,
++    facility_id         UUID NOT NULL,
++    seq                 INT NOT NULL CHECK (seq >= 1),            -- the instalment number within the facility
++    due_on              DATE NOT NULL,
++    amount              NUMERIC(28,6) NOT NULL CHECK (amount >= 0),
++    currency            CHAR(3) NOT NULL REFERENCES ref.currencies(code) ON DELETE RESTRICT,
++    paid_on             DATE,                                     -- set when the source shows the instalment paid in full
++    paid_amount         NUMERIC(28,6) CHECK (paid_amount IS NULL OR paid_amount >= 0),
++    source_id           UUID NOT NULL REFERENCES admin.sources(id) ON DELETE RESTRICT,
++    source_table        TEXT NOT NULL,
++    source_pk           TEXT NOT NULL,
++    source_version      TEXT,
++    row_hash            BYTEA NOT NULL,
++    batch_id            UUID NOT NULL,
++    extracted_at        TIMESTAMPTZ NOT NULL,
++    mapping_version_id  UUID NOT NULL REFERENCES admin.mapping_versions(id) ON DELETE RESTRICT,
++    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
++    CHECK (paid_amount IS NULL OR paid_on IS NOT NULL),
++    CONSTRAINT uq_facility_instalments_source UNIQUE (source_id, source_table, source_pk),
++    CONSTRAINT uq_facility_instalments_seq UNIQUE (facility_id, seq)
++);
++CREATE INDEX IF NOT EXISTS idx_facility_instalments_open ON canon.facility_instalments (facility_id) WHERE paid_on IS NULL;
++
++GRANT SELECT, INSERT ON canon.facility_instalments TO akr_ingest;
++GRANT UPDATE (paid_on, paid_amount, row_hash) ON canon.facility_instalments TO akr_ingest;
++GRANT UPDATE (granted_on, row_hash) ON canon.facility TO akr_ingest;
++GRANT SELECT ON canon.facility_instalments TO akr_app;
++GRANT SELECT, DELETE ON canon.facility_instalments TO akr_retention;
+@@ -137 +172,6 @@ FROM (VALUES
+-                                     'superseded_at', 'created_at'])
++                                     'superseded_at', 'created_at']),
++  ('facility', 'internal', ARRAY['granted_on']),                                         -- section 7.13
++  ('facility_instalments', 'internal', ARRAY['id', 'facility_id', 'seq', 'due_on', 'currency', 'paid_on', 'source_id',
++                                             'source_table', 'source_pk', 'source_version', 'row_hash', 'batch_id',
++                                             'extracted_at', 'mapping_version_id', 'created_at']),
++  ('facility_instalments', 'financial', ARRAY['amount', 'paid_amount'])
+@@ -145 +185,2 @@ INSERT INTO admin.retention_assignment (schema_name, table_name, retention_class
+- ('canon', 'deal_parties',  'R3', 'owner',   NULL,        'Follows its deal; superseded rows follow the same owner')
++ ('canon', 'deal_parties',  'R3', 'owner',   NULL,        'Follows its deal; superseded rows follow the same owner'),
++ ('canon', 'facility_instalments', 'R3', 'owner', NULL,  'Follows its facility')   -- section 7.13
+@@ -232,0 +274,2 @@ ON CONFLICT (schema_name, table_name) DO NOTHING;
++| `canon.facility_instalments` (section 7.13) | SELECT | SELECT, INSERT; UPDATE (paid_on, paid_amount, row_hash) | SELECT, DELETE | none |
++| `canon.facility` (`granted_on` added, section 7.13) | unchanged | adds UPDATE (granted_on, row_hash) | unchanged | unchanged |
+@@ -469 +512 @@ positive and negative fixtures (phase 16 section 3.1) and declares its `data_req
+-| SCN-ISL-07 | Repeat qard hasan within six months of full repayment, or while another is unpaid (hard rule) | I-08 | CBI 2018 pp. 58-59 (S) | `islamic_deal.contract_type`, `islamic_deal.opened_on`, `islamic_deal.closed_on`, `islamic_deal.status`; `facility.events` for schedule sources | readiness B; repayment dates come from the schedule tables, which the source maps later | restricted | L2 |
++| SCN-ISL-07 | Repeat qard hasan within six months of full repayment, or while another is unpaid (hard rule) | I-08 | CBI 2018 pp. 58-59 (S) | `islamic_deal.contract_type`, `islamic_deal.opened_on`, `islamic_deal.closed_on`, `islamic_deal.status`; for sources without agreements `facility.product_id`, `facility.customer_id`, `facility.granted_on?`, `product.islamic_contract_type`, `facility_instalment.facility_id?`, `facility_instalment.due_on?`, `facility_instalment.paid_on?` (section 7.13) | readiness A (agreement source); for a schedule source A once `facility.granted_on` and the family `<source>.facility_instalment` are published, B until then (section 7.13) | restricted | L2 |
+@@ -942 +985 @@ SCN-ISL-07 (deals of one customer with `contract_type = 'qard_hasan'`; N is the
+-- Schedule sources: `canon.facility.events` has no event kind for a repayment in this plan, so the facility leg is not evaluable until the schedule mapping names one. The document grades B on such a source, as the row says, and its facility leg is P2.
++- Schedule sources: replaced by section 7.13 (owner decision of 2026-10-10: instalments are mapped and the facility leg ships). The text of the verification pass was: `canon.facility.events` has no event kind for a repayment in this plan, so the facility leg is not evaluable until the schedule mapping names one. The document grades B on such a source, as the row says, and its facility leg is P2.
+@@ -959,0 +1003,79 @@ Section 4.5 item 7 gains two points of the phase 16 extension that this phase ow
++Owner decisions (2026-10-10): the product owner overturned the lead decision of section 7.9 that left the facility leg of SCN-ISL-07 to P2; lead-written, checked in the owner-decision round (tools/agent/owner-verdict.md).
++
++### 7.13 Schedule sources: instalments, and the facility leg of SCN-ISL-07 (owner decision 6; DR-419)
++The owner's decision: the mapping gains the repayment event of a schedule table, so SCN-ISL-07 runs at a bank whose qard hasan sits in schedule tables too. This block replaces the last item of section 7.9 ("Schedule sources") and the readiness cell of the SCN-ISL-07 row of section 3.6. `canon.facility.events` is not used for it.
++
++**1. SQL.** Migration `0083` gains this part after its part 5 (written into section 1.1 in the same change). The classification and retention inserts of section 1.2 gain the rows below.
++
++```sql
++-- 6. Schedule sources (owner decision 6, DR-419). A facility gains the date it was granted, and each scheduled
++--    instalment is one row; paid_on is the repayment event. Written by the CanonicalWriter as a fact (phase 10
++--    sections 3.7 and 7.27). No foreign key to canon.facility: canon children are deleted by owner (phase 23).
++ALTER TABLE canon.facility ADD COLUMN IF NOT EXISTS granted_on DATE;
++
++CREATE TABLE IF NOT EXISTS canon.facility_instalments (
++    id                  UUID PRIMARY KEY,
++    facility_id         UUID NOT NULL,
++    seq                 INT NOT NULL CHECK (seq >= 1),            -- the instalment number within the facility
++    due_on              DATE NOT NULL,
++    amount              NUMERIC(28,6) NOT NULL CHECK (amount >= 0),
++    currency            CHAR(3) NOT NULL REFERENCES ref.currencies(code) ON DELETE RESTRICT,
++    paid_on             DATE,                                     -- set when the source shows the instalment paid in full
++    paid_amount         NUMERIC(28,6) CHECK (paid_amount IS NULL OR paid_amount >= 0),
++    source_id           UUID NOT NULL REFERENCES admin.sources(id) ON DELETE RESTRICT,
++    source_table        TEXT NOT NULL,
++    source_pk           TEXT NOT NULL,
++    source_version      TEXT,
++    row_hash            BYTEA NOT NULL,
++    batch_id            UUID NOT NULL,
++    extracted_at        TIMESTAMPTZ NOT NULL,
++    mapping_version_id  UUID NOT NULL REFERENCES admin.mapping_versions(id) ON DELETE RESTRICT,
++    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
++    CHECK (paid_amount IS NULL OR paid_on IS NOT NULL),
++    CONSTRAINT uq_facility_instalments_source UNIQUE (source_id, source_table, source_pk),
++    CONSTRAINT uq_facility_instalments_seq UNIQUE (facility_id, seq)
++);
++CREATE INDEX IF NOT EXISTS idx_facility_instalments_open ON canon.facility_instalments (facility_id) WHERE paid_on IS NULL;
++
++GRANT SELECT, INSERT ON canon.facility_instalments TO akr_ingest;
++GRANT UPDATE (paid_on, paid_amount, row_hash) ON canon.facility_instalments TO akr_ingest;
++GRANT UPDATE (granted_on, row_hash) ON canon.facility TO akr_ingest;
++GRANT SELECT ON canon.facility_instalments TO akr_app;
++GRANT SELECT, DELETE ON canon.facility_instalments TO akr_retention;
++```
++
++```sql
++-- added to the VALUES list of the classification insert of section 1.2
++  ('facility', 'internal', ARRAY['granted_on']),
++  ('facility_instalments', 'internal', ARRAY['id', 'facility_id', 'seq', 'due_on', 'currency', 'paid_on', 'source_id',
++                                             'source_table', 'source_pk', 'source_version', 'row_hash', 'batch_id',
++                                             'extracted_at', 'mapping_version_id', 'created_at']),
++  ('facility_instalments', 'financial', ARRAY['amount', 'paid_amount'])
++-- added to the VALUES list of the retention insert of section 1.2
++ ('canon', 'facility_instalments', 'R3', 'owner', NULL, 'Follows its facility')
++```
++
++The table is owned by `akr_migrate` like every `canon` table. Section 1.5 gains the row `canon.facility_instalments`: `akr_app` SELECT; `akr_ingest` SELECT, INSERT, UPDATE (paid_on, paid_amount, row_hash); `akr_retention` SELECT, DELETE; `akr_readonly` none. The phase now has 4 tables in 2 migrations and 1 altered column list (`canon.facility.granted_on`).
++
++**2. Entity and mapping.** `facility_instalment` is the 32nd name of `CanonicalEntity` and of `canonical-model.v1.json`, after `islamic_deal` and `deal_party` (phase 10 sections 7.3 and 7.27), with the mapping family `<source>.facility_instalment`. The entity belongs to the base model, not to the Islamic pack: a bank maps it with or without `pack.islamic`. Catalogue flags: `facility_id`, `seq`, `due_on`, `amount` and `currency` are `required`; `paid_on` and `facility.granted_on` are `monitored` (inputs of SCN-ISL-07) and not `required`. One source row is one instalment. The mapping sets `paid_on` only when the source shows the instalment paid in full (a `filter` or an `expr` over the source's paid flag or amounts); a part payment leaves `paid_on` null.
++
++**3. Writer.** Phase 10 section 7.27 gives the rules: the facility key of the row is resolved through `admin.xref`, the row is written as a fact, and a later version that only sets `paid_on` updates the row in place.
++
++**4. Conditions of SCN-ISL-07 for a schedule source.** A qard hasan facility is a `canon.facility` row whose product row has `islamic_contract_type = 'qard_hasan'` (as in SCN-ISL-06). For such a facility F:
++- its start is `granted_on`;
++- it is repaid in full when it has at least one row in `canon.facility_instalments` and every one of them has `paid_on` set; its date of full repayment is then the latest `paid_on`;
++- it is unpaid on a day `d` when at least one of its instalments has `paid_on` null or later than `d`.
++The new loan N is a deal with `opened_on = d` (section 7.9) or a qard hasan facility with `granted_on = d`. The legs then read:
++- Repeat leg: another qard hasan of the same customer that is a deal as in section 7.9, or a facility repaid in full whose date of full repayment lies in the `repeat_months` months before `d`.
++- Unpaid leg: another qard hasan of the same customer that is a deal as in section 7.9, or a facility with `granted_on` before `d` that is unpaid on `d`.
++- Not evaluable, and never a match: a facility with a null `granted_on` as the new loan or in the unpaid leg; a facility with no instalment row in either leg. The alert evidence names which loan was not evaluable only by its count (`not_evaluable_count` in the measures), so a gap in the mapping is seen.
++One agreement is a deal or a facility, never both (section 7.9), so no loan is counted twice.
++
++**5. The row of section 3.6.** The "Canonical fields read" cell of SCN-ISL-07 reads: `islamic_deal.contract_type`, `islamic_deal.opened_on`, `islamic_deal.closed_on`, `islamic_deal.status`; for sources without agreements `facility.product_id`, `facility.customer_id`, `facility.granted_on?`, `product.islamic_contract_type`, `facility_instalment.facility_id?`, `facility_instalment.due_on?`, `facility_instalment.paid_on?`. The readiness cell reads: readiness A for an agreement source; for a schedule source A once `facility.granted_on` and the family `<source>.facility_instalment` are published, and B until then. The facility inputs are optional inputs (DSL A.3), so a bank with agreements only is not graded down for having no schedule mapping.
++
++**6. Fixtures.** The SCN-ISL-07 document gains four fixtures: a facility repaid in full four months before a new facility (positive, repeat leg); the same with eight months (negative); a facility with one unpaid instalment when a new one is granted (positive, unpaid leg); a new facility beside a facility with no instalment rows (negative, `not_evaluable_count` 1).
++
++**7. Audit, Cedar, tipping-off.** No route, event or action is added: instalments arrive through the mapping and load paths of phases 10 and 11 and are read by the scenario engine of phase 16 only. No screen shows an instalment. SCN-ISL-07 keeps its visibility `restricted`, so its alerts follow the rules of phase 17 as before.
++
++**8. Tests** (added to section 6): migration `0083` applies twice without error and `canon.facility` has `granted_on`; the classification test of check 2 passes with the new rows; `UPDATE canon.facility_instalments SET amount = 0` as `akr_ingest` is refused (no column grant) and `SET paid_on = current_date` is allowed; the four fixtures of item 6 pass; a schedule source with the family published grades A and the same source without it grades B for SCN-ISL-07.
++
+@@ -987,0 +1110,2 @@ Numbered from DR-246, the first number the lead assigned after DR-245. Each deci
++**DR-419 (owner decision of 2026-10-10: schedule tables are mapped, so SCN-ISL-07 ships for every bank).** The lead had left the facility leg of SCN-ISL-07 to P2, because `canon.facility.events` named no repayment event (section 7.9). The owner overturned it. Migration `0083` adds `canon.facility_instalments` (one row per scheduled instalment, `paid_on` is the repayment event) and `canon.facility.granted_on`; the entity `facility_instalment` joins the canonical model with its own mapping family; the writer rules are in phase 10 section 7.27; the conditions of the facility leg are in section 7.13. The related-person leg of SCN-ISL-06 is unchanged.
++

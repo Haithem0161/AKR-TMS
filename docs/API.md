@@ -104,7 +104,7 @@ Coarse gates carried by sessions (from role grants) and tokens. Cedar remains th
 | `admin.system` | Settings, flags, jobs, releases, ops cockpit | ADM |
 | `security.ops` | Break-glass approvals, access reviews, credential-reset confirmation, access matrix, support-session approval | SEC |
 | `support.readonly` | A support session opened by the bank (time-boxed); no route requires it: `VS` reads only its own profile (`self`; phase 25, DR-237) | VS |
-| `siem.pull` | `GET /siem/events` only; the route is not mounted for a client without it (phase 25, DR-245) | Service principals (`ClientCredentials`) only |
+| `siem.pull` | `GET /siem/events` and `GET /siem/access-events` only; the routes are not mounted for a client without it (phase 25, DR-245, DR-414) | Service principals (`ClientCredentials`) only |
 | `assess.call` | `/assess/v1` only | Gateway client certificate |
 | `capacity.plan` | Capacity inputs and simulation runs (phase 31, DR-353) | M |
 | `directory.sync` | `POST /directory/events` only; HMAC-verified webhook (phase 31, DR-352) | Service principal `polis-directory` only |
@@ -362,6 +362,8 @@ quality (docs/plan/phase-12.md s.2, DR-94 to DR-97); the blind-period routes are
 | POST | /ref/segments | config.author | Propose a static or risk-overlay segment (or a new version with `base_version`); **CR** `segment` (`cr_material`, volume effect measured, DR-99) |
 | GET | /ref/segments/{id} | config.author | Rule, merge chain, version, change request, last assignment run |
 | GET | /ref/segments/{id}/stats | config.author | Robust statistics (n, p50, p95, p99, MAD) per feature, currency and period; populations below 200 suppressed and counted only (S-12) |
+| GET | /ref/source-tags | config.author, config.approve | Source-tag register (payroll, pension and government-source payers the bank marks by hand): tag, subject kind and id, payer name and reference, dates, state, change request; `?state=&tag=`; no hash, no account number, no customer count (phase 13, added; DR-416) |
+| POST | /ref/source-tags | config.author | Propose a change set of tags to add and tags to end or void, at most 200 entries; `Idempotency-Key`; **CR** `source_tag` (phase 13, added; DR-416) |
 | GET | /ref/typologies | self | Shared typology set: number, tag and label (phase 06, DR-381) |
 
 ### 3.9 Screening and name matching (M9)
@@ -396,6 +398,8 @@ Phase 14 (DR-100 to DR-102). Screening alerts and pair memory are masked kinds: 
 | POST | /screening/good-guys | screening.work | Propose a rule (never on a freeze list); **CR** `good_guy_rule` |
 | GET | /screening/harness-runs | screening.work, config.author, config.approve, audit.read, assessor.read | Known-answer harness results per list version |
 | POST | /screening/harness-runs | screening.work | Run the harness (gate, oracle or canary) |
+| GET | /screening/harness-cases | screening.work | The bank's own known-answer cases: `?list_code=&state=`; the name and identifiers unsealed; SS and M only (phase 14, added; DR-415) |
+| POST | /screening/harness-cases | screening.work | Propose a case, or the retirement of one; `Idempotency-Key`; **CR** `harness_case`; 202 (phase 14, added; DR-415) |
 
 ### 3.10 Customer risk rating and KYC (M10)
 
@@ -556,6 +560,9 @@ Phase 14 (DR-100 to DR-102). Screening alerts and pair memory are masked kinds: 
 | POST | /rfis/{id}/extend | rfi.desk | One extension by working days, two at most (phase 19, added) |
 | GET | /rfis/correspondents | rfi.desk | Correspondent requests in and out: deadline, progress, recipient account id; no case detail; flag `pack.correspondent` (phase 31, added) |
 | POST | /rfis/{id}/packs | rfi.desk | Attach a correspondent or validator pack to an outbound correspondent request in draft; `If-Match` (phase 31, added) |
+| GET | /rfis/{id}/prefill | rfi.desk | Proposed answers for the open questions of an incoming correspondent RFI, computed from the product's records; nothing is stored; `X-Access-Purpose` required; `Cache-Control: no-store`; masked 404 for a suspicion RFI the caller may not see (phase 19, added; DR-417) |
+| GET | /rfi-prefill-map | config.author, config.approve, rfi.desk | Active pre-fill map rows and the source registry with the sensitive mark; `?state=all` adds retired rows (phase 19, added; DR-417) |
+| POST | /rfi-prefill-map | config.author | Propose a change set of map rows, at most 100 entries; `Idempotency-Key`; **CR** `rfi_prefill_map` (phase 19, added; DR-417) |
 | POST | /cases/{id}/watches | queue.work | Start a UTR watch by hand on a UTR decision of the case (phase 19, added) |
 | POST | /watches/{id}/review | case.decide | Review at expiry: extend, close or upgrade; **SU** (phase 19, added) |
 | POST | /hibernations/{id}/end | case.decide | End a hibernation by a person with a reason (phase 19, added) |
@@ -566,7 +573,7 @@ Phase 14 (DR-100 to DR-102). Screening alerts and pair memory are masked kinds: 
 | GET | /alarms | case.decide, audit.read | Alarm register: breach, chain, conflict, flat-line and critical QA alarms (phase 19, added) |
 | POST | /alarms/{id}/acknowledge | case.decide, audit.read | Acknowledge or close an alarm (phase 19, added) |
 
-Phase 17 ships /queues, /queues/{id}/items, /alerts/{id}, claim, unclaim, /cases, /cases/{id}, timeline, assign and merge as written, and the rows marked "phase 17, added". Phase 18 owns notes, evidence, proposals, decisions, escalate, reopen and the party pages, and ships them with the rows marked "phase 18, added" (25 routes, DR-146); phase 19 owns `/parties/{id}/graph`, hibernations, watches, RFIs, authority requests, internal reports and QA (the rows marked "phase 19") and ships them with the rows marked "phase 19, added" (31 routes, DR-157). Screening queues stay at `/screening/alerts` (3.9, phase 14).
+Phase 17 ships /queues, /queues/{id}/items, /alerts/{id}, claim, unclaim, /cases, /cases/{id}, timeline, assign and merge as written, and the rows marked "phase 17, added". Phase 18 owns notes, evidence, proposals, decisions, escalate, reopen and the party pages, and ships them with the rows marked "phase 18, added" (25 routes, DR-146); phase 19 owns `/parties/{id}/graph`, hibernations, watches, RFIs, authority requests, internal reports and QA (the rows marked "phase 19") and ships them with the rows marked "phase 19, added" (35 routes, DR-157; three of them from the owner decision DR-417). Screening queues stay at `/screening/alerts` (3.9, phase 14).
 
 ### 3.13 Reporting to the AML/CFT Office (M13) [P0 checker, P1]
 
@@ -581,6 +588,9 @@ Phase 17 ships /queues, /queues/{id}/items, /alerts/{id}, claim, unclaim, /cases
 | PUT | /goaml/profiles/{id} | config.author | Promote a candidate or amend a version; **CR** `goaml_profile` (corpus result required) [P0] |
 | GET | /goaml/watch-runs | report.prepare, config.author | Office schema watcher runs and the candidates they created [P0] |
 | POST | /goaml/watch-runs | report.prepare, config.author | Run the watcher now; refused while it is disabled (DR-71) [P0] |
+| GET | /goaml/corpus-cases | report.prepare, config.author, config.approve | Corpus cases the bank added, newest first: `?code=&state=`; the expectation, the intake result, size and hash, never the file (DR-415) [P0] |
+| POST | /goaml/corpus-cases | report.prepare | Propose a case: one XML file, its key and the result it must give; only a copy masked by the system is kept; `Idempotency-Key`; **CR** `goaml_corpus_case` (DR-415) [P0] |
+| POST | /goaml/corpus-cases/{id}/retire | report.prepare | Propose the retirement of an active case; `Idempotency-Key`; **CR** `goaml_corpus_case` (DR-415) [P0] |
 | POST | /cases/{id}/reports | report.prepare | Draft from the running proposal of type utr, str or tfr; 201, or 200 for the existing draft (phase 21) |
 | GET | /reports | report.prepare | List, suspicion tier post-filtered; cursor, no total (phase 21) |
 | GET | /reports/{id} | report.prepare | Draft or final with validation state and quality; **SU** (phase 21) |
@@ -614,7 +624,7 @@ Phase 17 ships /queues, /queues/{id}/items, /alerts/{id}, claim, unclaim, /cases
 | GET | /reports/periodic/{id} | dashboard.read | Pack detail: aggregates, suppressed cell count (phase 21, added) |
 | POST | /reports/periodic/{id}/sign | report.file | Sign and finalise the pack; **SU** (`signing`) (phase 21, added) |
 
-Phase 21 owns the rows marked "phase 21" and ships them with the rows marked "phase 21, added" (32 routes, DR-183); phase 07 owns the `/goaml` rows above. The liaison review rows of 3.16 are phase 22's.
+Phase 21 owns the rows marked "phase 21" and ships them with the rows marked "phase 21, added" (32 routes, DR-183); phase 07 owns the twelve `/goaml` rows above (nine of its section 2 and three of its section 7.6). The liaison review rows of 3.16 are phase 22's.
 
 ### 3.14 Operations tasks and freezes (M14)
 
@@ -838,9 +848,13 @@ on `cr_material` with no emergency change (DR-300); prohibited rules have no rou
 | POST | /admin/support-sessions/{id}/bundles | admin.system | Register a support bundle built and confirmed with `akr-ctl support-bundle` (hashes, size, key version); **SU** `export` (phase 25, added) |
 | GET | /help/articles | self | Bilingual help articles and "what changed" entries of the installed release, shipped in the signed bundle; `?kind=` (phase 25) |
 | GET | /siem/events | siem.pull | SIEM pull API for a service principal: `siem`-flagged events after a cursor, allow-listed fields, no case id, no tier (phase 25, added) |
+| GET | /siem/access-events | siem.pull | SIEM pull API for a service principal: access lines (every access event: allow, deny and conflict) after a cursor, allow-listed fields, no tier; empty while `siem.export_access_events` is off (phase 25, added; DR-414) |
+| GET | /admin/siem/dead-letters | admin.system, security.ops | SIEM dead letters, newest first; `?state=` open (default), resolved or all (phase 25, added; DR-418) |
+| POST | /admin/siem/dead-letters/{id}/resend | admin.system | Ask the forwarder to send the line again; 202; `If-Match`; **IDEM** (phase 25, added; DR-418) |
+| POST | /admin/siem/dead-letters/{id}/resolve | admin.system | Mark a dead letter resolved without sending it, with a resolution code; `If-Match` (phase 25, added; DR-418) |
 
-Phase 25 owns the rows marked "phase 25" here and in 3.2 and 3.3 (docs/plan/phase-25.md s.2; 21 rows, 9 added;
-DR-232 to DR-245). `/admin/ops` gains tiles, not routes.
+Phase 25 owns the rows marked "phase 25" here and in 3.2 and 3.3 (docs/plan/phase-25.md s.2; 26 rows, 14 added,
+four of them by the owner decisions DR-414 and DR-418; DR-232 to DR-245). `/admin/ops` gains tiles, not routes.
 
 ### 3.21 Workflow tasks and definitions (DSL.md Part E; DBS engine ported in P0, docs/plan phase 04)
 

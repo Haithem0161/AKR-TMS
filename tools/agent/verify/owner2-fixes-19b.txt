@@ -1,0 +1,130 @@
+Replacements of round 1 of the owner-decision check, key 19b. 19 entries.
+Each replaced the OLD text by the NEW text in place, in the file named by FILE. The id in brackets is the
+lead's finding id. WHY is the lead's verdict line for that finding: id, verdict and severity, what was
+wrong, and what the fix was meant to do.
+
+=== F1 [O-19-4]
+FILE: docs/plan/phase-19.md
+WHY: O-19-4 | CONFIRMED | MEDIUM (agent: HIGH) | item 6 step 5 does not say that the request is submitted. Phase 04 fixes the rule for every dedicated route (`create(origin = Dedicated)` with `submit = true`), so a developer has it, but the step must say it | step 5 names `ChangeRequestService::create` with origin Dedicated, so `submit` runs in the same transaction. Same fix in phase 13 section 7.17 item 6.
+OLD:    5. Create the change request through phase 04 `ChangeRequestService` (kind `rfi_prefill_map`, `object_key` `rfi_prefill_map`, reason family `change`), route `cr_material`, volume effect `neutral`.
+NEW:    5. Create the change request with phase 04 `ChangeRequestService::create` (origin Dedicated, so `submit` runs in the same transaction; kind `rfi_prefill_map`, `object_key` `rfi_prefill_map`, the caller's `reason_code` of family `change` and `reason_text`), route `cr_material`, volume effect `neutral`.
+
+=== F2 [O-19-5]
+FILE: docs/plan/phase-19.md
+WHY: O-19-5 | CONFIRMED | LOW | `ChangeRequestAccepted` is not a phase 04 type | the response is the phase 04 `ChangeRequestView`. Same fix in phase 13 section 7.17 item 5. // O-19-5 in phase 13, corrected by the lead while fixing: phase 13 section 2 defines `ChangeRequestAccepted` itself (the response of its two base proposal routes), so the source-tag POST keeps that schema and the block now says where it is defined. The change to `ChangeRequestView` holds for phase 19 only, where the block had called it a phase 04 type.
+OLD:    6. Respond 201 with the change request; `change_request.created` is written by phase 04.
+
+7. **Change target `rfi_prefill_map`**
+NEW:    6. Respond 201 with the `ChangeRequestView`; `change_request.created` is written by phase 04.
+
+7. **Change target `rfi_prefill_map`**
+
+=== F3 [O-19-6]
+FILE: docs/plan/phase-19.md
+WHY: O-19-6 | CONFIRMED | MEDIUM | six new sub-codes are missing from the closed list of section 3.11 | add them to the list.
+OLD: `forbidden_term`, `rfi_open`, `not_critical_finding`.
+NEW: `forbidden_term`, `rfi_open`, `not_critical_finding`; and the six of section 7.21: `prefill_not_applicable`, `prefill_off`, `source_unknown`, `question_unknown`, `format_mismatch`, `not_mapped`.
+
+=== F4 [O-19-12]
+FILE: docs/plan/phase-19.md
+WHY: O-19-12 | CONFIRMED | LOW | item 8 says "one more row of section 3.12" and the table has no such row | add the row to the table.
+OLD: | `clock.warning` (outbox, stage 50) | breach | owner | no |
+
+NEW: | `clock.warning` (outbox, stage 50) | breach | owner | no |
+| `rfi_prefill_map.applied` (section 7.21) | a pre-fill map change applied | rfi_prefill_map | no |
+
+
+=== F5 [O-19-7]
+FILE: docs/plan/phase-19.md
+WHY: O-19-7 | CONFIRMED | LOW (agent: MEDIUM) | the note under the Cedar file still says every action of CFG and CHK is denied | add the exception for the two `rfi_prefill_map.*` actions.
+OLD: every action for KYC, CFG, DS, CHK, MRO, ADM, SEC (except the alarm reads above),
+NEW: every action for KYC, CFG, DS, CHK, MRO, ADM, SEC (except the alarm reads above, and for CFG and CHK the `rfi_prefill_map.read` and `rfi_prefill_map.propose` permits of section 7.21),
+
+=== F6 [O-19-15]
+FILE: docs/plan/phase-19.md
+WHY: O-19-15 | CONFIRMED | LOW | the 5.2 heading reads as cut off ("but for the panel ...") | "but P1 for the panel Proposed answers of section 7.21".
+OLD: correspondents P2 for the desk, but for the panel Proposed answers of section 7.21)
+NEW: correspondents P2 for the desk, but P1 for the panel Proposed answers of section 7.21)
+
+=== F7 [O-19-20]
+FILE: docs/plan/phase-19.md
+WHY: O-19-20 | CONFIRMED | HIGH | the flag `incomplete` of `accounts.signatories` tells the desk (and, through the answer, another bank) that a hidden party holds the account; the phase rule is "no count and no placeholder" (section 3.14) | the source becomes sensitive (names of other persons): computed for the MLRO only, a party the caller may not see is left out with no flag, and the flag is removed. Item 10 says so.
+OLD: ten facts of the customer file and the account list, none of which is derived from monitoring or from a case. The two facts that could let a reader infer more, a closed account and the bank's risk label, are computed for the MLRO only; the desk sees that a proposal exists and that it is withheld, nothing else.
+NEW: ten facts of the customer file, the account list and the KYC records (the PEP register, the rating label, the monthly figures), none of which is derived from monitoring or from a case. Four facts are computed for the MLRO only: a closed account and the bank's risk label, which could let a reader infer more; the names of the other holders of an account, which are other persons' data; and the declared and actual activity, which is restricted data that the desk may not read. The desk sees that a proposal exists and that it is withheld, nothing else. A party the MLRO may not see is left out of the list of holders with no count and no flag (section 3.14), so the list never says that someone is hidden. A PEP lead that is not confirmed is answered `unknown`, never `yes`.
+
+=== F8 [O-19-17]
+FILE: docs/plan/phase-19.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD: a withheld proposal says "Needs the MLRO"; nothing is recorded until the person submits the form.
+NEW: a withheld proposal says "Needs the MLRO" to the desk, and to the MLRO, for whom only the activity figures can be withheld, "Choose the purpose Investigation to see this"; a former PEP is rendered as such (`former`); nothing is recorded until the person submits the form.
+
+=== F9 [O-19-18]
+FILE: docs/plan/phase-19.md
+WHY: O-19-18 | CONFIRMED | LOW (agent: MEDIUM) | the D3 tab is said to be read by RFI, but D3 is the studio of CFG and CHK, read by M, CH and IA (phase 09) | the tab is read by CHK and M; the desk reads the map through the API on W8. // O-19-18 final wording | the D3 tab renders for a D3 user who may call the GET (CFG, CHK, M); the desk keeps its Cedar permit on `rfi_prefill_map.read` and reads the map on W8.
+OLD: (rows to set, rows to remove; the server's answer per row; `Idempotency-Key`; 201 and a link to G10). CHK, M and RFI read the tab.
+NEW: (rows to set, rows to remove, a reason code and a reason text; the server's answer per row; `Idempotency-Key`; 201 and a link to G10). The tab has no role list of its own (phase 09 section 7.5): it renders for a D3 user who may call the GET, which is CFG, CHK and M. D3 is not a screen of the RFI desk; the desk reads the map through the same GET on W8, where the panel names the source of each proposal.
+
+=== F10 [L-1]
+FILE: docs/plan/phase-19.md
+WHY: L-1 | MEDIUM | check lines of the form "As `akr_app`: `DELETE FROM <table>` fails with `<guard message>`" cannot give the guard message where `akr_app` has no DELETE grant (PostgreSQL refuses on the privilege before any trigger). Places to check and fix: grep "never deleted" over docs/plan (owner blocks of phases 07, 13, 14, 19; base text phase 14 line ~1271, phase 09 line ~1184, phase 07 line ~906). Fix wording: as `akr_app` the DELETE fails with permission denied; as the owner `akr_migrate` it fails with the guard message.
+OLD: As `akr_app`: `DELETE FROM casework.rfi_prefill_map` fails with `pre-fill map rows are never deleted`; an `UPDATE` of a retired row fails with `pre-fill map row is retired`;
+NEW: `DELETE FROM casework.rfi_prefill_map` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `pre-fill map rows are never deleted`. As `akr_app`: an `UPDATE` of the `state` of a retired row fails with `pre-fill map row is retired`;
+
+=== F11 [O-19-8]
+FILE: docs/plan/phase-19.md
+WHY: O-19-8 | CONFIRMED | HIGH | the source `party.pep_status` answers from the CBS-derived column `canon.party.pep_status`, which phase 15 says is not the PEP state (DR-38); the bank's PEP register (`kyc.party_pep_state`) is ignored, so a PEP the bank confirmed could be proposed as "unknown" or "no" | the source reads the register first: `pep` -> yes; `former_pep` -> yes, marked former; `candidate` -> unknown (an unconfirmed lead is never stated); no entry -> the customer-file value (`pep` yes, `not_pep` no, else unknown). New small reader over the view (SELECT is granted to `akr_app` by phase 15). Item 10 and the test of item 11 are reworded. // O-19-8 final design | new port `PartyPepReader::pep_state(conn, party_id)` over the view `kyc.party_pep_state`; the view's fourth state `none` (a former entry whose persistence has passed) is treated as "no row", so the customer file decides. Facts are `{ answer, former? }`.
+OLD: `party.pep_status` gives `yes`, `no` and `unknown` for the three stored values; `accounts.signatories` leaves out a party the caller may not see and sets `incomplete`; a sensitive source is not computed for a caller without role M (the reader is not called).
+NEW: `party.pep_status` gives `yes` for a register state `pep`, `yes` with `former: true` for `former_pep` and `unknown` for `candidate`, also when the customer file says `not_pep`; with no register row it gives `yes`, `no` and `unknown` for the three customer-file values; `accounts.signatories` leaves out a party the caller may not see and the response holds no count and no flag that tells it; `PrefillSource::sensitive()` is true for exactly four keys; a sensitive source is not computed for a caller without role M (the reader is not called); as M with a purpose other than `investigation` the activity proposal is `withheld` and the other proposals are returned.
+
+=== F12 [O-19-11]
+FILE: docs/plan/phase-19.md
+WHY: O-19-11 | CONFIRMED | LOW (agent: MEDIUM) | the curl example maps a question key that no fixture defines (templates and question keys are pack content, Open doubts 2) | the curl check names the question as one of the correspondent template of the suite's fixture pack.
+OLD: as CFG `POST /api/v1/rfi-prefill-map` with `{"set":[{"question_key":"account.opened_on","source_key":"relationship.start_date"}]}` and `Idempotency-Key: pfm-0001` gives 201
+NEW: as CFG `POST /api/v1/rfi-prefill-map` with `{"set":[{"question_key":"<key>","source_key":"relationship.start_date"}],"reason_code":"<a code of family change>","reason_text":"..."}`, where `<key>` is a question key of the correspondent template of the suite's fixture pack, and `Idempotency-Key: pfm-0001` gives 201
+
+=== F13 [O-19-3]
+FILE: docs/plan/phase-19.md
+WHY: O-19-3 | CONFIRMED | HIGH | `PrefillMapChange` has no `reason_code` and `reason_text`, which phase 04 `create` requires, so the stated curl check (201) would get 422 | the DTO gains both fields; the curl body carries them. Same fix for `SourceTagChange` of phase 13 section 7.17.
+OLD: with `source_key: "case.status"` gives 422 with `source_unknown`;
+NEW: the same body without `reason_code` gives 422 `E_VALIDATION`; with `source_key: "case.status"` gives 422 with `source_unknown`;
+
+=== F14 [O-19-17]
+FILE: docs/plan/phase-19.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD: the two sources that could reveal more (a closed account, the bank's risk label) are computed for the MLRO only; and keeping the write
+NEW: four sources are computed for the MLRO only (a closed account and the bank's risk label, which could reveal more; the names of the other holders of an account; the declared and actual activity, which is restricted data); the PEP answer reads the bank's PEP register before the customer file; and keeping the write
+
+=== F15 [O-19-17]
+FILE: docs/plan/research.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD: the two sources that could reveal more (a closed account, the bank's risk label) are computed for the MLRO only; keeping the write
+NEW: four sources are computed for the MLRO only (a closed account and the bank's risk label, which could reveal more; the names of the other holders of an account; the declared and actual activity, which is restricted data); the PEP answer reads the bank's PEP register before the customer file; keeping the write
+
+=== F16 [O-19-17]
+FILE: docs/MODULES.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD: sources, two of them for the MLRO only), through a map
+NEW: sources, four of them for the MLRO only), through a map
+
+=== F17 [O-19-18]
+FILE: docs/DESIGN-SYSTEM.md
+WHY: O-19-18 | CONFIRMED | LOW (agent: MEDIUM) | the D3 tab is said to be read by RFI, but D3 is the studio of CFG and CHK, read by M, CH and IA (phase 09) | the tab is read by CHK and M; the desk reads the map through the API on W8. // O-19-18 final wording | the D3 tab renders for a D3 user who may call the GET (CFG, CHK, M); the desk keeps its Cedar permit on `rfi_prefill_map.read` and reads the map on W8.
+OLD: "Propose changes" (CFG) sets or removes rows through a change request. CHK, M and RFI
+read the tab.
+NEW: "Propose changes" (CFG) sets or removes rows through a change request. CHK and M
+read the tab; the RFI desk reads the map on W8.
+
+=== F18 [O-19-17]
+FILE: docs/DESIGN-SYSTEM.md
+WHY: O-19-17 | CONFIRMED | HIGH | the source `activity.declared_and_actual` reads the phase 13 profile, which the RFI desk may not read (`profile.read` is A1, A2, KYC and M; the profile is restricted data with fixed purposes) | the source becomes sensitive: computed for the MLRO only, under `profile.read` and the purpose `investigation`, with the access events phase 13 writes; the desk sees "Needs the MLRO". No change to phase 13. // O-19-17 final design | `ProfileQuery` is called with the caller's context and purpose code; for the MLRO a purpose other than `investigation` gives `withheld` for that one proposal, and the panel says "Choose the purpose Investigation to see this".
+OLD: A proposal from a
+sensitive source says "Needs the MLRO" for a caller who is not the MLRO.
+NEW: A proposal from a
+sensitive source (four of the ten) says "Needs the MLRO" for a caller who is not the MLRO; the MLRO sees the
+activity figures only under the purpose Investigation.
+
+=== F19 [DR-422]
+FILE: docs/plan/phase-19.md
+WHY: DR-422 is the decision record that locks the design corrections of round 1. The row in docs/plan/research.md must say only what the phase files now say; each citing sentence in a phase block must name corrections that the block really carries.
+OLD: The desk gets proposed answers for an incoming correspondent RFI, computed from the product's own records, and a person records each one. What was missing is the map from a question key of the bank's template to a fact the product holds; it is now admin-managed data. M-44 is implemented.
+NEW: The desk gets proposed answers for an incoming correspondent RFI, computed from the product's own records, and a person records each one. What was missing is the map from a question key of the bank's template to a fact the product holds; it is now admin-managed data. M-44 is implemented. DR-422 locks the corrections of the check round of 2026-10-11: four sensitive sources, the PEP register as the first source of `party.pep_status`, and the purpose rule for the activity figures.

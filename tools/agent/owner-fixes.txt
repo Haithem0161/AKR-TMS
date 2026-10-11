@@ -1,0 +1,1461 @@
+@@ FIX R1 O-18-1 docs/plan/phase-18.md
+that the row already returns (section 3.14 step 5), so the bank
+@@ WITH
+that the row already returns (section 3.14, step 5 of `GET /parties/{id}/transactions`), so the bank
+@@ END
+@@ FIX R1 O-18-1-note docs/plan/phase-18.md
+and the copied value is an id the caller already holds. Test: the menu
+@@ WITH
+and the copied value is an id the caller already holds. This is so at every tier: the value is a UUID in a response the caller was already given, and it names no person. Test: the menu
+@@ END
+@@ FIX R1 O-08-4 docs/plan/phase-08.md
+the rest stands. The text of the verification pass was: The `Name` component shows what the source gives. The original is the party's `canon.party_name` row in Arabic or Kurdish script; the transliteration beneath it is the row of the same party and `name_type` with `script = 'lat'`, when the source supplied one, and its source label is the word `typed`: a Latin name held in a CBS column was keyed by staff, and no mapped field says that it was read from a card or a passport (`source_field` is a bare column name, phase 10). A party with no Latin row shows no second line. The product generates no Latin form and reads no document, so the labels `card`, `passport` and `generated` of DESIGN-SYSTEM 7.6 are not used in this plan; phase 14's back-transliteration serves matching only.
+@@ WITH
+what follows stands. The `Name` component shows what the source gives. The original is the party's `canon.party_name` row in Arabic or Kurdish script; the transliteration beneath it is the row of the same party and `name_type` with `script = 'lat'`, when the source supplied one. A party with no Latin row shows no second line. The product generates no Latin form and reads no document.
+@@ END
+@@ FIX R1 O-08-5 docs/plan/phase-08.md
+The source label is shown after the Latin line, in the muted small style of DESIGN-SYSTEM 7.6, as a word
+@@ WITH
+The source label is shown after the Latin line, smaller, as DESIGN-SYSTEM 7.6 says, and in the secondary text colour (`--color-stone`), as a word
+@@ END
+@@ FIX R1 O-08-6 docs/plan/phase-08.md
+Phase 14's back-transliteration serves matching only and is never shown under a name.
+@@ WITH
+`Name` shows only a Latin row that the source gave; a back-transliteration made for matching (phase 14) is never passed to it.
+@@ END
+@@ FIX R1 O-08-7a docs/plan/phase-08.md
+read with `getGoamlCorpusCases` for the profile code shown.
+@@ WITH
+read with `getGoamlCorpusCases` for the profile code of the version list (`IQ` unless the bank keeps a second profile code).
+@@ END
+@@ FIX R1 O-08-3a docs/plan/phase-08.md
+the expected result in words ("Would be rejected" with its rule codes, or "Accepted")
+@@ WITH
+the expected result in words (`corpus_case.expect.would_reject` with its rule codes, or `corpus_case.expect.graded`)
+@@ END
+@@ FIX R1 O-08-8 docs/plan/phase-08.md
+A form: `FileDrop` limited to one XML file; the key (lower-case letters, digits and hyphens, 3 to 61 characters);
+@@ WITH
+A form: `FileDrop` limited to one XML file (the client checks the type only; no response gives the size limit, so a file that is too large is the server's 422 `file_too_large`, shown at the file field); the key (it starts with a lower-case letter, then lower-case letters, digits or hyphens; 3 to 61 characters in all);
+@@ END
+@@ FIX R1 O-08-3b docs/plan/phase-08.md
+the expected outcome (two choices, "Would be rejected" and "Accepted"); the expected block codes, a multi-select over the rule codes of the active version, enabled only with "Would be rejected";
+@@ WITH
+the expected outcome (two choices, with the words of `corpus_case.expect.would_reject` and `corpus_case.expect.graded`); the expected block codes, a multi-select over the rule codes of the active version, enabled only with the first choice;
+@@ END
+@@ FIX R1 O-08-1a docs/plan/phase-08.md
+Submit sends `postGoamlCorpusCases` (multipart) with a generated `Idempotency-Key`; on 202 the page links to the change request on G10.
+@@ WITH
+Submit sends `postGoamlCorpusCases` (multipart) with a generated `Idempotency-Key` and with `profile_code` = the profile code of item 1. On 202 the page shows the reference of the change request: as a link to G10 for M, whom G10 lists, and as text for A2, whom G10 does not list and who follows the request in the inbox tab "Waiting on others" (X3). An A2 maker therefore has no withdraw screen in this version; an unwanted proposal is closed by the approver's reject (phase 07 section 7.6 item 7).
+@@ END
+@@ FIX R1 O-08-1b docs/plan/phase-08.md
+then `postGoamlCorpusCasesIdRetire`; on 202 the link to the change request.
+@@ WITH
+then `postGoamlCorpusCasesIdRetire`; on 202 the reference of the change request, shown as in item 3.
+@@ END
+@@ FIX R1 O-08-3c docs/plan/phase-08.md
+| `corpus_case.state.rejected` | مرفوضة | Rejected |
+
+@@ WITH
+| `corpus_case.state.rejected` | مرفوضة | Rejected |
+| `corpus_case.expect.would_reject` | سيُرفض | Would be rejected |
+| `corpus_case.expect.graded` | مقبول | Accepted |
+
+@@ END
+@@ FIX R1 O-08-3d docs/plan/phase-08.md
+the form with "Accepted" chosen disables the block-code select;
+@@ WITH
+the form with the choice `corpus_case.expect.graded` ("Accepted") disables the block-code select;
+@@ END
+@@ FIX R1 O-10-7a docs/plan/phase-10.md
+Grants, indexes and the retention row are unchanged.
+@@ WITH
+Indexes and the retention row are unchanged; one column grant is added (item 5).
+@@ END
+@@ FIX R1 O-10-7b docs/plan/phase-10.md
+A mapping that leaves it out writes `typed` (the column default), which is what phase 08 showed
+@@ WITH
+A mapping that leaves it out writes `typed` (item 5), which is what phase 08 showed
+@@ END
+@@ FIX R1 O-10-1/6/7 docs/plan/phase-10.md
+5. **Writer** (section 3.7): the compiler adds the validation rule `enum(capture_source, [card, passport, typed, generated])` with `on_fail: dq_issue` to every `party_name` mapping that supplies the field. A row whose value fails it is written with `typed` and counted as a data-quality issue, as DSL.md B.5 says for `dq_issue`. A change of `capture_source` changes the `row_hash`, so the row is replaced as any changed child row is (step 6).
+@@ WITH
+5. **Executor and writer** (section 3.6 step 4 and section 3.7). The compiler adds the validation rule `enum(capture_source, [card, passport, typed, generated])` with `on_fail: dq_issue` to every `party_name` mapping that supplies the field. This block's rule for a value that fails it: the executor puts `typed` in the mapped row and counts the data-quality issue. (DSL.md B.5 alone says only that the row loads and the count rises; the failing value would then meet the column CHECK.) A mapped row with no value for the field, because the mapping leaves it out or its `expr` gives null, is written with `typed`: the writer always supplies the column and does not rely on the column default. `row_hash` is the hash of the landed source row (phase 11 section 3.2 step 2), so a mapping version that changes only this value leaves the hash as it is and step 3 writes nothing. The label is therefore tested on the mapped value: when the hash is equal and the stored `capture_source` of the current row differs from the mapped one, the writer calls `CanonRepository::set_capture_source(tx, id, capture_source)`, which sets that one column; when the hash differs, the row is replaced as step 6 says and the new row carries the mapped value. `CurrentRow` (section 7.17) holds `capture_source` for `canon.party_name`. `CanonRepository` gains `async fn set_capture_source(&self, tx: &mut Tx, id: Uuid, capture_source: &str) -> Result<u64, RepoError>;`, and migration `0030` (section 1.2) gains `GRANT UPDATE (capture_source) ON canon.party_name TO akr_ingest;`. A name already stored takes a new label when its row is mapped again: at the next load of its source row, or in the apply of a mapping replay (phase 11 section 3.8).
+@@ END
+@@ FIX R1 O-10-1b docs/plan/phase-10.md
+No new route, event or action: the column travels with the name rows through the mapping change path (`mapping.*` events and the `mapping` change target of section 3.9).
+@@ WITH
+No new route, event or action: the value is set by the mapping, and a mapping changes only through its change path (`mapping.*` events and the `mapping` change target of section 3.9).
+@@ END
+@@ FIX R1 O-10-7c docs/plan/phase-10.md
+the literal `'scan'` fails `validate` with `E_VALIDATION` at `/fields/capture_source`; `akr-ctl canon verify-catalogue` passes with the new column.
+@@ WITH
+the literal `'scan'` fails `validate` with `E_VALIDATION` at `/fields/capture_source`; a row whose `expr` gives null writes `typed`; a row whose `expr` reads `scan` from a source column writes `typed` and counts one data-quality issue; a stored name with `typed`, mapped again from the same landed row by a version that gives `passport`, has `passport` afterwards and no second row; `akr-ctl canon verify-catalogue` passes with the new column.
+@@ END
+@@ FIX R1 O-10-7d docs/plan/phase-10.md
+GRANT UPDATE (superseded_at) ON canon.party_name, canon.party_identifier, canon.party_contact TO akr_ingest;
+
+@@ WITH
+GRANT UPDATE (superseded_at) ON canon.party_name, canon.party_identifier, canon.party_contact TO akr_ingest;
+GRANT UPDATE (capture_source) ON canon.party_name TO akr_ingest;   -- the label of a name, section 7.26 item 5
+
+@@ END
+@@ FIX R1 O-10-3a docs/plan/phase-10.md
+and for `canon.account_hold` also `end_at`. `CanonRow` (taken by `insert_rows`)
+@@ WITH
+and for `canon.account_hold` also `end_at`; sections 7.26 and 7.27 add `capture_source` for `canon.party_name`, `granted_on` for `canon.facility`, and `paid_on` and `paid_amount` for `canon.facility_instalments`. `CanonRow` (taken by `insert_rows`)
+@@ END
+@@ FIX R1 O-10-2 docs/plan/phase-10.md
+and registers the mapping family `<source>.facility_instalment`. In the dependency order
+@@ WITH
+and registers the mapping family `<source>.facility_instalment`. The catalogue entry of the entity names its table, `canon.facility_instalments` (an entry holds the table, the columns, the classification and the nullability: phase 26 section 3.2 item 2), as the entry of `islamic_deal` names `canon.islamic_deals`. In the dependency order
+@@ END
+@@ FIX R1 O-10-5a docs/plan/phase-10.md
+a `RowConflict` of kind `parent_missing` is returned, and phase 11 records it as section 7.20 says.
+@@ WITH
+a `RowConflict` of kind `parent_missing` is returned, and phase 11 records it as section 7.20 says (reason `parent_missing`, phase 11 section 3.2 step 5).
+@@ END
+@@ FIX R1 O-10-3/4, O-26-3 docs/plan/phase-10.md
+3. **Fact rule** (section 3.7 steps 3 and 5). `facility_instalment` is a fact. Its insert target is `uq_facility_instalments_source`. One exception to the fact rule, like the end of a hold (section 7.19): when the stored `paid_on` is null and the mapped `paid_on` is set, the writer calls `CanonRepository::pay_instalment(tx, id, paid_on, paid_amount, row_hash)`, which sets the three columns; no conflict is returned. Any other difference is a `RowConflict`.
+@@ WITH
+3. **Fact rule** (section 3.7 steps 3 and 5). `facility_instalment` is a fact. Its insert target is `uq_facility_instalments_source`, the only unique constraint of the table beside the primary key, so a second source key for an instalment number the facility already holds is inserted like any new row. One exception to the fact rule, like the end of a hold (section 7.19): an instalment is open while its stored `paid_on` is null. For an open instalment whose mapped `paid_on` or `paid_amount` differs from the stored value (`IS DISTINCT FROM`), the writer calls `CanonRepository::pay_instalment(tx, id, paid_on, paid_amount, row_hash)`, which sets the three columns where `paid_on IS NULL`; `paid_on` stays null for a part payment. No conflict is returned, and the row counts as written for this batch: a difference in `seq`, `due_on`, `amount` or `currency` that arrives in the same version is not written and not reported. The test is on the mapped values, not on the hash, so it also runs when the hash is equal (the landed row is the same and the mapping changed, as in the apply of phase 11 section 3.8). In every other case step 3 stands: a different hash on a paid instalment, or on an open one whose two payment columns did not move, is the `RowConflict` of a fact. `CurrentRow` holds `paid_on` and `paid_amount` for this entity.
+@@ END
+@@ FIX R1 O-10-3b docs/plan/phase-10.md
+4. **`granted_on` of a facility.** `facility` stays a dimension. One exception to the dimension rule of step 3: when the stored `granted_on` is null and the mapped one is set, the writer calls `CanonRepository::set_granted_on(tx, id, granted_on, row_hash)`, which sets the two columns; no conflict is returned. Any other difference is a `RowConflict` as before. The grants for both updates are in phase 26's migration `0083`.
+@@ WITH
+4. **`granted_on` of a facility.** `facility` stays a dimension. One exception to the dimension rule of step 3: when the stored `granted_on` is null and the mapped one is set, the writer calls `CanonRepository::set_granted_on(tx, id, granted_on, row_hash)`, which sets the two columns where `granted_on IS NULL`. No conflict is returned, and the row counts as written for this batch: a difference in another column that arrives in the same version is not written and not reported. As in item 3 the test is on the mapped value, not on the hash, so a mapping version that adds the field reaches the facilities already stored when they are mapped again. In every other case step 3 stands, and a stored `granted_on` is never changed. `CurrentRow` holds `granted_on` for `canon.facility`. The grants for both updates are in phase 26's migration `0083`.
+@@ END
+@@ FIX R1 O-26-3b docs/plan/phase-10.md
+`async fn pay_instalment(&self, tx: &mut Tx, id: Uuid, paid_on: NaiveDate, paid_amount: Option<Decimal>, row_hash: &[u8]) -> Result<u64, RepoError>;`
+@@ WITH
+`async fn pay_instalment(&self, tx: &mut Tx, id: Uuid, paid_on: Option<NaiveDate>, paid_amount: Option<Decimal>, row_hash: &[u8]) -> Result<u64, RepoError>;`
+@@ END
+@@ FIX R1 O-10-3c docs/plan/phase-10.md
+a second version with `paid_on` set updates the row and returns no conflict; a second version with a different `amount` returns a `RowConflict`; a facility row that arrives again with `granted_on` set updates only `granted_on` and `row_hash`.
+@@ WITH
+a second version with `paid_on` set updates the row and returns no conflict; a second version with only `paid_amount` set (a part payment) updates `paid_amount` and leaves `paid_on` null; a second version of an open instalment with only a different `amount` returns a `RowConflict`, and so does any second version of a paid instalment; the same landed row mapped by a version that now gives `paid_on` updates the row; a second source key for an instalment number the facility already holds is inserted; a facility row that arrives again with `granted_on` set updates only `granted_on` and `row_hash`, and a later version with another `granted_on` leaves the stored date and returns the dimension `RowConflict`.
+@@ END
+@@ FIX R1 O-10-5b docs/plan/phase-11.md
+changed; the new version stays in raw), `value_change` or `label_change` (dimensions). Each
+@@ WITH
+changed; the new version stays in raw), `value_change` or `label_change` (dimensions), or `parent_missing` (a row
+   whose parent key has no `admin.xref` row yet, phase 10 sections 7.20 and 7.27; the row is not written). Each
+@@ END
+@@ FIX R1 L-3-doubt docs/plan/phase-11.md
+13. The outbox event `dq.stale` has no consumer until phase 18, and its payload is the DSL's name, not yet a catalogued event kind.
+
+@@ WITH
+13. The outbox event `dq.stale` has no consumer until phase 18, and its payload is the DSL's name, not yet a catalogued event kind.
+14. The apply of section 3.8 runs the writer over the landed rows, and the writer's guard (phase 10 section 3.7 step 3) compares the hash of the landed row, which a mapping change does not move. Read literally, an apply finds every row unchanged. The writer needs a comparison of mapped values in the apply, or a stored hash that covers the mapped row; the choice is made when phases 10 and 11 are built. The three column rules of phase 10 sections 7.26 and 7.27 (`capture_source`, `paid_on` with `paid_amount`, `granted_on`) do not wait for it: they test mapped values. Found in the owner-decision round (2026-10-11).
+
+@@ END
+@@ FIX R1 O-10-5c docs/plan/phase-12.md
+   (medium). Rule failures -> `validation_rule`,
+@@ WITH
+   (medium); `parent_missing` (a row whose parent key has not landed, phase 10 sections 7.20 and 7.27) ->
+   `unresolved_pointer` (medium). Rule failures -> `validation_rule`,
+@@ END
+@@ FIX R1 O-10-5d docs/plan/phase-12.md
+(`fact_changed_in_source`, `value_change`, `label_change`; section 3.3).
+@@ WITH
+(`fact_changed_in_source`, `value_change`, `label_change`, `parent_missing`; section 3.3).
+@@ END
+@@ FIX R1 O-26-3a docs/plan/phase-26.md
+    paid_amount         NUMERIC(28,6) CHECK (paid_amount IS NULL OR paid_amount >= 0),
+
+@@ WITH
+    paid_amount         NUMERIC(28,6) CHECK (paid_amount IS NULL OR paid_amount >= 0),   -- paid so far, when the source gives it
+
+@@ END
+@@ FIX R1 O-26-1a docs/plan/phase-26.md
+    CHECK (paid_amount IS NULL OR paid_on IS NOT NULL),
+    CONSTRAINT uq_facility_instalments_source UNIQUE (source_id, source_table, source_pk),
+    CONSTRAINT uq_facility_instalments_seq UNIQUE (facility_id, seq)
+);
+
+@@ WITH
+    CONSTRAINT uq_facility_instalments_source UNIQUE (source_id, source_table, source_pk)
+);
+-- (facility_id, seq) is an index, not a unique constraint: a rescheduled loan can give a number under a second source key.
+CREATE INDEX IF NOT EXISTS idx_facility_instalments_facility ON canon.facility_instalments (facility_id, seq);
+
+@@ END
+@@ FIX R1 O-26-10 docs/plan/phase-26.md
+The phase now has 4 tables in 2 migrations and 1 altered column list (`canon.facility.granted_on`).
+@@ WITH
+The phase now has 4 tables in 2 migrations and 1 column added (`canon.facility.granted_on`). The source key is the table's only unique constraint: the fact write of phase 10 has one conflict target, and a second unique rule on `(facility_id, seq)` would fail the batch of a rescheduled loan whose new rows repeat the numbers. `paid_amount` may be set while `paid_on` is null (a part payment), so no CHECK ties the two.
+@@ END
+@@ FIX R1 O-26-3c docs/plan/phase-26.md
+`paid_on` and `facility.granted_on` are `monitored` (inputs of SCN-ISL-07) and not `required`. One source row is one instalment. The mapping sets `paid_on` only when the source shows the instalment paid in full (a `filter` or an `expr` over the source's paid flag or amounts); a part payment leaves `paid_on` null.
+@@ WITH
+`paid_on` and `facility.granted_on` are `monitored` (inputs of SCN-ISL-07) and not `required`; `paid_amount` is neither: it is the amount paid so far, kept when the source gives it and read by no scenario. One source row is one instalment. The mapping sets `paid_on` only when the source shows the instalment paid in full (an `expr` over the source's paid flag or amounts); a part payment leaves `paid_on` null and may set `paid_amount`. Rescheduling: when the source keeps the rows that a new schedule replaced, the mapping leaves them out with a `filter`, so that an old unpaid row does not hold the facility unpaid. A replaced row that was loaded before the rescheduling stays in `canon`, since facts are not deleted; Open doubts 24 names this limit.
+@@ END
+@@ FIX R1 O-26-12 docs/plan/phase-26.md
+the row is written as a fact, and a later version that only sets `paid_on` updates the row in place.
+@@ WITH
+the row is written as a fact, and while an instalment is unpaid a later version may set its `paid_on` and `paid_amount` in place; a paid instalment does not change.
+@@ END
+@@ FIX R1 O-26-9/11 docs/plan/phase-26.md
+The alert evidence names which loan was not evaluable only by its count (`not_evaluable_count` in the measures), so a gap in the mapping is seen.
+@@ WITH
+The SCN-ISL-07 document gains the measure alias `not_evaluable_count`, an integer: the number of the customer's facilities that were not evaluable in the evaluation. It stands in the `measures` of the alert evidence (phase 16). The evidence gives this count only, not which facility, so a gap in the mapping is seen.
+@@ END
+@@ FIX R1 O-26-2a docs/plan/phase-26.md
+The readiness cell reads: readiness A for an agreement source; for a schedule source A once `facility.granted_on` and the family `<source>.facility_instalment` are published, and B until then. The facility inputs are optional inputs (DSL A.3), so a bank with agreements only is not graded down for having no schedule mapping.
+@@ WITH
+The readiness cell reads: readiness A (agreement source) or B (schedule source), as for SCN-ISL-06. The three inputs marked `?` are optional inputs (DSL.md, CanonicalRef), and phase 06 section 3.2 rule 4 gives an optional input no effect on the grade. While `facility.granted_on` or the family `<source>.facility_instalment` is not published, the three are listed in the `reasons` of the readiness result and the facility legs are not evaluable (item 4); once they are published the facility legs run. A bank with agreements only is therefore not graded down for having no schedule mapping.
+@@ END
+@@ FIX R1 O-26-2b docs/plan/phase-26.md
+| readiness A (agreement source); for a schedule source A once `facility.granted_on` and the family `<source>.facility_instalment` are published, B until then (section 7.13) |
+@@ WITH
+| readiness A (agreement source) or B (schedule source); the inputs marked `?` are optional and do not change the grade: until they are published the facility legs are not evaluable (section 7.13) |
+@@ END
+@@ FIX R1 O-26-2c docs/plan/phase-26.md
+the four fixtures of item 6 pass; a schedule source with the family published grades A and the same source without it grades B for SCN-ISL-07.
+@@ WITH
+a second row with a new source key and a `(facility_id, seq)` that the table already holds is inserted; a row with `paid_amount` set and `paid_on` null is accepted; the four fixtures of item 6 pass; for SCN-ISL-07 a source without the family `<source>.facility_instalment` has the three optional inputs in the `reasons` of its readiness result and the same grade as the same source with the family published.
+@@ END
+@@ FIX R1 O-26-7a docs/plan/phase-26.md
+The only existing table altered is `canon.product` (phase 10), and only its CHECK, as stated in 1.1.
+@@ WITH
+The existing tables altered are `canon.product` (phase 10), only in its CHECK, as stated in 1.1, and `canon.facility` (phase 10), which gains the column `granted_on` (section 7.13).
+@@ END
+@@ FIX R1 O-26-8 docs/plan/phase-26.md
+`VALUES` rows cover every column of the two tables; a test (section 6, check 2)
+@@ WITH
+`VALUES` rows cover every column of the three tables and the column `granted_on` of `canon.facility`; a test (section 6, check 2)
+@@ END
+@@ FIX R1 O-26-6a docs/plan/phase-26.md
+1. Two mapping families are added: `<source>.islamic_deal` (target entity `islamic_deal`) and `<source>.deal_party` (target entity
+   `deal_party`), one active family per source and entity (phase 10).
+@@ WITH
+1. Two mapping families are added: `<source>.islamic_deal` (target entity `islamic_deal`) and `<source>.deal_party` (target entity
+   `deal_party`), one active family per source and entity (phase 10). Section 7.13 adds a third, `<source>.facility_instalment`.
+@@ END
+@@ FIX R1 O-26-6b docs/plan/phase-26.md
+   `canonical-model.v1.json` gets two entries (table, columns, classification, nullability).
+@@ WITH
+   `canonical-model.v1.json` gets two entries (table, columns, classification, nullability); section 7.13 adds a third entity,
+   `facility_instalment`, with its entry, and the column `facility.granted_on`.
+@@ END
+@@ FIX R1 O-26-4 docs/plan/phase-26.md
+2. `cargo check`; then the classification check: every column of `canon.islamic_deals`, `canon.deal_parties` and `kyc.possession_evidence`
+   has a `admin.column_classification` row
+@@ WITH
+2. `cargo check`; then the classification check: every column of `canon.islamic_deals`, `canon.deal_parties`, `canon.facility_instalments` and
+   `kyc.possession_evidence`, and the column `canon.facility.granted_on`, has a `admin.column_classification` row
+@@ END
+@@ FIX R1 O-26-5 docs/plan/phase-26.md
+5. `akr-ctl canon verify-catalogue`: the two new entities match the migrated columns.
+@@ WITH
+5. `akr-ctl canon verify-catalogue`: the three new entities (with `facility_instalment` of section 7.13) and `facility.granted_on` match the migrated columns.
+@@ END
+@@ FIX R1 O-26-7b docs/plan/phase-26.md
+beyond the widened CHECK; no change to `canon.facility`, `canon.account`, `canon.party` or the customer tables;
+@@ WITH
+beyond the widened CHECK; no change to `canon.facility` beyond the column `granted_on` of section 7.13; no change to `canon.account`, `canon.party` or the customer tables;
+@@ END
+@@ FIX R1 O-26-1b docs/plan/phase-26.md
+23. **Routes that depend on the flag.** The flag is checked per request, which makes the router mount independent of it. A bank that never uses the pack may prefer the routes not mounted at all (a build flag); the behaviour required here is 404 either way.
+
+@@ WITH
+23. **Routes that depend on the flag.** The flag is checked per request, which makes the router mount independent of it. A bank that never uses the pack may prefer the routes not mounted at all (a build flag); the behaviour required here is 404 either way.
+24. **Rescheduled and cancelled instalments** (section 7.13; found in the owner-decision round, 2026-10-11). No schedule table of a bank has been studied. A source that changes an unpaid instalment in place is handled: the payment still lands, and a changed due date or amount is recorded as a conflict (phase 10 section 7.27 item 3). A source that replaces a schedule by new rows, or deletes rows, leaves the rows already loaded in `canon` as unpaid, so the unpaid leg of SCN-ISL-07 can fire for that facility and its repeat leg never sees it repaid. Until a schedule source is studied, the bank's mapping leaves replaced rows out from the first load; a column that marks an instalment as replaced is added when a source needs it.
+
+@@ END
+@@ FIX R1 O-26-1c docs/DATA-MODEL.md
+paid_amount null; unique (facility_id, seq); one source row is one instalment;
+@@ WITH
+paid_amount null (the amount paid so far, when the source gives it); index on (facility_id, seq), not unique (a rescheduled loan can give a number under a second source key); one source row is one instalment;
+@@ END
+@@ FIX R1 O-14-1 docs/plan/phase-14.md
+tags `lists` (8 operations) and `screening` (17); 25 in all, each with
+@@ WITH
+tags `lists` (8 operations) and `screening` (19: the 17 of section 2.8 and the 2 of section 7.19); 27 in all, each with
+@@ END
+@@ FIX R1 O-14-2 docs/plan/phase-14.md
+the phase 00 schema checks pass for the ten new tables (classification and retention rows present).
+@@ WITH
+the phase 00 schema checks pass for the eleven new tables, `alert.harness_cases` of section 7.19 among them (classification and retention rows present).
+@@ END
+@@ FIX R1 O-14-3 docs/plan/phase-14.md
+`screening.search_per_min`, `screening.lookback_chunk`, and the four `schedule.*` keys. List thresholds
+@@ WITH
+`screening.search_per_min`, `screening.lookback_chunk`, `screening.harness_cases_max` (section 7.19), and the four `schedule.*` keys. List thresholds
+@@ END
+@@ FIX R1 O-14-4 docs/plan/phase-14.md
+- **Phase 04**: three change targets (`list_setting`, `screening_policy`, `good_guy_rule`); the route map is unchanged.
+@@ WITH
+- **Phase 04**: four change targets (`list_setting`, `screening_policy`, `good_guy_rule`, and `harness_case` of section 7.19); the route map is unchanged.
+@@ END
+@@ FIX R1 O-14-4 docs/plan/phase-14.md
+AlertDedupe, FreezeTrigger port, the three change targets (pure logic, ports only)
+@@ WITH
+AlertDedupe, FreezeTrigger port, the four change targets (pure logic, ports only)
+@@ END
+@@ FIX R1 O-14-4 docs/plan/phase-14.md
+# Pg repositories for the eleven tables of section 1
+
+@@ WITH
+# Pg repositories for the ten tables of section 1 and alert.harness_cases (section 7.19)
+
+@@ END
+@@ FIX R1 O-14-4 docs/plan/phase-14.md
+`GoodGuyTarget` (the three change targets, section 3.10), `RecordingFreezeTrigger`
+@@ WITH
+`GoodGuyTarget` (the three change targets of section 3.10; `HarnessCaseService` and the fourth target `HarnessCaseTarget` are in section 7.19), `RecordingFreezeTrigger`
+@@ END
+@@ FIX R1 O-14-5 docs/plan/phase-14.md
+is the raw form of `Identifiers` (section 2.1), hashed on receipt and never stored: `{ birth:
+@@ WITH
+is the raw form of `Identifiers` (section 2.1), hashed on receipt and never stored, except inside the sealed query of a known-answer case (section 7.19 item 3): `{ birth:
+@@ END
+@@ FIX R1 O-14-6 docs/plan/phase-14.md
+`report.bank_cases = {cases, met, unmet, absent, unmet_ids: [case ids]}`; `absent` counts cases
+@@ WITH
+`report.bank_cases = {cases, met, unmet, absent, results: [{case_id, result}]}`: `results` has one element per case the run took, and `result` is `met`, `unmet` or `absent`; `absent` counts cases
+@@ END
+@@ FIX R1 O-14-6 docs/plan/phase-14.md
+the state and the result of the latest run in words ("As expected", "Not as expected", "Entry no longer on the list"); "Add a case" (list, entry key, name, optional identifiers, expectation, reason) and "Retire". On S1,
+@@ WITH
+the state and the result in words ("As expected", "Not as expected", "Entry no longer on the list"); "Add a case" (list, entry key, name, optional identifiers, expectation, reason; the reason field carries the hint to write no name in it) and "Retire". The result of a case is its element of `report.bank_cases.results` in the newest `gate` or `oracle` run of the list's active version, joined by case id (`useGetScreeningHarnessRuns`, which S3 already calls); a case that no such run holds yet shows its trial result (`trial.met`). On S1,
+@@ END
+@@ FIX R1 O-14-6 docs/plan/phase-14.md
+The harness report, which CFG, CHK, IA and AS read on S3, holds counts and case ids.
+@@ WITH
+The harness report, which CFG, CHK, CH, IA and AS read on S3, holds counts and, for each case id, one of three results.
+@@ END
+@@ FIX R1 L-4 docs/plan/phase-14.md
+(`hit`, `below_line`, `needs_more_data`, `clear`) or `absent` when the version has no entry with the key.
+@@ WITH
+(`hit`, `below_line`, `needs_more_data`, `clear`). A trial is never `absent`: item 4 step 3 refuses a key that the active version does not hold, and `absent` is a result of a later harness run only (item 6).
+@@ END
+@@ FIX R1 O-14-7 docs/plan/phase-14.md
+- Curl (added to the phase suite): as SS `POST /api/v1/screening/harness-cases` with a synthetic entry key, `expect: "hit"` and `Idempotency-Key: hc-0001` -> 202
+@@ WITH
+- Curl (added to the phase suite, after its Lists step has activated the fixture version of `iq_national`): as SS `POST /api/v1/screening/harness-cases` with `list_code: "iq_national"`, the `entry_key` and the name of one entry of that fixture version, `expect: "hit"` and `Idempotency-Key: hc-0001` -> 202
+@@ END
+@@ FIX R1 O-14-8 docs/plan/phase-14.md
+Normalise `name` with the names crate (section 3.1) and hash the identifiers as a search does (section 3.12 step 3).
+@@ WITH
+Normalise `name` with the names crate (section 3.1), as section 3.12 step 3 does for a search, and hash the identifiers into `Identifiers` on receipt (section 7.16).
+@@ END
+@@ FIX R1 O-14-9 docs/plan/phase-14.md
+Bundle tests: CFG, CHK, IA and AS are refused both actions;
+@@ WITH
+Bundle tests: CFG, CHK, CH, IA and AS are refused both actions;
+@@ END
+@@ FIX R1 O-14-10 docs/plan/phase-14.md
+The change request, which CHK reads, and the audit events hold the list code, the expectation and the trial result.
+@@ WITH
+The change request as its approvers read it (the diff of item 5) and the audit events hold the list code, the expectation and the trial result. The stored body of the request also holds the entry key, the sealed query and its keyed hash (item 4 step 7): the diff leaves all three out, and no reader of the request can open the sealed query. `reason_text` is plain text that the approvers read, so the form asks the maker to write no name in it (item 11).
+@@ END
+@@ FIX R1 O-14-11 docs/plan/phase-14.md
+The dry run also scores the active `hit` cases of each list the change touches, under the old and the new configuration.
+@@ WITH
+The dry run also scores the active `hit` cases of each list the change touches, under the old and the new configuration. A `list_setting` change touches the list of its object key; a `screening_policy` change touches every enabled list.
+@@ END
+@@ FIX R1 O-14-12 docs/plan/phase-14.md
+`akr_readonly` gets no grant, as for the alert tables.
+@@ WITH
+`akr_readonly` gets no grant, as for `alert.screening_alerts`, `alert.screening_decisions`, `alert.pair_memory` and `alert.good_guy_rules`.
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-14.md
+`DELETE` fails with `known-answer cases are never deleted`; an UPDATE of a `rejected` row fails;
+@@ WITH
+a `DELETE` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `known-answer cases are never deleted`; as `akr_app` an UPDATE of the `state` of a `rejected` row fails with the guard's `is final` message;
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-14.md
+2. Negative DDL as `akr_app`: `DELETE FROM ref.list_versions` fails with `list versions are never deleted`; `UPDATE ref.list_entries` fails with permission denied;
+@@ WITH
+2. Negative DDL as `akr_app`: `DELETE FROM ref.list_versions` fails with permission denied (no role has a DELETE grant), and as the owner `akr_migrate` with `list versions are never deleted`; `UPDATE ref.list_entries` fails with permission denied;
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-14.md
+`UPDATE alert.screening_decisions` fails with `screening_decisions is append-only`;
+@@ WITH
+`UPDATE alert.screening_decisions` fails with permission denied (no UPDATE grant), and as `akr_migrate` with `screening_decisions is append-only`;
+@@ END
+@@ FIX R1 O-14-14 docs/plan/phase-14.md
+5. **Change target `harness_case`** (a fourth row of the section 3.10 table; reason family `change`;
+@@ WITH
+5. **Change target `harness_case`** (a fourth target; the table of section 3.10 keeps its three rows; reason family `change`;
+@@ END
+@@ FIX R1 O-07-10 docs/plan/phase-14.md
+`add`: `lock`; not `proposed` -> the target refuses and the request ends `failed`; `activate`;
+@@ WITH
+`add`: `lock`; not `proposed` -> the target refuses (phase 04 section 3.2: an immediate approval is rolled back with the error, and a scheduled activation ends `failed`); `activate`;
+@@ END
+@@ FIX R1 O-07-10 docs/plan/phase-14.md
+`retire`: `lock`; not `active` -> refused; `retire` with the request id;
+@@ WITH
+`retire`: `lock`; not `active` -> refused in the same way; `retire` with the request id;
+@@ END
+@@ FIX R1 O-14-15 docs/plan/phase-14.md
+   `NewHarnessCase` holds the id, `list_id`, `entry_key`, `expect`, `query_enc`, `query_hk`, `trial`, `change_request_id` and `created_by`.
+@@ WITH
+   `NewHarnessCase` holds the id, `list_id`, `entry_key`, `expect`, `query_enc`, `query_hk`, `trial`, `change_request_id` and `created_by`. `activate` sets `state = 'active'` and `activated_at = at`; `retire` sets `state = 'retired'`, `retired_by_request = cr` and `closed_at = at`; `reject` sets `state = 'rejected'` and `closed_at = at`. These four columns are the whole UPDATE grant of item 1.
+@@ END
+@@ FIX R1 O-07-1 docs/plan/phase-07.md
+runs already queued keep their pinned version; audit `goaml_profile.activated {code, profile_version, from_version, change_request_id}` |
+@@ WITH
+runs already queued keep their pinned version; audit `goaml_profile.activated {code, profile_version, from_version, change_request_id}`; then enqueue `goaml_case_intake {case_id}` for every `proposed` bank case of the code that has a stored file (`stored_proposed_for_code`, section 7.6 item 4), so its intake result is taken again under the new active version before anyone decides it |
+@@ END
+@@ FIX R1 O-07-1 docs/plan/phase-07.md
+`intake_result.profile_version` differs from the active version's -> enqueue `goaml_case_intake {case_id}` again and issue `intake_stale` (the approver decides after the job).
+@@ WITH
+`intake_result.profile_version` differs from the active version's -> issue `intake_stale`. This hook enqueues nothing: an issue is a refusal, phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row. The intake is run again by the activation of the profile version (section 3.6, Activate), which commits, and the approver decides after that job.
+@@ END
+@@ FIX R1 O-07-1 docs/plan/phase-07.md
+    async fn count_open(&self, conn: &mut PgConnection, code: &str) -> Result<i64, RepoError>;          // proposed + active
+    async fn set_intake(
+@@ WITH
+    async fn count_open(&self, conn: &mut PgConnection, code: &str) -> Result<i64, RepoError>;          // proposed + active
+    async fn stored_proposed_for_code(&self, tx: &mut Tx, code: &str) -> Result<Vec<Uuid>, RepoError>;  // proposed, evidence_id set
+    async fn set_intake(
+@@ END
+@@ FIX R1 O-07-1 docs/plan/phase-07.md
+   4. Later run (`evidence_id` is set; item 7 asks for it when the active profile changed): `EvidenceStore::open(evidence_id)` gives the masked bytes.
+@@ WITH
+   4. Later run (`evidence_id` is set; the activation of a profile version of the code asks for it, section 3.6): `EvidenceStore::open(evidence_id)` gives the masked bytes.
+@@ END
+@@ FIX R1 O-07-1 docs/plan/phase-07.md
+  - `goaml_case_intake` (payload `{case_id}`; enqueued when a bank case is proposed and when its intake is stale;
+
+@@ WITH
+  - `goaml_case_intake` (payload `{case_id}`; enqueued when a bank case is proposed, and for every `proposed` case
+    with a stored file when a profile version of its code is activated (section 3.6);
+
+@@ END
+@@ FIX R1 O-07-1 docs/plan/phase-07.md
+after a profile activation -> 422 `intake_stale` and a new `goaml_case_intake` job, then approval succeeds;
+@@ WITH
+a profile activation enqueues one `goaml_case_intake` job for the `proposed` case; a decision before that job ran -> 422 `intake_stale` and no new job row; after it ran, approval succeeds;
+@@ END
+@@ FIX R1 O-07-2 docs/plan/phase-07.md
+as CFG the POST -> 403 `E_SCOPE`; as DS the GET -> 403 `E_SCOPE`;
+@@ WITH
+as CFG the POST -> 403 `E_SCOPE`; as DS the GET -> 403 `E_FORBIDDEN` (DS holds `config.author`, which the route accepts, and Cedar denies); as SS the GET -> 403 `E_SCOPE`;
+@@ END
+@@ FIX R1 O-07-3 docs/plan/phase-07.md
+the same key and body -> the stored 202 with `x-idempotent-replay: true`; as CHK approve -> the case `active`; as CFG `GET /api/v1/goaml/corpus-cases`
+@@ WITH
+the same key and body -> the stored 202 with `x-idempotent-replay: true`; after the intake job has completed (the script polls `GET /api/v1/goaml/corpus-cases` as A2 until `intake_result` is set), as CHK approve -> the case `active`; as CFG `GET /api/v1/goaml/corpus-cases`
+@@ END
+@@ FIX R1 O-07-4 docs/plan/phase-07.md
+   1. Load the case. A state other than `proposed` -> done.
+@@ WITH
+   1. Load the case. A state other than `proposed` -> done; when the case has no `intake_result` (its request was withdrawn or rejected before the first run, so the uploaded file is still staged), first `delete_transient("goaml", case_id)` and the audit event `goaml_corpus_case.transient_deleted {case_id, by: "intake"}`.
+@@ END
+@@ FIX R1 O-07-5 docs/plan/phase-07.md
+   8. After the transaction of a first run, in every path: `delete_transient("goaml", case_id)`. An object left by a crash is deleted by `maintenance_sweep` after `evidence.staging_ttl_h`: its owner is not a run, which the sweep of section 3.2 step 13 treats as a missing run.
+@@ WITH
+   8. After the transaction of a first run, in every path: `delete_transient("goaml", case_id)`, then the audit event `goaml_corpus_case.transient_deleted {case_id, by: "intake"}`. An object left by a crash is deleted by `maintenance_sweep` after `evidence.staging_ttl_h`: its owner is not a run, which the sweep of section 3.2 step 13 treats as a missing run; when the owner id is the id of a corpus case the sweep writes `goaml_corpus_case.transient_deleted {case_id, by: "sweep"}` in place of `goaml_check.transient_deleted`.
+@@ END
+@@ FIX R1 O-07-5 docs/plan/phase-07.md
+9. **Audit events** (six more kinds in section 3.8, all on resource `goaml_corpus_case`): `goaml_corpus_case.proposed`, `goaml_corpus_case.retire_proposed`, `goaml_corpus_case.intake_ran`, `goaml_corpus_case.activated`, `goaml_corpus_case.retired` and `goaml_corpus_case.rejected`.
+@@ WITH
+9. **Audit events** (seven more kinds in section 3.8, all on resource `goaml_corpus_case`): `goaml_corpus_case.proposed`, `goaml_corpus_case.retire_proposed`, `goaml_corpus_case.intake_ran`, `goaml_corpus_case.transient_deleted` (`{case_id, by}`, `by` is `intake` or `sweep`; the uploaded file is gone, as `goaml_check.transient_deleted` says for a check run), `goaml_corpus_case.activated`, `goaml_corpus_case.retired` and `goaml_corpus_case.rejected`. The failed proposal of item 5 step 5 writes no event: no case row exists, as for a failed check request (section 3.2 step 4).
+@@ END
+@@ FIX R1 O-07-5 docs/plan/phase-07.md
+    final or missing are deleted and the run flagged `transient_deleted` (audit `goaml_check.transient_deleted` with
+    `by: sweep`).
+@@ WITH
+    final or missing are deleted and the run flagged `transient_deleted` (audit `goaml_check.transient_deleted` with
+    `by: sweep`; for an object whose owner is a bank corpus case, `goaml_corpus_case.transient_deleted`, section 7.6
+    item 6).
+@@ END
+@@ FIX R1 O-07-5 docs/plan/phase-07.md
+a file with a `<!DOCTYPE` -> refusal `not_maskable`; an EICAR file -> refusal `unsafe_file`.
+@@ WITH
+a file with a `<!DOCTYPE` -> refusal `not_maskable`; an EICAR file -> refusal `unsafe_file`; a case whose request is withdrawn before the job ran -> after the job no object under `transient/goaml/<case_id>/` and one `goaml_corpus_case.transient_deleted` event.
+@@ END
+@@ FIX R1 O-07-5 docs/plan/phase-07.md
+Audit: `goaml_corpus_case.proposed`, `.intake_ran`, `.activated`, `.retire_proposed` appear,
+@@ WITH
+Audit: `goaml_corpus_case.proposed`, `.intake_ran`, `.transient_deleted`, `.activated`, `.retire_proposed` appear,
+@@ END
+@@ FIX R1 O-07-6 docs/plan/phase-07.md
+The key is typed by the maker and read by the approver, so a key that names a person is refused at approval, as any reason text is.
+@@ WITH
+The key is typed by the maker and read by the approver. The form asks for a short code for the rule and says that it must not be a name (item 13), and the approver rejects a request whose key names a person; the system does not screen the key.
+@@ END
+@@ FIX R1 O-07-6 docs/plan/phase-07.md
+for A2 and M the action "Add a case" (one XML file, a key, the expected outcome,
+@@ WITH
+for A2 and M the action "Add a case" (one XML file, a key with the hint "A short code for the rule. Never a name.", the expected outcome,
+@@ END
+@@ FIX R1 O-07-7 docs/plan/phase-07.md
+| letter in U+0621 to U+063A or U+0641 to U+064A | a random letter of those two ranges |
+@@ WITH
+| letter in U+0621 to U+064A (the class `ء-ي` of patch `P-01`; the tatweel U+0640 is one of them) | a random letter of U+0621 to U+063A or U+0641 to U+064A, so a value the class accepts stays accepted |
+@@ END
+@@ FIX R1 O-07-7 docs/plan/phase-07.md
+a letter U+0695 becomes U+06A9; the three validated samples,
+@@ WITH
+a letter U+0695 becomes U+06A9; a tatweel U+0640 becomes a letter of U+0621 to U+063A or U+0641 to U+064A, and an entity name that holds one still passes `P-01`; the three validated samples,
+@@ END
+@@ FIX R1 O-07-8 docs/plan/phase-07.md
+  of the run (DR-69); nothing derived from them holds a value, a name or the narrative. The run rows are `secret-str`,
+@@ WITH
+  of the run (DR-69); nothing derived from them holds a value, a name or the narrative. The one exception is the
+  masked file of a corpus case the bank adds (section 7.6): it keeps enumeration codes, booleans, dates, date-times
+  and the bank's own goAML identifiers, no route returns it, and nothing in it names a person. The run rows are `secret-str`,
+@@ END
+@@ FIX R1 O-07-8 docs/plan/phase-07.md
+element names). Never a value from the file, never the libxml2 message, never the rejection text. The requester
+
+@@ WITH
+element names). Never a value from the file, never the libxml2 message, never the rejection text. (This is the rule
+for a check run. A corpus case the bank adds keeps a masked copy of its file; section 7.6 item 2 says what stays in
+it.) The requester
+
+@@ END
+@@ FIX R1 L-5 docs/plan/phase-07.md
+What is kept is the masked file: no name, identifier, account number, address, telephone number, amount or narrative of the original is in it, and no route returns it to anyone.
+@@ WITH
+What is kept is the masked file: no name, identifier, account number, address, telephone number, amount or narrative of the original is in it, and no route returns it to anyone. Dates and date-times stay as they were, a date of birth among them, as do enumeration codes such as nationality and gender, because the rules read them; with every name and number beside them replaced they do not name a person, and the file is `secret-str` evidence that only the corpus runner opens.
+@@ END
+@@ FIX R1 O-07-9 docs/plan/phase-07.md
+`office_code`, when given, is the `rule_code` of a rejection pattern of the active version (else 422 `rule_unknown` at `/office_code`);
+@@ WITH
+`office_code`, when given, has the form `OFF-nn` that the column CHECK admits and is the `rule_code` of a rejection pattern of the active version (else 422 `rule_unknown` at `/office_code`);
+@@ END
+@@ FIX R1 O-07-10 docs/plan/phase-07.md
+not `proposed`, or the open count above the cap -> the target refuses and the request ends `failed`; `activate` (`activated_at` = the request's `activated_at`);
+@@ WITH
+not `proposed`, or the open count above the cap -> the target refuses (phase 04 section 3.2: an immediate approval is rolled back with the error, and a scheduled activation ends `failed`); `activate` (`activated_at` = the request's `activated_at`);
+@@ END
+@@ FIX R1 O-07-10 docs/plan/phase-07.md
+`retire`: `lock`; not `active` -> refused; `retire` with the request id; audit `goaml_corpus_case.retired {case_id, change_request_id}`.
+@@ WITH
+`retire`: `lock`; not `active` -> refused in the same way; `retire` with the request id; audit `goaml_corpus_case.retired {case_id, change_request_id}`.
+@@ END
+@@ FIX R1 O-07-11 docs/plan/phase-07.md
+│   └── jobs/      # + kinds goaml_check, goaml_watch, goaml_corpus (akr-worker)
+@@ WITH
+│   └── jobs/      # + kinds goaml_check, goaml_watch, goaml_corpus, goaml_case_intake (akr-worker; the last in section 7.6)
+@@ END
+@@ FIX R1 O-07-11 docs/plan/phase-07.md
+├── api/           # + router goaml; change target goaml_profile
+@@ WITH
+├── api/           # + router goaml; change targets goaml_profile and goaml_corpus_case (section 7.6)
+@@ END
+@@ FIX R1 O-07-11 docs/plan/phase-07.md
+├── worker/        # + the three job handlers, SandboxedXsdValidator, ProxySchemaFetcher
+@@ WITH
+├── worker/        # + the four job handlers (the fourth in section 7.6), SandboxedXsdValidator, ProxySchemaFetcher
+@@ END
+@@ FIX R1 O-07-11 docs/plan/phase-07.md
+│   │              #   PackageChecks (zip), RejectionParser, the corpus runner
+@@ WITH
+│   │              #   PackageChecks (zip), RejectionParser, the corpus runner, CaseMasker (section 7.6)
+@@ END
+@@ FIX R1 O-08-1 docs/plan/phase-07.md
+cannot be approved: its maker withdraws the request and the case becomes `rejected`.
+@@ WITH
+cannot be approved: the approver rejects the request or its maker withdraws it, and the case becomes `rejected`.
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-07.md
+Negative checks: `DELETE FROM rpt.goaml_profiles` fails with
+   `profile versions are never deleted`;
+@@ WITH
+Negative checks: `DELETE FROM rpt.goaml_profiles` as the owner `akr_migrate` fails with
+   `profile versions are never deleted` (as `akr_app` it fails with permission denied, the last check of this item);
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-07.md
+`DELETE` fails with `goAML corpus cases are never deleted`; an UPDATE of a `rejected` row fails;
+@@ WITH
+a `DELETE` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `goAML corpus cases are never deleted`; as `akr_app` an UPDATE of the `state` of a `rejected` row fails with the guard's `is final` message;
+@@ END
+@@ FIX R1 O-07-6 docs/plan/phase-08.md
+the key (it starts with a lower-case letter, then lower-case letters, digits or hyphens; 3 to 61 characters in all);
+@@ WITH
+the key (it starts with a lower-case letter, then lower-case letters, digits or hyphens; 3 to 61 characters in all; under the field the hint "A short code for the rule. Never a name." in the user's language, phase 07 section 7.6 item 13);
+@@ END
+@@ FIX R1 O-13-12 docs/plan/phase-13.md
+the government-source flag to P2 (header, S-17; section 7.7); lead-written,
+@@ WITH
+the government-source flag to P2 (header, S-17); lead-written,
+@@ END
+@@ FIX R1 O-19-1 docs/plan/phase-13.md
+added to migration `0044_feat_counterparty_links.sql` as its second part; owner `akr_app`):
+@@ WITH
+added to migration `0044_feat_counterparty_links.sql` as its second part; owner `akr_migrate`, written by `akr_app`):
+@@ END
+@@ FIX R1 L-2 docs/plan/phase-13.md
+In the `where` of a feature definition (section 3.1) the name is true for a posting whose counterparty carries a row of that tag that holds on the posting's `booking_date`. The name says nothing about direction:
+@@ WITH
+In the `where` of a feature definition (section 3.1) the name is written as a comparison with a boolean literal, `tag.payroll = true` or `tag.payroll = false`, the form the Filter subset of DSL.md has (as `txn.cash_flag = true` in the shipped catalogue). `tag.payroll = true` holds for a posting whose counterparty carries a row of that tag that holds on the posting's `booking_date`; `tag.payroll = false` holds for every other posting. Any other use of the name in a `where` (the bare name, another operator, a value that is not a boolean) is `E_FIELD_TYPE`. The name says nothing about direction:
+@@ END
+@@ FIX R1 L-2 docs/plan/phase-13.md
+`FeatureCompiler` compiles the name to the following, with the tag as a bound parameter:
+@@ WITH
+`FeatureCompiler` compiles `tag.<name> = true` to the following, with the tag as a bound parameter, and `tag.<name> = false` to `NOT` of the same expression:
+@@ END
+@@ FIX R1 L-2 docs/plan/phase-13.md
+`cargo test`: the validator accepts `tag.payroll` in a `where` and refuses it in `field` (`E_UNKNOWN_ATTRIBUTE`);
+@@ WITH
+`cargo test`: the validator accepts `tag.payroll = true` and `tag.payroll = false` in a `where`, refuses the bare name there (`E_FIELD_TYPE`) and refuses the name in `field` (`E_UNKNOWN_ATTRIBUTE`);
+@@ END
+@@ FIX R1 L-2 docs/plan/phase-13.md
+the compiled filter of a fixture feature `payroll_credit_1m` holds the `EXISTS` of item 3;
+@@ WITH
+the compiled filter of a fixture feature `payroll_credit_1m` (`where`: `txn.dr_cr = 'C' AND tag.payroll = true`) holds the `EXISTS` of item 3, and the same feature with `tag.payroll = false` holds `NOT EXISTS`;
+@@ END
+@@ FIX R1 O-13-4 docs/plan/phase-13.md
+`{ "ref": "tag.payroll", "op": "=", "value": true }` (or `false`) is true for a customer with a `feat.customer_source_tags` row of that tag. Only `=` with a boolean is accepted (`E_FIELD_TYPE` otherwise). The assignment of section 3.3 step 1 compiles it to `EXISTS (SELECT 1 FROM feat.customer_source_tags s WHERE s.customer_id = cu.id AND s.tag = $n)`, where `cu` is the customer row of the page.
+@@ WITH
+`{ "ref": "tag.payroll", "op": "=", "value": true }` is true for a customer with a `feat.customer_source_tags` row of that tag; with `"value": false` it is true for a customer with no such row. Only `=` with a boolean is accepted (`E_FIELD_TYPE` otherwise). The assignment of section 3.3 step 1 compiles `true` to `EXISTS (SELECT 1 FROM feat.customer_source_tags s WHERE s.customer_id = cu.id AND s.tag = $n)`, where `cu` is the customer row of the page, and `false` to `NOT EXISTS` over the same subquery.
+@@ END
+@@ FIX R1 O-13-4 docs/plan/phase-13.md
+a static segment with `tag.pension = true` compiles and a risk overlay with it is refused (`E_SEGMENT_INPUT_NOT_ALLOWED`);
+@@ WITH
+a static segment with `tag.pension = true` compiles to `EXISTS`, one with `tag.pension = false` to `NOT EXISTS`, and a risk overlay with either is refused (`E_SEGMENT_INPUT_NOT_ALLOWED`);
+@@ END
+@@ FIX R1 O-19-3 docs/plan/phase-13.md
+DTOs: `SourceTagChange { add: Vec<NewSourceTag>, retire: Vec<RetireSourceTag> }`,
+@@ WITH
+DTOs: `SourceTagChange { add: Vec<NewSourceTag>, retire: Vec<RetireSourceTag>, reason_code: String, reason_text: String }` (the two reason fields are the ones phase 04 `create` requires),
+@@ END
+@@ FIX R1 O-19-5 docs/plan/phase-13.md
+`SourceTagChange` and `ChangeRequestAccepted` (reused). Repository trait
+@@ WITH
+`SourceTagChange` and `ChangeRequestAccepted` (the response schema of section 2, reused: the change request id, class, route and volume effect). Repository trait
+@@ END
+@@ FIX R1 O-19-9 docs/plan/phase-13.md
+    async fn insert(&self, tx: &mut Tx, row: &SourceTag) -> Result<(), RepoError>;
+@@ WITH
+    async fn insert(&self, tx: &mut Tx, row: &SourceTag) -> Result<SourceTag, RepoError>;   // RETURNING
+@@ END
+@@ FIX R1 O-13-1 docs/plan/phase-13.md
+    /// Sets `ended` (with `valid_to`) or `void` on an `active` row; `Ok(false)` when the row is no longer active.
+@@ WITH
+    /// Sets `ended` (with `valid_to`) or `void` on an `active` row, and for both `retired_at = now()` and
+    /// `retired_by_request = cr`; `Ok(false)` when the row is no longer active.
+@@ END
+@@ FIX R1 O-13-6 docs/plan/phase-13.md
+and that is not in `retire`, is sub-code `already_tagged`. Each is 422 `E_VALIDATION` at `/add/<i>/subject_id`.
+@@ WITH
+and that is not in `retire`, is sub-code `already_tagged`. So is an entry that shares a hash with an earlier entry of `add` for the same tag (an account and a counterparty row of that account, for example), at the later entry. Each is 422 `E_VALIDATION` at `/add/<i>/subject_id`.
+@@ END
+@@ FIX R1 O-13-2 docs/plan/phase-13.md
+`end` takes `valid_to` between the row's `valid_from` and today, and defaults to the last closed business date (phase 11 `FreshnessQuery`);
+@@ WITH
+`end` takes `valid_to` between the row's `valid_from` and today, and defaults to the later of the row's `valid_from` and the last closed business date (phase 11 `FreshnessQuery`), so the default never falls before `valid_from`;
+@@ END
+@@ FIX R1 O-19-4 docs/plan/phase-13.md
+   5. Create the change request through phase 04 `ChangeRequestService` (kind `source_tag`, `object_key` `source_tags`, reason family `change`), route `cr_material`.
+@@ WITH
+   5. Create the change request with phase 04 `ChangeRequestService::create` (origin Dedicated, so `submit` runs in the same transaction; kind `source_tag`, `object_key` `source_tags`, the caller's `reason_code` of family `change` and `reason_text`), route `cr_material`.
+@@ END
+@@ FIX R1 O-13-7 docs/plan/phase-13.md
+and the two lists hold the keys of the active static segments and active feature definitions that read a tag name of the change set.
+@@ WITH
+and the two lists hold the keys of the active static segments and active feature definitions that read a tag name of the change set. The tag names of a change set are the tags of its `add` entries and the tags of the rows that its `retire` entries name (read by `id`), so a change set that only ends or voids a tag has its readers counted too.
+@@ END
+@@ FIX R1 O-13-5 docs/plan/phase-13.md
+| Insert each `add` as `active` with the hashes resolved again; close each `retire` as `ended` (with `valid_to`) or `void` (`retired_at = now()`, `retired_by_request`); enqueue `source_tag_refresh`; audit `source_tag.applied` |
+@@ WITH
+| In this order: close each `retire` as `ended` (with `valid_to`) or `void`, both with `retired_at = now()` and `retired_by_request` = this request; then insert each `add` as `active` with the hashes resolved again; enqueue `source_tag_refresh`; when a feature reads a tag of the change set, enqueue `feature_compute {reopen_from}` (first point below); audit `source_tag.applied` |
+@@ END
+@@ FIX R1 O-13-8 docs/plan/phase-13.md
+   - **Volume effect.** `neutral` when both impact lists are empty: nothing reads the tags yet.
+@@ WITH
+   - **Order, and months already computed.** The retires are closed before the adds are inserted, because an add may take the place of a row that the same change set retires (item 6 step 2; this is how a payer name is changed) and `uq_source_tags_active` allows one active row per tag and account. A tag change also moves what a tag-reading feature gives for months that are already computed, and the hourly run does not take those months again. So, when `reading_features` of the stored impact is not empty, the activation enqueues `feature_compute {reopen_from}`, where `reopen_from` is the month-end of the month of the earliest date the change set moves: the earliest of the `valid_from` of every add, the `valid_from` of every voided row and the `valid_to` of every ended row (a row ended on day D still holds on D, so the month of D is the first that can change). The job is enqueued with the coalesce key `feature_compute:reopen:<reopen_from>`, a key of its own: under the key `feature_compute` a queued hourly run would swallow the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen would be lost; the kind's concurrency of 1 still runs the jobs one at a time. Section 3.2 step 1 then takes every month from `reopen_from`, computes it again whatever its `basis` says (the register is not part of the basis), and step 5 updates only the rows whose value changed.
+   - **Volume effect.** `neutral` when both impact lists are empty: nothing reads the tags yet.
+@@ END
+@@ FIX R1 O-13-8 docs/plan/phase-13.md
+enqueued by a `feature_definition` activation (with `catchup`) and by a replay of phase 11 |
+@@ WITH
+enqueued by a `feature_definition` activation (with `catchup`), by a replay of phase 11 and by a `source_tag` activation that a feature reads (with `reopen_from` and a coalesce key of its own, section 7.17 item 7) |
+@@ END
+@@ FIX R1 O-13-8 docs/plan/phase-13.md
+after the tag is voided the row is gone and `segment_assign` is enqueued when a segment reads `tag.payroll`.
+@@ WITH
+after the tag is voided the row is gone and `segment_assign` is enqueued when a segment reads `tag.payroll`. With the fixture feature `payroll_credit_1m` active, the activation of a change set that voids a tag whose `valid_from` lies two months back enqueues one `feature_compute` job with that month's month-end as `reopen_from`, also while an hourly `feature_compute` job is queued, and after it ran the feature rows of the two months no longer count the credits.
+@@ END
+@@ FIX R1 O-13-5 docs/plan/phase-13.md
+a second `active` row with the same tag and `account_hk` fails on `uq_source_tags_active`.
+@@ WITH
+a second `active` row with the same tag and `account_hk` fails on `uq_source_tags_active`. A change set that retires a row and adds the same subject under the same tag with another payer name activates without error (retires first).
+@@ END
+@@ FIX R1 O-13-9 docs/plan/phase-13.md
+- **Network zones:** no change. Only the worker reads `canon` for this phase; the API reads `feat` only.
+@@ WITH
+- **Network zones:** no change. The worker reads `canon` for this phase; the API reads `feat`, and `canon.account` and `canon.counterparty` (read only, as `akr_app`, which holds the SELECT grants of phase 10) for the source-tag proposal of section 7.17 item 6 only.
+@@ END
+@@ FIX R1 O-13-10 docs/plan/phase-13.md
+built in this phase on the phase 08 layer; `screens.ts` lists the tab for CFG (propose) and for CHK, M and CH (read).
+@@ WITH
+built in this phase on the phase 08 layer. The tab has no role list of its own (phase 09 section 7.5): it renders when the caller may call `GET /ref/source-tags` (CFG, CHK, M and CH in the shipped bundle), and "Propose changes" renders when the caller may call the POST (CFG).
+@@ END
+@@ FIX R1 O-13-11 docs/plan/phase-13.md
+9. **Audit events** (two more rows of section 3.10):
+@@ WITH
+9. **Audit events** (the two events named after the table of section 3.10):
+@@ END
+@@ FIX R1 O-13-11 docs/plan/phase-13.md
+10. **Cedar actions** (two more rows of section 3.11; policies in `81_features.cedar`;
+@@ WITH
+10. **Cedar actions** (one more row of section 3.11, for both actions; policies in `81_features.cedar`;
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-13.md
+As `akr_app`: `DELETE FROM feat.source_tags` fails with `source tags are never deleted`; an `UPDATE` of an `ended` row fails with `source tag is closed`;
+@@ WITH
+`DELETE FROM feat.source_tags` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `source tags are never deleted`. As `akr_app`: an `UPDATE` of the `state` of an `ended` row fails with `source tag is closed`;
+@@ END
+@@ FIX R1 O-19-3 docs/plan/phase-13.md
+as CFG `POST /api/v1/ref/source-tags` with one `add` on a counterparty and `Idempotency-Key: tag-0001` gives 201
+@@ WITH
+as CFG `POST /api/v1/ref/source-tags` with one `add` on a counterparty, a `reason_code` of family `change`, a `reason_text` and `Idempotency-Key: tag-0001` gives 201
+@@ END
+@@ FIX R1 L-6 docs/plan/phase-13.md
+  min size, `base_version?`), `PeerBuildRequest { currency }`. No Update struct:
+@@ WITH
+  min size, `base_version?`), `PeerBuildRequest { currency }`. Both proposals also carry `reason_code` and
+  `reason_text`, which phase 04 `create` requires (a code of a family the target accepts, section 3.7). No Update struct:
+@@ END
+@@ FIX R1 O-13-8 docs/plan/phase-13.md
+A tag is matched on the other side of a posting only, so the debits of a tagged account itself are not marked.
+@@ WITH
+A tag is matched on the other side of a posting only, so the debits of a tagged account itself are not marked.
+- **Reopen enqueues and the coalesce key (found in the owner-decision round).** An enqueue of `feature_compute {reopen_from}` under the coalesce key `feature_compute` is dropped while another `feature_compute` job is queued (phase 00: `ON CONFLICT DO NOTHING`), and the reopen is lost. The source-tag activation uses a key of its own (section 7.17 item 7). The replay enqueue of section 3.2 has the same weakness as written and should take the same key form when it is built.
+@@ END
+@@ FIX R1 O-19-3 docs/plan/phase-13.md
+an unknown subject gives 422 with `subject_not_found`;
+@@ WITH
+a body without `reason_code` gives 422 `E_VALIDATION`; an unknown subject gives 422 with `subject_not_found`;
+@@ END
+@@ FIX R1 O-19-1 docs/plan/phase-19.md
+the guard, grants, classification and retention rows to `0065_casework_followup_guards_grants.sql`; owner `akr_app`):
+@@ WITH
+the guard, grants, classification and retention rows to `0065_casework_followup_guards_grants.sql`; owner `akr_migrate`, written by `akr_app`):
+@@ END
+@@ FIX R1 O-19-13 docs/plan/phase-19.md
+(`PrefillSource`, a closed enum of `domain::rfi::prefill`;
+@@ WITH
+(`PrefillSource`, a closed enum of `domain::casework::prefill`;
+@@ END
+@@ FIX R1 O-19-16 docs/plan/phase-19.md
+| `relationship.start_date` | `{ date }`: the earliest `onboarded_on` of the party's current `canon.customer` rows | `CanonPartyReader` (phase 18 section 3.14) |
+@@ WITH
+| `relationship.start_date` | `{ date }`: the earliest `onboarded_on` of the party's current `canon.customer` rows | `CanonPartyReader::current_customers` (the reader of phase 18; the method is added in item 4) |
+@@ END
+@@ FIX R1 O-19-16 docs/plan/phase-19.md
+| `relationship.status` | `{ records: [{ status, cdd_level }] }`, one per current customer row; no CIF | `CanonPartyReader` |
+@@ WITH
+| `relationship.status` | `{ records: [{ status, cdd_level }] }`, one per current customer row; no CIF | `CanonPartyReader::current_customers` |
+@@ END
+@@ FIX R1 O-19-8 docs/plan/phase-19.md
+| `party.pep_status` | `{ answer }`: `yes` for `pep`, `no` for `not_pep`, `unknown` otherwise | `CanonPartyReader` | `yes_no_unknown`, `value` | no |
+@@ WITH
+| `party.pep_status` | `{ answer, former? }`. The bank's PEP register decides first (view `kyc.party_pep_state`, phase 15): `pep` gives `yes`; `former_pep` gives `yes` with `former: true`; `candidate` gives `unknown`, because an unconfirmed lead is never stated. With no row, or the state `none`, the customer file decides (`canon.party.pep_status`): `pep` gives `yes`, `not_pep` gives `no`, anything else `unknown` | `PartyPepReader` (item 4), then `CanonPartyReader::current_party` | `yes_no_unknown`, `value` | no |
+@@ END
+@@ FIX R1 O-19-20 docs/plan/phase-19.md
+| `accounts.signatories` | `{ parties: [{ role, name }], incomplete }`: the other parties with a current `joint` or `signatory` role on the accounts of `accounts.open`, each with its current primary name; a party the caller may not see under phase 18 section 3.10 is left out and `incomplete` is `true` | `CanonPartyReader` | `value`, `free_text` | no |
+@@ WITH
+| `accounts.signatories` | `{ parties: [{ role, name }] }`: the other parties with a current `joint` or `signatory` role on the accounts of `accounts.open`, each with its current `legal` name (`name_type = 'legal'`, `superseded_at IS NULL`; the Arabic or Kurdish form first). A party the caller may not see under phase 18 section 3.10 is left out, with no count and no flag | `CanonPartyReader::co_holders` (item 4) and `current_names` | `value`, `free_text` | yes (the names of other persons) |
+@@ END
+@@ FIX R1 O-19-17 docs/plan/phase-19.md
+| `ProfileQuery` of phase 13 with its `PartyProfilesView` projection (`actual`, `declared` and `status`; never a deviation, an own-history or a peer value) | `value`, `free_text` | no |
+@@ WITH
+| `ProfileQuery` of phase 13 with its `PartyProfilesView` projection (`actual`, `declared` and `status`; never a deviation, an own-history or a peer value), called with the caller's context and purpose code, so the Cedar check `profile.read`, the purpose rule and the access events of phase 13 section 3.6 apply as on the party page | `value`, `free_text` | yes (the profile is restricted data that the desk may not read) |
+@@ END
+@@ FIX R1 O-19-14 docs/plan/phase-19.md
+| `value`, `free_text` | yes (the bank's own view) |
+@@ WITH
+| `value`, `free_text` | yes (the bank's own risk label) |
+@@ END
+@@ FIX R1 O-19-17 docs/plan/phase-19.md
+   No source reads an alert, a case, a decision, a report, a watch,
+@@ WITH
+   Four of the ten sources are sensitive: `accounts.closed`, `accounts.signatories`, `activity.declared_and_actual` and `rating.cbi_level`. A sensitive source is computed for a caller with role M only (item 5 step 5). No source reads an alert, a case, a decision, a report, a watch,
+@@ END
+@@ FIX R1 O-19-14 docs/plan/phase-19.md
+linked documents and the bank's own view (question 22 of the Wolfsberg list).
+@@ WITH
+linked documents and the respondent's comfort with the relationship (question 22 of the Wolfsberg list).
+@@ END
+@@ FIX R1 O-19-3 docs/plan/phase-19.md
+DTOs: `PrefillMapChange { set: Vec<PrefillMapEntry>, remove: Vec<String> }`,
+@@ WITH
+DTOs: `PrefillMapChange { set: Vec<PrefillMapEntry>, remove: Vec<String>, reason_code: String, reason_text: String }` (the two reason fields are the ones phase 04 `create` requires),
+@@ END
+@@ FIX R1 O-19-5 docs/plan/phase-19.md
+`PrefillMapChange`, `ChangeRequestAccepted` (phase 04, reused), and `RfiPrefillView
+@@ WITH
+`PrefillMapChange`, the phase 04 `ChangeRequestView` (the answer of the POST), and `RfiPrefillView
+@@ END
+@@ FIX R1 O-19-17 docs/plan/phase-19.md
+`withheld` (a sensitive source and the caller is not the MLRO) or `format_mismatch`.
+@@ WITH
+`withheld` (a sensitive source and the caller is not the MLRO, or phase 13 refused the profile read) or `format_mismatch`.
+@@ END
+@@ FIX R1 O-19-9 docs/plan/phase-19.md
+    async fn insert(&self, tx: &mut Tx, row: &RfiPrefillMapRow) -> Result<(), RepoError>;
+@@ WITH
+    async fn insert(&self, tx: &mut Tx, row: &RfiPrefillMapRow) -> Result<RfiPrefillMapRow, RepoError>;   // RETURNING
+@@ END
+@@ FIX R1 O-19-16 docs/plan/phase-19.md
+   AppState: `api` gains `rfi_prefill: Arc<RfiPrefillService>` and one more change target.
+@@ WITH
+   AppState: `api` gains `rfi_prefill: Arc<RfiPrefillService>` and one more change target.
+
+   Readers added for the registry. `CanonPartyReader` (phase 18 section 2) gains two methods: `current_customers(conn, party_id) -> Result<Vec<CustomerRow>, RepoError>`, the current `canon.customer` rows of the party (`recorded_to IS NULL`) with `onboarded_on`, `status` and `cdd_level`; and `co_holders(conn, account_ids) -> Result<Vec<CoHolder>, RepoError>`, the party id and role of every current `joint` or `signatory` row of `canon.account_party_role` on those accounts (`recorded_to IS NULL`). A new port `PartyPepReader` (domain layer; `PgPartyPepReader` in `db`) has one method, `pep_state(conn, party_id) -> Result<Option<String>, RepoError>`: the `pep_state` of the party's row in the view `kyc.party_pep_state`, on which phase 15 grants SELECT to `akr_app`. This phase reads the view and never writes the register.
+@@ END
+@@ FIX R1 O-19-10 docs/plan/phase-19.md
+   3. `X-Access-Purpose` holds a purpose code (422 `E_PURPOSE_REQUIRED` otherwise, phase 02).
+@@ WITH
+   3. `X-Access-Purpose` holds a purpose code (422 `E_PURPOSE_REQUIRED` otherwise). This is a rule of this route at every tier, as the profile read of phase 13 has one; the phase 02 rule alone covers restricted and suspicion data only.
+@@ END
+@@ FIX R1 O-19-10 docs/plan/phase-19.md
+| `PurposeRequired` | `E_PURPOSE_REQUIRED` | 422 | a kinship read or a suspicion item read without `X-Access-Purpose` |
+@@ WITH
+| `PurposeRequired` | `E_PURPOSE_REQUIRED` | 422 | a kinship read, a suspicion item read or a pre-fill read (section 7.21) without `X-Access-Purpose` |
+@@ END
+@@ FIX R1 O-19-17 docs/plan/phase-19.md
+otherwise compute the source (item 2), with `outcome = empty` when it returns nothing and `proposed` otherwise.
+@@ WITH
+otherwise compute the source (item 2), with `outcome = empty` when it returns nothing and `proposed` otherwise. For `activity.declared_and_actual` a refusal by phase 13 (for the MLRO that is a purpose other than `investigation`) also gives `withheld`, and the other proposals of the response are not affected.
+@@ END
+@@ FIX R1 O-19-17 docs/plan/phase-19.md
+through the phase 02 access layer. No audit row: the read changes nothing.
+@@ WITH
+through the phase 02 access layer; the profile read of `activity.declared_and_actual` writes its own access events in phase 13, one per customer record. No audit row: the read changes nothing.
+@@ END
+@@ FIX R1 O-19-4 docs/plan/phase-19.md
+   5. Create the change request through phase 04 `ChangeRequestService` (kind `rfi_prefill_map`, `object_key` `rfi_prefill_map`, reason family `change`), route `cr_material`, volume effect `neutral`.
+@@ WITH
+   5. Create the change request with phase 04 `ChangeRequestService::create` (origin Dedicated, so `submit` runs in the same transaction; kind `rfi_prefill_map`, `object_key` `rfi_prefill_map`, the caller's `reason_code` of family `change` and `reason_text`), route `cr_material`, volume effect `neutral`.
+@@ END
+@@ FIX R1 O-19-5 docs/plan/phase-19.md
+   6. Respond 201 with the change request; `change_request.created` is written by phase 04.
+
+7. **Change target `rfi_prefill_map`**
+@@ WITH
+   6. Respond 201 with the `ChangeRequestView`; `change_request.created` is written by phase 04.
+
+7. **Change target `rfi_prefill_map`**
+@@ END
+@@ FIX R1 O-19-6 docs/plan/phase-19.md
+`forbidden_term`, `rfi_open`, `not_critical_finding`.
+@@ WITH
+`forbidden_term`, `rfi_open`, `not_critical_finding`; and the six of section 7.21: `prefill_not_applicable`, `prefill_off`, `source_unknown`, `question_unknown`, `format_mismatch`, `not_mapped`.
+@@ END
+@@ FIX R1 O-19-12 docs/plan/phase-19.md
+| `clock.warning` (outbox, stage 50) | breach | owner | no |
+
+@@ WITH
+| `clock.warning` (outbox, stage 50) | breach | owner | no |
+| `rfi_prefill_map.applied` (section 7.21) | a pre-fill map change applied | rfi_prefill_map | no |
+
+@@ END
+@@ FIX R1 O-19-7 docs/plan/phase-19.md
+every action for KYC, CFG, DS, CHK, MRO, ADM, SEC (except the alarm reads above),
+@@ WITH
+every action for KYC, CFG, DS, CHK, MRO, ADM, SEC (except the alarm reads above, and for CFG and CHK the `rfi_prefill_map.read` and `rfi_prefill_map.propose` permits of section 7.21),
+@@ END
+@@ FIX R1 O-19-15 docs/plan/phase-19.md
+correspondents P2 for the desk, but for the panel Proposed answers of section 7.21)
+@@ WITH
+correspondents P2 for the desk, but P1 for the panel Proposed answers of section 7.21)
+@@ END
+@@ FIX R1 O-19-20 docs/plan/phase-19.md
+ten facts of the customer file and the account list, none of which is derived from monitoring or from a case. The two facts that could let a reader infer more, a closed account and the bank's risk label, are computed for the MLRO only; the desk sees that a proposal exists and that it is withheld, nothing else.
+@@ WITH
+ten facts of the customer file, the account list and the KYC records (the PEP register, the rating label, the monthly figures), none of which is derived from monitoring or from a case. Four facts are computed for the MLRO only: a closed account and the bank's risk label, which could let a reader infer more; the names of the other holders of an account, which are other persons' data; and the declared and actual activity, which is restricted data that the desk may not read. The desk sees that a proposal exists and that it is withheld, nothing else. A party the MLRO may not see is left out of the list of holders with no count and no flag (section 3.14), so the list never says that someone is hidden. A PEP lead that is not confirmed is answered `unknown`, never `yes`.
+@@ END
+@@ FIX R1 O-19-17 docs/plan/phase-19.md
+a withheld proposal says "Needs the MLRO"; nothing is recorded until the person submits the form.
+@@ WITH
+a withheld proposal says "Needs the MLRO" to the desk, and to the MLRO, for whom only the activity figures can be withheld, "Choose the purpose Investigation to see this"; a former PEP is rendered as such (`former`); nothing is recorded until the person submits the form.
+@@ END
+@@ FIX R1 O-19-18 docs/plan/phase-19.md
+(rows to set, rows to remove; the server's answer per row; `Idempotency-Key`; 201 and a link to G10). CHK, M and RFI read the tab.
+@@ WITH
+(rows to set, rows to remove, a reason code and a reason text; the server's answer per row; `Idempotency-Key`; 201 and a link to G10). The tab has no role list of its own (phase 09 section 7.5): it renders for a D3 user who may call the GET, which is CFG, CHK and M. D3 is not a screen of the RFI desk; the desk reads the map through the same GET on W8, where the panel names the source of each proposal.
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-19.md
+As `akr_app`: `DELETE FROM casework.rfi_prefill_map` fails with `pre-fill map rows are never deleted`; an `UPDATE` of a retired row fails with `pre-fill map row is retired`;
+@@ WITH
+`DELETE FROM casework.rfi_prefill_map` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `pre-fill map rows are never deleted`. As `akr_app`: an `UPDATE` of the `state` of a retired row fails with `pre-fill map row is retired`;
+@@ END
+@@ FIX R1 O-19-8 docs/plan/phase-19.md
+`party.pep_status` gives `yes`, `no` and `unknown` for the three stored values; `accounts.signatories` leaves out a party the caller may not see and sets `incomplete`; a sensitive source is not computed for a caller without role M (the reader is not called).
+@@ WITH
+`party.pep_status` gives `yes` for a register state `pep`, `yes` with `former: true` for `former_pep` and `unknown` for `candidate`, also when the customer file says `not_pep`; with no register row it gives `yes`, `no` and `unknown` for the three customer-file values; `accounts.signatories` leaves out a party the caller may not see and the response holds no count and no flag that tells it; `PrefillSource::sensitive()` is true for exactly four keys; a sensitive source is not computed for a caller without role M (the reader is not called); as M with a purpose other than `investigation` the activity proposal is `withheld` and the other proposals are returned.
+@@ END
+@@ FIX R1 O-19-11 docs/plan/phase-19.md
+as CFG `POST /api/v1/rfi-prefill-map` with `{"set":[{"question_key":"account.opened_on","source_key":"relationship.start_date"}]}` and `Idempotency-Key: pfm-0001` gives 201
+@@ WITH
+as CFG `POST /api/v1/rfi-prefill-map` with `{"set":[{"question_key":"<key>","source_key":"relationship.start_date"}],"reason_code":"<a code of family change>","reason_text":"..."}`, where `<key>` is a question key of the correspondent template of the suite's fixture pack, and `Idempotency-Key: pfm-0001` gives 201
+@@ END
+@@ FIX R1 O-19-3 docs/plan/phase-19.md
+with `source_key: "case.status"` gives 422 with `source_unknown`;
+@@ WITH
+the same body without `reason_code` gives 422 `E_VALIDATION`; with `source_key: "case.status"` gives 422 with `source_unknown`;
+@@ END
+@@ FIX R1 O-19-17 docs/plan/phase-19.md
+the two sources that could reveal more (a closed account, the bank's risk label) are computed for the MLRO only; and keeping the write
+@@ WITH
+four sources are computed for the MLRO only (a closed account and the bank's risk label, which could reveal more; the names of the other holders of an account; the declared and actual activity, which is restricted data); the PEP answer reads the bank's PEP register before the customer file; and keeping the write
+@@ END
+@@ FIX R1 O-19-17 docs/plan/research.md
+the two sources that could reveal more (a closed account, the bank's risk label) are computed for the MLRO only; keeping the write
+@@ WITH
+four sources are computed for the MLRO only (a closed account and the bank's risk label, which could reveal more; the names of the other holders of an account; the declared and actual activity, which is restricted data); the PEP answer reads the bank's PEP register before the customer file; keeping the write
+@@ END
+@@ FIX R1 O-19-16 docs/plan/phase-18.md
+`current_accounts(conn, party_id)` (joins `canon.account_party_role` where `recorded_to IS NULL`), `transactions(conn, account_ids, filter, cursor)`.
+@@ WITH
+`current_accounts(conn, party_id)` (joins `canon.account_party_role` where `recorded_to IS NULL`), `transactions(conn, account_ids, filter, cursor)`. Phase 19 section 7.21 item 4 adds `current_customers(conn, party_id)` and `co_holders(conn, account_ids)` for the RFI pre-fill.
+@@ END
+@@ FIX R1 O-19-17 docs/MODULES.md
+sources, two of them for the MLRO only), through a map
+@@ WITH
+sources, four of them for the MLRO only), through a map
+@@ END
+@@ FIX R1 O-19-18 docs/DESIGN-SYSTEM.md
+"Propose changes" (CFG) sets or removes rows through a change request. CHK, M and RFI
+read the tab.
+@@ WITH
+"Propose changes" (CFG) sets or removes rows through a change request. CHK and M
+read the tab; the RFI desk reads the map on W8.
+@@ END
+@@ FIX R1 O-19-17 docs/DESIGN-SYSTEM.md
+A proposal from a
+sensitive source says "Needs the MLRO" for a caller who is not the MLRO.
+@@ WITH
+A proposal from a
+sensitive source (four of the ten) says "Needs the MLRO" for a caller who is not the MLRO; the MLRO sees the
+activity figures only under the purpose Investigation.
+@@ END
+@@ FIX R1 O-25-1 docs/plan/phase-25.md
+CHECK ((resolution = 'marked') IS NOT DISTINCT FROM (resolution_code IS NOT NULL))
+@@ WITH
+CHECK (((resolution = 'marked') IS TRUE) = (resolution_code IS NOT NULL))   -- a code on a marked row only; an open row has neither
+@@ END
+@@ FIX R1 O-25-2 docs/plan/phase-25.md
+The size of the phase is L. The owned `GET /api/v1/admin/releases` row
+@@ WITH
+The size of the phase is XL (25 routes or more; section 7.24 item 2). The owned `GET /api/v1/admin/releases` row
+@@ END
+@@ FIX R1 O-25-3 docs/plan/phase-25.md
+(insert or update, `forwarded_total` unchanged) and end the pass. Nothing read while the export was off is sent later.
+@@ WITH
+(insert or update, `forwarded_total` unchanged) and end the pass. An access event recorded before an off-run is never sent. The cursor moves only when a run executes, so an event recorded after the last off-run (at most one run interval, 10 seconds, before the setting is `true` again) is sent by the first run that finds the setting `true`.
+@@ END
+@@ FIX R1 O-25-3 docs/plan/phase-25.md
+with the setting `false` no access line is sent and, after it is set back to `true`, the events written meanwhile are not sent.
+@@ WITH
+with the setting `false` no access line is sent; the test writes two access events, lets one more run pass with the setting `false`, sets it back to `true`, and the two events are not sent, while an event written after that off-run is sent.
+@@ END
+@@ FIX R1 O-25-4 docs/plan/phase-25.md
+`schema.cedarschema` receives the action declarations of section 3.12 only (the appended-declarations pattern
+@@ WITH
+`schema.cedarschema` receives the action declarations of section 3.12 and of section 7.24 item 3 only (the appended-declarations pattern
+@@ END
+@@ FIX R1 O-25-5 docs/API.md
+access lines (allowed reads of sensitive routes) after a cursor
+@@ WITH
+access lines (every access event: allow, deny and conflict) after a cursor
+@@ END
+@@ FIX R1 O-25-5 docs/MODULES.md
+Owner decisions of 2026-10-10: allowed reads of sensitive routes are exported too, through SECURITY DEFINER
+@@ WITH
+Owner decisions of 2026-10-10: record reads are exported too (every access event: allow, deny and conflict), through SECURITY DEFINER
+@@ END
+@@ FIX R1 O-25-5 docs/DATA-MODEL.md
+Owner decisions of 2026-10-10: allowed reads of sensitive routes are exported too (DR-414). They are read from
+@@ WITH
+Owner decisions of 2026-10-10: record reads are exported too, as every access event with the decision allow, deny
+or conflict (DR-414). They are read from
+@@ END
+@@ FIX R1 O-25-6 docs/plan/phase-25.md
+actor_id, actor_role, on_behalf_of, resource_type, resource_id: Option<Uuid>, subject_party: Option<Uuid>, protected: bool,
+@@ WITH
+actor_id, actor_role, on_behalf_of: Option<Uuid>, resource_type, resource_id: Option<Uuid>, subject_party: Option<Uuid>, protected: bool,
+@@ END
+@@ FIX R1 L-7 docs/plan/phase-25.md
+`SiemLine { occurred_at, audit_id, action, severity: SiemSeverity, actor_id, on_behalf_of, resource_type, resource_id: Option<Uuid>,
+@@ WITH
+`SiemLine { occurred_at, audit_id, action, severity: SiemSeverity, actor_id: Option<Uuid>, on_behalf_of: Option<Uuid>, resource_type, resource_id: Option<Uuid>,
+@@ END
+@@ FIX R1 O-25-7 docs/plan/phase-25.md
+1. Cedar `siem_dead_letter.resolve`. `If-Match` is required. `resolution_code` is one of
+@@ WITH
+1. Cedar `siem_dead_letter.resolve`. `If-Match` is required (428 `E_PRECONDITION_REQUIRED`). `resolution_code` is one of
+@@ END
+@@ FIX R1 O-25-8 docs/plan/phase-25.md
+The three kinds that the forwarder's own work produces are not exported,
+@@ WITH
+The three kinds of the resend work (the request writes the first, the forwarder the other two) are not exported,
+@@ END
+@@ FIX R1 O-25-9 docs/plan/phase-25.md
+An access line of a protected row carries the time, the actor, the role, the verb, the resource kind, the purpose code, the client address and three flags.
+@@ WITH
+An access line of a protected row carries the time, the access id, the decision, the actor, the role, the on-behalf-of id (a staff id, when the read used a delegated role), the verb, the resource kind, the purpose code, the client address and three flags. The access id is the id of the access event and opens nothing in the SIEM.
+@@ END
+@@ FIX R1 DOC-10 docs/DATA-MODEL.md
+`superseded_at` of the three party child tables,
+`loaded_last_at` of `party_contact`, and
+@@ WITH
+`superseded_at` of the three party child tables,
+`capture_source` of `party_name` (DR-420; phase 10 section 7.26), `loaded_last_at` of `party_contact`, and
+@@ END
+@@ FIX R1 DOC-26 docs/DATA-MODEL.md
+with UPDATE only on `(paid_on, paid_amount, row_hash)`; `akr_app` has SELECT;
+@@ WITH
+with UPDATE only on `(paid_on, paid_amount, row_hash)`, and UPDATE on `canon.facility (granted_on, row_hash)`; `akr_app` has SELECT;
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-06.md
+`DELETE FROM scn.cbi_catalogue_items` (any row, as
+   the owner role too) fails with `register rows are never deleted`;
+@@ WITH
+`DELETE FROM scn.cbi_catalogue_items` (any row) fails, as
+   `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `register rows are never deleted`;
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-09.md
+Negative checks, each
+   as the owner role and as `akr_app`: `DELETE FROM ref.countries` fails with `reference rows are never deleted`;
+   `UPDATE ref.fx_rates SET rate_to_iqd = 1` fails with `an FX rate is a fact`; a second
+@@ WITH
+Negative checks, each
+   as the owner role `akr_migrate` and as `akr_app`: `DELETE FROM ref.countries` fails with `reference rows are never deleted`
+   and `UPDATE ref.fx_rates SET rate_to_iqd = 1` fails with `an FX rate is a fact` (the two messages as the owner; as `akr_app`,
+   which holds neither privilege, both statements fail with permission denied); a second
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-09.md
+`UPDATE admin.policy_packs SET document = document` fails with `versions are
+   append-only`; `akr_app` has no DELETE
+@@ WITH
+`UPDATE admin.policy_packs SET document = document` fails with `versions are
+   append-only` as the owner and with permission denied as `akr_app` (SELECT and INSERT only); `akr_app` has no DELETE
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-15.md
+as `akr_app`: `UPDATE kyc.ratings SET level = 2` fails with `append-only`; `DELETE FROM kyc.ratings`
+   fails;
+@@ WITH
+as `akr_app`: `UPDATE kyc.ratings SET level = 2` fails with permission denied (no UPDATE grant; as the owner
+   `akr_migrate` it fails with `append-only`); `DELETE FROM kyc.ratings`
+   fails;
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-17.md
+11. Case chain: a test-only superuser change to one `case_events` payload is refused for `akr_app` by the trigger (`case_events` has no UPDATE
+    grant); the same change made by a superuser in the test database makes
+@@ WITH
+11. Case chain: a change to one `case_events` payload is refused for `akr_app` with permission denied (`case_events` has no UPDATE
+    grant; item 12); the same change made by a superuser in the test database, with `trg_case_events_append_only` disabled for that statement, makes
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-18.md
+`casework.opened_views` or `casework.evidence_items` (the append-only trigger raises);
+@@ WITH
+`casework.opened_views` or `casework.evidence_items` (permission denied: it holds SELECT and INSERT only; as the owner `akr_migrate` the append-only trigger raises);
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-20.md
+`UPDATE casework.ops_tasks SET task_ref = ...` fails with `the identity of an operations task does not change`;
+@@ WITH
+`UPDATE casework.ops_tasks SET task_ref = ...` fails with permission denied (`task_ref` is not in the column grant) and, as the owner `akr_migrate`, with `the identity of an operations task does not change`;
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-21.md
+an `UPDATE rpt.filings SET goaml_reference` fails with `the filing record is written once`;
+@@ WITH
+an `UPDATE rpt.filings SET goaml_reference` fails with permission denied (`goaml_reference` is not in the column grant) and, as the owner `akr_migrate`, with `the filing record is written once`;
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-21.md
+a `DELETE FROM rpt.fiu_feedback` fails with `rpt.fiu_feedback is append only`.
+@@ WITH
+a `DELETE FROM rpt.fiu_feedback` fails with permission denied (no DELETE grant) and, as the owner `akr_migrate`, with `rpt.fiu_feedback is append only`.
+@@ END
+@@ FIX R1 L-1 docs/plan/phase-21.md
+as the owner `akr_migrate`, with `rpt.fiu_feedback is append only`.
+@@ WITH
+as the owner `akr_migrate`, with `fiu_feedback is append only` (the guard prints `TG_TABLE_NAME`, which has no schema name).
+@@ END
+@@ FIX R1 DR-422 docs/plan/research.md
+replaced by DR-414 to DR-420; the rest of DR-413 stands |
+
+@@ WITH
+replaced by DR-414 to DR-420; the rest of DR-413 stands |
+| DR-422 | 2026-10-11 | Design corrections of the check round on the owner decisions (round 1; every verdict is in tools/agent/owner-verdict.md). They change what DR-414 to DR-420 build, so they are locked here. (1) Writer, phases 10 and 26 (DR-419, DR-420): `capture_source`, `paid_on`, `paid_amount` and `granted_on` are compared as mapped values, also when the hash of the landed row is equal (`set_capture_source`, `pay_instalment`, `set_granted_on`, each with its column grant); the index on `(facility_id, seq)` is not unique; `paid_amount` may be set while `paid_on` is null. (2) RFI pre-fill, phase 19 (DR-417): four of the ten sources are sensitive and computed for the MLRO only (`accounts.closed`, `accounts.signatories`, `activity.declared_and_actual`, `rating.cbi_level`); `party.pep_status` answers from the bank's PEP register (`kyc.party_pep_state`) before the customer file; the activity figures are read through the phase 13 profile query under the purpose `investigation`; a hidden signatory is left out with no flag. (3) Source tags, phase 13 (DR-416): the activation closes the retire entries before it inserts the add entries; a second add with the same hash for one tag is refused (`already_tagged`); the default end date is the later of the row's `valid_from` and the last closed business date; a feature reads a tag as `tag.<name> = true` or `= false`; when a feature reads a changed tag, the activation enqueues `feature_compute {reopen_from}` under its own coalesce key. (4) Bank cases, phases 07 and 14 (DR-415): a stale intake is run again by the activation of the `goaml_profile` version, for `proposed` cases with a stored file, and not by the approval check; each deletion of an uploaded file writes `goaml_corpus_case.transient_deleted`; the mask keeps an Arabic letter inside the class of patch `P-01`; the screening harness report carries one result per case (`results`) in place of `unmet_ids`. (5) SIEM, phase 25 (DR-414, DR-418): the last CHECK of `admin.siem_dead_letters` is `((resolution = 'marked') IS TRUE) = (resolution_code IS NOT NULL)`; an access event recorded after the last off-run is sent when the export is switched on again. (6) Check lines, phases 06, 07, 09, 13, 14, 15, 17, 18, 19, 20 and 21: a statement by a role without the privilege fails with permission denied, and the guard message is expected as the owner `akr_migrate` | Found by the round-1 agents and the lead. Each would have made a stated check fail, or left an owner decision with no effect on rows already stored. Three points are written down and not redesigned, for the build: the replay apply against the landed-hash guard (phase 11 Open doubts 14), instalment rows a source replaces or deletes (phase 26 Open doubts 24), and the replay enqueue under the plain coalesce key (phase 13 Open doubts) |
+
+@@ END
+@@ FIX R1 DR-422 docs/plan/phase-07.md
+A bank adds its own cases to the regression corpus through change control (RP-06, RP-83: the FIU-answers corpus). A case is one goAML XML file and the result the checker must give for it. The preparer or the MLRO uploads the file; a worker job masks every name, number and text in it, checks that the masked file still gives the stated result, and keeps only the masked file. From then on every corpus run of that profile code runs the case, so a later amendment or a new Office schema that stops giving the result shows as a failed case before it can be promoted. The shipped corpus and its 63 cases do not change.
+@@ WITH
+A bank adds its own cases to the regression corpus through change control (RP-06, RP-83: the FIU-answers corpus). A case is one goAML XML file and the result the checker must give for it. The preparer or the MLRO uploads the file; a worker job masks every name, number and text in it, checks that the masked file still gives the stated result, and keeps only the masked file. From then on every corpus run of that profile code runs the case, so a later amendment or a new Office schema that stops giving the result shows as a failed case before it can be promoted. The shipped corpus and its 63 cases do not change. DR-422 locks the corrections of the check round of 2026-10-11: the intake is run again at profile activation, each deletion of an uploaded file is audited, and the mask keeps an Arabic letter inside the class of patch `P-01`.
+@@ END
+@@ FIX R1 DR-422 docs/plan/phase-10.md
+The owner's decision: the four source labels of DESIGN-SYSTEM 7.6 (card, passport, typed, generated) are kept, and the mapping says which one applies to each name.
+@@ WITH
+The owner's decision: the four source labels of DESIGN-SYSTEM 7.6 (card, passport, typed, generated) are kept, and the mapping says which one applies to each name. DR-422 locks the correction of the check round of 2026-10-11: the label is compared as a mapped value, also when the hash of the landed row is equal (item 5).
+@@ END
+@@ FIX R1 DR-422 docs/plan/phase-10.md
+Phase 26 section 7.13 adds the table `canon.facility_instalments` and the column `canon.facility.granted_on` (migration `0083`), so that a schedule table gives the repayment event SCN-ISL-07 needs. This phase's parts:
+@@ WITH
+Phase 26 section 7.13 adds the table `canon.facility_instalments` and the column `canon.facility.granted_on` (migration `0083`), so that a schedule table gives the repayment event SCN-ISL-07 needs. This phase's parts: DR-422 locks the corrections of the check round of 2026-10-11: the payment columns and the grant date are compared as mapped values, and the index on `(facility_id, seq)` is not unique.
+@@ END
+@@ FIX R1 DR-422 docs/plan/phase-13.md
+No CBS field feeds the tags, so the bank keeps them by hand as governed data: a register of paying sources, each marked `payroll`, `pension` or `government_source`. The register is read in two places, a feature filter and a static segment predicate, so public-salary and pension customers can form peer segments (S-17). Counterparty profiles stay as section 7.7 says: VB-05 is carried as counterparty-keyed features, and a counterparty profile is P2.
+@@ WITH
+No CBS field feeds the tags, so the bank keeps them by hand as governed data: a register of paying sources, each marked `payroll`, `pension` or `government_source`. The register is read in two places, a feature filter and a static segment predicate, so public-salary and pension customers can form peer segments (S-17). Counterparty profiles stay as section 7.7 says: VB-05 is carried as counterparty-keyed features, and a counterparty profile is P2. DR-422 locks the corrections of the check round of 2026-10-11: the order of the activation, the refusal of a double add, the default end date, the form `tag.<name> = true` in a feature filter, and the recompute of months already computed.
+@@ END
+@@ FIX R1 DR-422 docs/plan/phase-14.md
+A bank adds its own known-answer cases through change control: a name, with identifiers when the bank has them, that must hit a named list entry (`hit`) or must not hit it (`no_hit`). This is the bank-side intake of N-44: a spelling the analysts want kept as a known hit, and a name that matched wrongly kept as a hard negative. The shipped corpus stays synthetic (N-38) and it alone decides the gate. The bank's cases run in every gate and oracle run and are reported beside it. They never block a list activation, because a list update is a legal duty (the 12-hour rule) and a case can go stale when the publisher changes an entry. A configuration change that would lose a known hit says so before it is approved (item 8). The bank-specific variant table (N-57) stays P2.
+@@ WITH
+A bank adds its own known-answer cases through change control: a name, with identifiers when the bank has them, that must hit a named list entry (`hit`) or must not hit it (`no_hit`). This is the bank-side intake of N-44: a spelling the analysts want kept as a known hit, and a name that matched wrongly kept as a hard negative. The shipped corpus stays synthetic (N-38) and it alone decides the gate. The bank's cases run in every gate and oracle run and are reported beside it. They never block a list activation, because a list update is a legal duty (the 12-hour rule) and a case can go stale when the publisher changes an entry. A configuration change that would lose a known hit says so before it is approved (item 8). The bank-specific variant table (N-57) stays P2. DR-422 locks the correction of the check round of 2026-10-11: the harness report carries one result per case (`results`, item 6).
+@@ END
+@@ FIX R1 DR-422 docs/plan/phase-19.md
+The desk gets proposed answers for an incoming correspondent RFI, computed from the product's own records, and a person records each one. What was missing is the map from a question key of the bank's template to a fact the product holds; it is now admin-managed data. M-44 is implemented.
+@@ WITH
+The desk gets proposed answers for an incoming correspondent RFI, computed from the product's own records, and a person records each one. What was missing is the map from a question key of the bank's template to a fact the product holds; it is now admin-managed data. M-44 is implemented. DR-422 locks the corrections of the check round of 2026-10-11: four sensitive sources, the PEP register as the first source of `party.pep_status`, and the purpose rule for the activity figures.
+@@ END
+@@ FIX R1 DR-422 docs/plan/phase-25.md
+The owner's decision: allowed reads go to the bank's SIEM too, so the behaviour rules of research 30 section 9.3 ship in this version. This block replaces item 3 of section 7.13 and extends its item 1. Where it differs from sections 3.5, 3.10 and 4.4, it wins.
+@@ WITH
+The owner's decision: allowed reads go to the bank's SIEM too, so the behaviour rules of research 30 section 9.3 ship in this version. This block replaces item 3 of section 7.13 and extends its item 1. Where it differs from sections 3.5, 3.10 and 4.4, it wins. DR-422 locks the correction of the check round of 2026-10-11 to item 6 (which events the off switch holds back).
+@@ END
+@@ FIX R1 DR-422 docs/plan/phase-25.md
+The owner's decision: an operator can resend a dead letter or mark it resolved, and each act is audited. This block replaces the second item of section 7.16, the `siem_dead_letters` row of section 3.10 and the table DDL of section 1.3.
+@@ WITH
+The owner's decision: an operator can resend a dead letter or mark it resolved, and each act is audited. This block replaces the second item of section 7.16, the `siem_dead_letters` row of section 3.10 and the table DDL of section 1.3. DR-422 locks the correction of the check round of 2026-10-11 to the last CHECK of the table.
+@@ END
+@@ FIX R1 DR-422 docs/plan/phase-26.md
+The owner's decision: the mapping gains the repayment event of a schedule table, so SCN-ISL-07 runs at a bank whose qard hasan sits in schedule tables too. This block replaces the last item of section 7.9 ("Schedule sources") and the readiness cell of the SCN-ISL-07 row of section 3.6. `canon.facility.events` is not used for it.
+@@ WITH
+The owner's decision: the mapping gains the repayment event of a schedule table, so SCN-ISL-07 runs at a bank whose qard hasan sits in schedule tables too. This block replaces the last item of section 7.9 ("Schedule sources") and the readiness cell of the SCN-ISL-07 row of section 3.6. `canon.facility.events` is not used for it. DR-422 locks the corrections of the check round of 2026-10-11: the plain index on `(facility_id, seq)`, `paid_amount` without `paid_on`, and what the grader does with the optional inputs.
+@@ END
+@@ FIX R2 P-14b-1 docs/plan/phase-14.md
+(phase 04 section 3.2: an immediate approval is rolled back with the error, and a scheduled activation ends `failed`)
+@@ WITH
+(phase 04: an immediate approval is rolled back with the error, section 3.4; a scheduled activation ends `failed`, section 3.6)
+@@ END
+@@ FIX R2 P-07b-2 docs/plan/phase-07.md
+(phase 04 section 3.2: an immediate approval is rolled back with the error, and a scheduled activation ends `failed`)
+@@ WITH
+(phase 04: an immediate approval is rolled back with the error, section 3.4; a scheduled activation ends `failed`, section 3.6)
+@@ END
+@@ FIX R2 P-07a-1 docs/plan/phase-07.md
+   1. Load the case. A state other than `proposed` -> done; when the case has no `intake_result` (its request was withdrawn or rejected before the first run, so the uploaded file is still staged), first `delete_transient("goaml", case_id)` and the audit event `goaml_corpus_case.transient_deleted {case_id, by: "intake"}`.
+@@ WITH
+   1. Load the case. When its state is not `proposed`: a case with no `intake_result` (its request was withdrawn or rejected before the first run, so the uploaded file is still staged) first has the staged file deleted with `delete_transient("goaml", case_id)` and the audit event `goaml_corpus_case.transient_deleted {case_id, by: "intake"}` written; then the job is done. A `proposed` case goes on with step 2.
+@@ END
+@@ FIX R2 P-07b-1 docs/plan/phase-07.md
+the file is `secret-str` evidence that only the corpus runner opens.
+@@ WITH
+the file is `secret-str` evidence that only the corpus runner and the intake job (item 6 step 4) open.
+@@ END
+@@ FIX R2 P-07b-3/4 docs/plan/phase-07.md
+fails with
+   `profile versions are never deleted` (as `akr_app` it fails with permission denied, the last check of this item);
+@@ WITH
+fails with
+   `goAML profile versions are never deleted` (as `akr_app` it fails with permission denied; see the last check of this item);
+@@ END
+@@ FIX R2 P-07b-5 docs/plan/phase-07.md
+retention row. a `DELETE` fails, as `akr_app`
+@@ WITH
+retention row. A `DELETE` fails, as `akr_app`
+@@ END
+@@ FIX R2 P-07b-6 docs/plan/phase-07.md
+each deletion of an uploaded file is audited, and the mask
+@@ WITH
+each deletion of an uploaded file by an intake run or by the sweep is audited, and the mask
+@@ END
+@@ FIX R2 P-07b-7 docs/plan/phase-07.md
+This hook enqueues nothing: an issue is a refusal, phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row.
+@@ WITH
+This hook enqueues nothing: an issue refuses an approval (a rejection is not checked, phase 04 section 7.21), phase 04 rolls the action back, and a job enqueued in a rolled-back transaction leaves no row.
+@@ END
+@@ FIX R2 P-07b-7 docs/plan/phase-07.md
+cannot be approved: the approver rejects the request or its maker withdraws it, and the case becomes `rejected`.
+@@ WITH
+cannot be approved: the approver rejects the request (the check does not hold a rejection back, phase 04 section 7.21) or its maker withdraws it, and the case becomes `rejected`.
+@@ END
+@@ FIX R2 P-07b-7 docs/plan/phase-04.md
+returned as 409 `E_STALE_BASE`, 422 `E_EVIDENCE_STALE` or 422 `E_VALIDATION`, and the task stays open.
+@@ WITH
+returned as 409 `E_STALE_BASE`, 422 `E_EVIDENCE_STALE` or 422 `E_VALIDATION`, and the task stays open. A `Reject` is not
+checked (section 7.21).
+@@ END
+@@ FIX R2 P-07b-7 docs/plan/phase-04.md
+
+## What This Phase Does NOT Touch
+
+@@ WITH
+
+### 7.21 A rejection of a change request is not held by the subject check (owner-decision check round 2, HIGH; DR-423)
+Section 3.2 (`decide`) and section 3.4 step 6 run the subject check before every action, a rejection included, and the hook of section 7.1 is not told which action it guards. For a change request this leaves a request that can be neither approved nor rejected whenever its check fails: a moved base, evidence past `change.evidence_max_age_days`, `shadow_too_short`, `volume_effect_changed` (section 7.9), or a refusal of a later phase's target such as `intake_not_met` (phase 07 section 7.6). Only its maker could then end it, by a withdraw. Section 3.6 says of an offboarded maker's submitted requests that "their checkers still decide them", and phase 07 section 7.6 with phase 08 section 7.11 closes an unmet corpus case by the approver's reject. So:
+
+1. Trait `WorkflowSubject` (section 2; section 7.1) gains one method with a default body:
+
+       fn holds_reject(&self) -> bool { true }
+
+2. Section 3.4 step 6 (as section 7.1 reads) now reads: "Subject check before decision: the subject's `check_before_decision` runs in the same transaction, before the action applies; it is skipped when the action is `TaskAction::Reject` and the subject's `holds_reject()` is `false`. A refusal rolls the action back and the task stays open."
+3. The change subject returns `false`. A rejection of a change request therefore runs neither the evidence-age check of section 3.2 nor `ChangeTarget::check_before_decision`. Steps 1 to 5 of section 3.4 (task and instance state, step type, Cedar, four-eyes, step-up) apply as before, and the outcome handling of section 3.2 is unchanged: `set_decided(rejected)`, `target.on_closed(Rejected)`, audit `change_request.rejected`.
+4. Every other subject keeps the default `true`: the checks of the subjects of later phases (the case, RFI, freeze, operations-task, report and legal-hold subjects among them) run for a rejection as they do for an approval.
+5. Reading rule. Where this file or a later phase says that the check of a change target runs "at every deciding action" or refuses "the decision", it means every action other than a rejection. No target changes: `ChangeTarget::check_before_decision` keeps its signature and is not called for a rejection.
+6. Tests (added to section 6): a submitted `_dev_object` request whose dev row's version was bumped: approve -> 409 `E_STALE_BASE` and the task stays open; reject by the same approver, with a comment -> 200, the request is `rejected`, `on_closed(Rejected)` ran and `change_request.rejected` is in the audit trail. A request whose evidence is older than `change.evidence_max_age_days`: approve -> 422 `E_EVIDENCE_STALE`; reject -> 200. A test subject that keeps the default and whose check refuses: a reject returns that refusal and the task stays open.
+
+## What This Phase Does NOT Touch
+
+@@ END
+@@ FIX R2 P-08-1 docs/plan/phase-08.md
+For a change-request task the panel links to G10 detail.
+@@ WITH
+For a change-request task the panel links to G10 detail for a role that G10 lists (the screen table above) and shows the reference of the request as text for any other role (an A2 maker of a corpus case, section 7.11 item 3).
+@@ END
+@@ FIX R2 P-08-2 docs/plan/phase-08.md
+(the client checks the type only; no response gives the size limit, so a file
+@@ WITH
+(the client checks the type only; no response open to A2 or M gives the size limit, so a file
+@@ END
+@@ FIX R2 P-10-1 docs/plan/phase-10.md
+A name already stored takes a new label when its row is mapped again: at the next load of its source row, or in the apply of a mapping replay (phase 11 section 3.8).
+@@ WITH
+A name already stored takes a new label when its row is mapped again. A source row that changed lands again, and its name row is replaced with the mapped label. A source row that did not change is not landed again (phase 11 section 3.2 step 2), so a mapping edit alone reaches it only in the apply of a mapping replay (phase 11 section 3.8).
+@@ END
+@@ FIX R2 P-10-2 docs/plan/phase-10.md
+This phase's parts: DR-422 locks the corrections of the check round of 2026-10-11: the payment columns and the grant date are compared as mapped values, and the index on `(facility_id, seq)` is not unique.
+@@ WITH
+DR-422 locks the corrections of the check round of 2026-10-11: the payment columns and the grant date are compared as mapped values, and the index on `(facility_id, seq)` is not unique. This phase's parts:
+@@ END
+@@ FIX R2 P-11-3 docs/plan/phase-11.md
+-- Rows that did not map (`row_failed`) and rows whose canonical value differs from a settled one (`row_conflict`,
+-- returned by the CanonicalWriter, phase 10 section 3.7).
+@@ WITH
+-- Rows that did not map (`row_failed`) and rows the CanonicalWriter returns as a conflict (`row_conflict`, phase 10
+-- section 3.7): a canonical value that differs from a settled one, or a parent key that has not landed (`parent_missing`).
+@@ END
+@@ FIX R2 P-11-1 docs/plan/phase-12.md
+`ConflictKind` (`FactChangedInSource`,
+  `LabelChange`, `ValueChange`; the mapping to `DqKind` is section 3.3)
+@@ WITH
+`ConflictKind` (`FactChangedInSource`,
+  `LabelChange`, `ValueChange`, `ParentMissing`; the mapping to `DqKind` is section 3.3)
+@@ END
+@@ FIX R2 P-11-1 docs/plan/phase-12.md
+the three `ConflictKind` values map to their kinds and severities
+@@ WITH
+the four `ConflictKind` values map to their kinds and severities
+@@ END
+@@ FIX R2 P-11-2 docs/plan/phase-12.md
+is a mapped row that disagrees with a settled one, so it is never retried; it is closed when its issue is resolved
+(section 3.4).
+@@ WITH
+is a mapped row that disagrees with a settled one, so it is never retried; it is closed when its issue is resolved
+(section 3.4). One kind is the exception: a `parent_missing` row disagrees with nothing (its parent has not landed yet),
+and the trailing re-read window of phase 10 section 7.20 meets it again.
+@@ END
+@@ FIX R2 P-13b-1 docs/plan/phase-13.md
+for the source-tag proposal of section 7.17 item 6 only.
+@@ WITH
+for the source-tag proposal, its decision check and its activation (section 7.17 items 6 and 7) only.
+@@ END
+@@ FIX R2 P-13b-2 docs/plan/phase-13.md
+and the hourly run does not take those months again. So, when
+@@ WITH
+and the hourly run takes again only the months within `features.catchup_months` (section 3.2 step 1). So, when
+@@ END
+@@ FIX R2 P-13b-4 docs/plan/phase-13.md
+(a row ended on day D still holds on D, so the month of D is the first that can change)
+@@ WITH
+(a row ended on day D still holds on D, so the first date that can change is the day after D; taking the month of D is at most one month early, which costs one recompute and changes no value)
+@@ END
+@@ FIX R2 P-13b-3 docs/plan/phase-13.md
+under the key `feature_compute` a queued hourly run would swallow the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen would be lost;
+@@ WITH
+under the plain key `feature_compute` another queued job with that key (the catch-up enqueue of a feature activation, or the enqueue of a replay) would swallow the enqueue (phase 00 `ON CONFLICT DO NOTHING`) and the reopen would be lost; the scheduler's hourly job is not one of them, because its key is `feature_compute:<slot>` (phase 00);
+@@ END
+@@ FIX R2 L2-2 docs/plan/phase-13.md
+computes it again whatever its `basis` says (the register is not part of the basis), and step 5 updates only the rows whose value changed.
+@@ WITH
+computes it again whatever its `basis` says (the register is not part of the basis), step 5 updates only the rows whose value changed, and section 7.18 resets the rows the recompute no longer produces (a customer whose only matching credits came from the changed tag).
+@@ END
+@@ FIX R2 P-13b-2/3 docs/plan/phase-13.md
+the activation of a change set that voids a tag whose `valid_from` lies two months back enqueues one `feature_compute` job with that month's month-end as `reopen_from`, also while an hourly `feature_compute` job is queued, and after it ran the feature rows of the two months no longer count the credits.
+@@ WITH
+the activation of a change set that voids a tag whose `valid_from` lies five months back (outside `features.catchup_months`) enqueues one `feature_compute` job with that month's month-end as `reopen_from`, also while a `feature_compute` job with the plain key is queued, and after it ran the feature rows of those months no longer count the credits: the row of a customer with other payroll credits holds the smaller sum, and the row of a customer whose only payroll credits came from the voided tag holds no value (`no_history`, `basis.reason = no_activity`; section 7.18).
+@@ END
+@@ FIX R2 P-13b-3 docs/plan/phase-13.md
+is dropped while another `feature_compute` job is queued (phase 00: `ON CONFLICT DO NOTHING`), and the reopen is lost.
+@@ WITH
+is dropped while another job with that plain key is queued (phase 00: `ON CONFLICT DO NOTHING`; the scheduler's hourly job has the key `feature_compute:<slot>` and is not one), and the reopen is lost.
+@@ END
+@@ FIX R2 L2-1 docs/plan/phase-13.md
+Counterparty to party links. Owner akr_app; retention R2
+@@ WITH
+Counterparty to party links. Owner akr_migrate; written by akr_app; retention R2
+@@ END
+@@ FIX R2 P-DR-2 docs/plan/phase-13.md
+`UPDATE feat.feature_definitions SET expression = '{}'` fails with `feature definition content is immutable`;
+@@ WITH
+`UPDATE feat.feature_definitions SET expression = '{}'` fails with permission denied (`expression` is not in the
+   column grant) and, as the owner `akr_migrate`, with `feature definition content is immutable`;
+@@ END
+@@ FIX R2 P-19b-2 docs/plan/phase-13.md
+`DELETE FROM feat.source_tags` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `source tags are never deleted`.
+@@ WITH
+A `DELETE` of a row of `feat.source_tags` fails, as `akr_app` with permission denied (no DELETE grant; with or without a row) and as the owner `akr_migrate` with `source tags are never deleted` (the guard is a row trigger, so the owner's statement needs a row).
+@@ END
+@@ FIX R2 L2-2 docs/plan/phase-13.md
+    /// Set-based insert-or-update on the primary key; touches only rows whose basis differs. Returns (inserted, updated).
+@@ WITH
+    /// Set-based insert-or-update on the primary key; touches only rows whose basis differs. Returns (inserted, updated).
+    /// Section 7.18: the same statement resets the rows of the pair that the SELECT no longer produces; they count as updated.
+@@ END
+@@ FIX R2 L2-2 docs/plan/phase-13.md
+   zero rows. A re-run with changed data updates only the rows whose value changed.
+@@ WITH
+   zero rows. A re-run with changed data updates only the rows whose value changed. A row that the re-run no longer
+   produces is not left as it was: it is reset (section 7.18).
+@@ END
+@@ FIX R2 L2-2 docs/plan/phase-13.md
+
+## Decisions
+
+@@ WITH
+
+### 7.18 A recompute resets the rows it no longer produces (owner-decision check round 2, HIGH; DR-423)
+The month-end statement of section 3.1 inserts or updates the rows its SELECT produces and leaves every other row of the pair `(feature, as_of)` as it was, and `akr_app` has no DELETE on `feat.feature_values` (section 1, by design). When a re-run no longer produces a group that an earlier run stored, the old value stayed. Two cases reach it: a replay that cancels the only posting an entity had in the window (section 3.2, `reopen_from`), and a source tag that is voided or ended when its credits were a customer's only match (section 7.17 item 7). The row then kept a value the data no longer supports, in the reopened months and in every later run.
+
+1. **Rule.** The write of a pair `(feature, as_of)` also resets, in the same statement, every stored row of that pair that holds a value and whose `(entity_id, currency)` the SELECT did not produce. The reset sets `value` to NULL, `status` to `no_history` (`beyond_window` for the kind `days_since`, as section 7.11 says of an account with no posting in its window), `basis` to the run's basis with the member `"reason": "no_activity"` added, and `computed_at` to `now()`. No row is deleted and no grant changes: `akr_app` holds UPDATE on these four columns (section 1). The reset runs only for a pair that passes the gate of section 3.2 step 2; a `not_ready` or `dark` pair writes nothing, as before.
+2. **Readers.** A row without a value is read as an absent row. Section 3.4 step 2 and the profile build of section 3.6 already take `status = value` only; "absent" in section 3.2 step 4 and in section 3.5 step 1 means no row with a value. So a reset row gives zero for a `count` or `sum` feature under a `computed` run and "not applicable" for the other kinds, and it is not counted in a segment statistic.
+3. **The statement.** `FeatureCompiler::compile` wraps the SELECT of the feature as the CTE `cur` (one row per `(entity_id, currency)`, with the value and the status the INSERT of section 3.1 selected) and emits one statement of four parts for every kind. For `credit_turnover_1m` it replaces the SQL of section 3.1:
+
+```sql
+WITH cur AS MATERIALIZED (
+    SELECT a.customer_id AS entity_id, t.currency AS currency, SUM(t.amount) AS value, 'value'::text AS status
+    FROM canon.txn t
+    JOIN canon.account a ON a.id = t.account_id AND a.recorded_to IS NULL
+    WHERE t.booking_date BETWEEN $4 AND $2 AND t.dr_cr = 'C' AND t.status = 'posted' AND t.system_generated IS NOT TRUE
+    GROUP BY a.customer_id, t.currency
+), had AS MATERIALIZED (                      -- the keys stored before this statement (one snapshot for all parts)
+    SELECT entity_id, currency FROM feat.feature_values WHERE feature_id = $1 AND as_of = $2
+), up AS (
+    INSERT INTO feat.feature_values (entity, entity_id, feature_id, currency, as_of, value, status, basis, computed_at)
+    SELECT 'customer', entity_id, $1, currency, $2, value, status, $3, now() FROM cur
+    ON CONFLICT (entity, entity_id, feature_id, currency, as_of) DO UPDATE
+        SET value = EXCLUDED.value, status = EXCLUDED.status, basis = EXCLUDED.basis, computed_at = now()
+        WHERE feat.feature_values.value IS DISTINCT FROM EXCLUDED.value
+           OR feat.feature_values.basis IS DISTINCT FROM EXCLUDED.basis
+    RETURNING entity_id, currency
+), gone AS (
+    UPDATE feat.feature_values v
+       SET value = NULL, status = 'no_history', basis = $3 || '{"reason": "no_activity"}'::jsonb, computed_at = now()
+     WHERE v.feature_id = $1 AND v.as_of = $2 AND v.status = 'value'
+       AND NOT EXISTS (SELECT 1 FROM cur c WHERE c.entity_id = v.entity_id AND c.currency = v.currency)
+    RETURNING 1
+)
+SELECT (SELECT count(*) FROM up u WHERE NOT EXISTS
+            (SELECT 1 FROM had h WHERE h.entity_id = u.entity_id AND h.currency = u.currency)) AS inserted,
+       (SELECT count(*) FROM up u WHERE EXISTS
+            (SELECT 1 FROM had h WHERE h.entity_id = u.entity_id AND h.currency = u.currency))
+     + (SELECT count(*) FROM gone)                                                             AS updated;
+```
+
+   `up` and `gone` never touch the same row: `up` writes the keys of `cur`, `gone` the stored keys that are not in `cur`. The lookup of `had` and `gone` uses `idx_feature_values_feature` inside the one monthly partition of `$2`. `write_month_end` reads the one result row and returns `(inserted, updated)`; reset rows count as updated, so `feature_runs.rows_written` and the audit event `feature.computed` include them. Only a row with `status = 'value'` is reset, so a second run for the same months still writes zero rows (section 3.2 step 5). A reset row whose entity has activity again is written by `up` with the run's basis, without the reason.
+4. **Tests** (added to section 6): a month with the customers A and B is computed; the fixture then cancels B's only posting of the month and the job runs with `reopen_from` = that month-end. B's row then has `value` NULL, `status = 'no_history'` and `basis->>'reason' = 'no_activity'`; A's row is unchanged; the run reports one updated row and the next run reports zero. `segment_stats_refresh` for the period does not count B in `n`. When B has a posting again and the month is reopened, B's row holds the new value and a basis without `reason`. As `akr_app`, `DELETE FROM feat.feature_values` still fails with permission denied (section 6 item 1).
+
+## Decisions
+
+@@ END
+@@ FIX R2 L2-3 docs/plan/phase-18.md
+a `casework.case_acl` row cannot change its `access` (the guard raises).
+@@ WITH
+a `casework.case_acl` row cannot change its `access` (permission denied for `akr_app`, whose column grant is `revoked_by` and `revoked_at`; as the owner `akr_migrate` the guard raises `an access grant is revoked, never changed`).
+@@ END
+@@ FIX R2 P-19b-1 docs/plan/phase-19.md
+and for CFG and CHK the `rfi_prefill_map.read` and `rfi_prefill_map.propose` permits of section 7.21)
+@@ WITH
+and for CFG the `rfi_prefill_map.read` and `rfi_prefill_map.propose` permits and for CHK the `rfi_prefill_map.read` permit of section 7.21)
+@@ END
+@@ FIX R2 P-19b-2 docs/plan/phase-19.md
+`DELETE FROM casework.rfi_prefill_map` fails, as `akr_app` with permission denied (no DELETE grant) and as the owner `akr_migrate` with `pre-fill map rows are never deleted`.
+@@ WITH
+A `DELETE` of a row of `casework.rfi_prefill_map` fails, as `akr_app` with permission denied (no DELETE grant; with or without a row) and as the owner `akr_migrate` with `pre-fill map rows are never deleted` (the guard is a row trigger, so the owner's statement needs a row).
+@@ END
+@@ FIX R2 P-19b-3 docs/DESIGN-SYSTEM.md
+through a change request. CHK and M
+read the tab;
+@@ WITH
+through a change request. CFG, CHK and M
+read the tab;
+@@ END
+@@ FIX R2 P-26-1 docs/plan/phase-26.md
+The three inputs marked `?` are optional inputs (DSL.md, CanonicalRef)
+@@ WITH
+The four inputs marked `?` (`facility.granted_on` and the three `facility_instalment` fields) are optional inputs (DSL.md, CanonicalRef)
+@@ END
+@@ FIX R2 P-26-1 docs/plan/phase-26.md
+is not published, the three are listed in the `reasons` of the readiness result
+@@ WITH
+is not published, the inputs that are missing are listed in the `reasons` of the readiness result
+@@ END
+@@ FIX R2 P-26-2 docs/plan/phase-26.md
+has a `admin.column_classification` row
+@@ WITH
+has an `admin.column_classification` row
+@@ END
+@@ FIX R2 P-26-3 docs/plan/phase-26.md
+the payment still lands, and a changed due date or amount is recorded as a conflict (phase 10 section 7.27 item 3).
+@@ WITH
+the payment still lands; a changed due date or amount that arrives with no payment change is recorded as a conflict, and one that arrives in the same version as the payment is neither written nor reported (phase 10 section 7.27 item 3).
+@@ END
+@@ FIX R2 L2-4 docs/DATA-MODEL.md
+where it does not, the scenario
+is declared not covered.
+@@ WITH
+where it does not, the facility
+legs of the scenario are not evaluable and its readiness grade does not change (phase 26 section 7.13 item 5).
+@@ END
+@@ FIX R2 L2-4 docs/DATA-MODEL.md
+and `status` and `status_history` of `payment_message`; no role has DELETE on
+@@ WITH
+and `status` and `status_history` of `payment_message` (phase 26 adds the updates named in its own paragraph below); no role has DELETE on
+@@ END
+@@ FIX R2 L2-2 docs/DATA-MODEL.md
+; sparse by activity | as_of (month) | R4 |
+@@ WITH
+; sparse by activity (a row that a recompute no longer produces is kept without a value: `no_history`, `basis.reason = no_activity`; phase 13 section 7.18) | as_of (month) | R4 |
+@@ END
+@@ FIX R2 P-DR-1 docs/plan/research.md
+each deletion of an uploaded file writes `goaml_corpus_case.transient_deleted`;
+@@ WITH
+each deletion of an uploaded file by an intake run or by the sweep writes `goaml_corpus_case.transient_deleted` (a failed proposal has no case row and writes no event);
+@@ END
+@@ FIX R2 P-26-4 docs/plan/research.md
+`paid_amount` may be set while `paid_on` is null. (2)
+@@ WITH
+`paid_amount` may be set while `paid_on` is null; the four optional inputs of SCN-ISL-07 (`facility.granted_on` and the three `facility_instalment` fields) do not change the readiness grade, and while they are not published the facility legs are not evaluable. (2)
+@@ END
+@@ FIX R2 DR-423 docs/plan/research.md
+and the replay enqueue under the plain coalesce key (phase 13 Open doubts) |
+
+@@ WITH
+and the replay enqueue under the plain coalesce key (phase 13 Open doubts) |
+| DR-423 | 2026-10-11 | Design corrections of round 2 of the check on the owner decisions (every verdict is in tools/agent/owner-verdict.md, under Round 2). (1) Feature values, phase 13 section 7.18: the write of a month-end resets, in the same statement, every stored row of the pair (feature, month-end) that holds a value and that its SELECT no longer produces: `value` NULL, status `no_history` (`beyond_window` for the kind `days_since`), `basis.reason = no_activity`. No row is deleted and no grant changes, and a reader takes a row without a value as an absent row. (2) Change requests, phase 04 section 7.21: the subject check is not run for a rejection of a change request (`WorkflowSubject::holds_reject`, default `true`, `false` for the change subject), so a request that can no longer be approved is closed by its approver's reject as well as by its maker's withdraw. Every other subject keeps its check for a rejection | Found by the lead and by a round-2 agent. Without (1) a voided source tag, or a replay that cancels a customer's only posting of a month, left the old feature value in place, and a stated test of phase 13 section 7.17 failed. Without (2) the approver's rejection of a corpus case whose intake was not met (phase 07 section 7.6, DR-415) was refused by the same check that stops its approval, and an A2 maker has no withdraw screen (phase 08 section 7.11) |
+
+@@ END
+@@ FIX R3 Q-18-1 docs/plan/phase-18.md
+as the owner `akr_migrate` the guard raises `an access grant is revoked, never changed`).
+@@ WITH
+as the owner `akr_migrate` the guard raises `an access grant is revoked, never changed` for a grant that is not revoked and `a revoked access grant does not change` for a revoked one).
+@@ END
+@@ FIX R3 Q-26-1/2, L3-1 docs/DATA-MODEL.md
+`loaded_last_at` of `party_contact`, and `status` and `status_history` of `payment_message` (phase 26 adds the updates named in its own paragraph below); no role has DELETE on
+`canon` except `akr_retention` on the party tree (phase 23; partitions are dropped only by `admin.retention_drop_partition`). `akr_readonly` reads a subset
+@@ WITH
+`loaded_last_at` of `party_contact`, `end_at` and `row_hash` of `account_hold` (phase 10 section 7.19), and `status` and `status_history` of `payment_message`; no role has DELETE on
+`canon` except `akr_retention` on the party tree (phase 23; partitions are dropped only by `admin.retention_drop_partition`). Phase 26 adds to both lists (its own paragraph below): UPDATE for `akr_ingest` on columns of `islamic_deals`, `deal_parties`, `facility_instalments` and `facility`, and DELETE for `akr_retention` on `islamic_deals`, `deal_parties` and `facility_instalments`. `akr_readonly` reads a subset
+@@ END
+@@ FIX R3 Q-13-1 docs/plan/phase-13.md
+and, as the owner `akr_migrate`, with `feature definition content is immutable`;
+@@ WITH
+and, as the owner `akr_migrate` on a stored row (the guard is a row trigger, so the owner's statement needs a row: a fixture row, or a row of the seed of item 3), with `feature definition content is immutable; propose a new version`;
+@@ END
+@@ FIX R3 Q-13-2 docs/DATA-MODEL.md
+is kept without a value: `no_history`, `basis.reason = no_activity`; phase 13 section 7.18)
+@@ WITH
+is kept without a value: `no_history` (`beyond_window` for the kind `days_since`), `basis.reason = no_activity`; phase 13 section 7.18)
+@@ END
